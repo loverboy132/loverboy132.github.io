@@ -1,0 +1,27 @@
+
+ Craftnet Bugs & Updates (Compact Roadmap)
+
+🔴 Compulsory Bugs (Fix Immediately – Today, Sept 9)
+
+1. Email verification & password reset #
+2. Escrow payments (admin dashboard, minimum version working)#
+🟠 Other Compulsory Features (Today → Weekend, Sept 10–15)
+3. Submit, disputes (with evidence, pending admin review)#
+4. Referral# and profile pic
+5. Visitors page
+6. Explore page edit (with connect-to-hire logic, apprentices included)
+7. Notification system (expanded) – In-app + Email + Push (Job offers, Messages, Payment updates, Dispute updates, Verification updates)
+8. Login page (reversco version)
+Core Stability & Payments (Sept 16 – Sept 30)
+9. Admin dashboard functionality – Review all members, Ban/suspend accounts, Complete profile verification (KYC upgrade)
+10. Paystack setup (replace current payment system)
+11. Remove old payment setup
+12. Robust escrow functionality (upgrade from minimum version)
+13. Help & Support section – FAQ page, Contact Support or Live Chat
+ UI/UX Enhancements & Growth Features (Oct 1 – Oct 31)
+14. Dark mode setup in website
+15. Badge system for apprentices (Professional tag: ratings + completed jobs)
+16. Redesign on website (front-end polish)
+17. Reconstruction of website dashboard (UI/UX rework as discussed)
+🔒 Future (Post-October, Security Phase)
+18. Security features – 2FA (Two-factor authentication), Fraud detection

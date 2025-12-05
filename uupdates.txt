@@ -1,0 +1,173 @@
+✅ CRAFTNET — FINAL DEVELOPMENT TASK LIST (UPDATED)
+1.	Dashboard Top Bar
+Add Craftnet logo
+Notification bell (with dropdown + email alerts)
+Auto-scroll icons when clicked
+Profile picture/avatar on the right
+
+
+2.	Themes
+Dark Mode
+Add dark mode toggle
+Apply dark theme to all pages
+Save user preference
+
+
+3.	Profile Setup (REQUIRED FOR ALL USERS)
+Apprentice Setup Profile (CV Format)
+To include:
+Profile picture / avatar
+Full name, username
+Email, phone
+Short bio
+Skill category + sub-skills
+Years of experience
+Portfolio links (optional)
+Education / training
+Certifications (optional)
+Preferred job type
+Availability
+Resume upload (optional)
+Displayed as:
+Apprentice Profile Page
+Job Application CV
+Job ID Card
+Member Setup Profile (Business Format)
+To include:
+Business name / full name
+Profile photo or logo
+Email + phone
+Business description
+Industry / category
+Services offered
+Location
+Website / social links
+Project categories
+Budget range (optional)
+Displayed as:
+Member Profile Page
+Business ID Card
+Visible on Job Posts
+
+
+4.	Profile Cards (Design Required)
+Apprentice = Job ID Card
+Avatar
+Name
+Skill category
+Rating
+Completed jobs
+Joined date
+Bio preview
+Member = Business ID Card
+Logo/photo
+Business name
+Industry
+Completed hires
+Contact details
+Joined date
+
+
+5.	Subscription System
+Only ₦1,500 Creative Plan active
+Unlocks ALL premium features:
+Leaderboard
+Gallery
+Earnings
+Job applications
+Connects
+Referral rewards
+Competitions (Coming Soon)
+
+
+6.	Payments (MANUAL for now)
+For Every Payment (Flutterwave link):
+Show:
+“Payment processing… Your payment will be issued within 24 hours.”
+Admin actions:
+Verify payment manually
+Activate subscription
+Mark escrow as funded
+Release payment for completed jobs
+Withdrawals:
+Apprentice requests withdrawal
+Admin processes manually within 24 hours
+
+
+7.	Help Center (Inside Settings)
+Categories:
+Payment issues
+Login issues
+Referral issues
+Job issues
+Others
+Form fields:
+Username
+Email
+Phone
+Role
+Issue type
+Description
+Auto-response:
+“Thank you for contacting us. Please check your email within 72 hours.”
+
+
+8.	Notifications
+Job updates
+Work submissions
+Payment release
+Subscription activated
+System messages
+Email + in-app alerts
+
+
+
+9.	Visitors Page (Reversco’s old design)
+Must include:
+About Craftnet
+Join as Member/Apprentice
+Gallery preview
+Testimonials placeholder
+Light/Dark mode
+Social links
+
+
+10.	Reports / Disputes
+Users can report:
+Payment issues
+Job disputes
+Fraud
+General account problems
+Admin receives all reports.
+
+
+11.	UI & UX Fixes
+Improve spacing
+Better card layout
+Dark theme compatibility
+Better font consistency
+Smooth transitions
+
+
+12.	Profile Pictures / Avatars
+Upload photo
+Default avatar if none
+Display across:
+Dashboard
+CV
+Gallery
+Notifications
+
+
+
+13.	CV Preview (IMPORTANT)
+When Apprentice applies for a job, Member sees a CV Summary Card with:
+Profile picture
+Skills + sub-skills
+Experience
+Bio
+Portfolio link
+Completed jobs
+Ratings
+
+

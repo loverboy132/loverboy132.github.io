@@ -1,0 +1,728 @@
+/* Brilliant Dark Mode Styles for Craftiva */
+
+/* Dark mode color variables */
+:root {
+    --dark-bg-primary: #0f172a;
+    --dark-bg-secondary: #1e293b;
+    --dark-bg-tertiary: #334155;
+    --dark-text-primary: #f1f5f9;
+    --dark-text-secondary: #cbd5e1;
+    --dark-text-tertiary: #94a3b8;
+    --dark-border: #334155;
+    --dark-accent: #3b82f6;
+    --dark-accent-hover: #2563eb;
+}
+
+/* Dark mode toggle button */
+.dark-mode-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+    color: white;
+}
+
+/* Responsive adjustments for mobile */
+@media (max-width: 640px) {
+    .dark-mode-toggle {
+        width: 44px;
+        height: 44px;
+        top: 15px;
+        right: 15px;
+    }
+    
+    .dark-mode-toggle svg {
+        width: 20px;
+        height: 20px;
+    }
+}
+
+/* Adjust position if header is present (header is a sibling of the toggle in body) */
+body > header ~ .dark-mode-toggle {
+    top: 80px;
+}
+
+@media (max-width: 640px) {
+    body > header ~ .dark-mode-toggle {
+        top: 70px;
+    }
+}
+
+.dark-mode-toggle:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.dark-mode-toggle:active {
+    transform: scale(0.95);
+}
+
+.dark-mode-toggle svg {
+    width: 24px;
+    height: 24px;
+    transition: transform 0.3s ease;
+}
+
+.dark-mode-toggle:hover svg {
+    transform: rotate(20deg);
+}
+
+/* Dark mode styles */
+html.dark {
+    color-scheme: dark;
+}
+
+html.dark body {
+    background-color: var(--dark-bg-primary) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+/* Header & Navigation */
+html.dark header {
+    background-color: var(--dark-bg-secondary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+/* Target Tailwind's bg-white/80 (opacity modifier) - forward slash must be escaped */
+html.dark [class*="bg-white/80"],
+html.dark .bg-white\/80,
+html.dark .bg-white {
+    background-color: var(--dark-bg-secondary) !important;
+}
+
+html.dark .text-gray-900,
+html.dark .text-gray-800 {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .text-gray-600,
+html.dark .text-gray-500 {
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark .text-gray-700 {
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark .border-gray-200,
+html.dark .border-gray-300 {
+    border-color: var(--dark-border) !important;
+}
+
+/* Hero Section */
+html.dark .hero-bg {
+    background-color: var(--dark-bg-secondary) !important;
+    background-image: radial-gradient(var(--dark-border) 1px, transparent 1px) !important;
+}
+
+/* Cards & Sections */
+html.dark .bg-white {
+    background-color: var(--dark-bg-secondary) !important;
+}
+
+html.dark .bg-gray-50 {
+    background-color: var(--dark-bg-tertiary) !important;
+}
+
+html.dark .bg-gray-100 {
+    background-color: var(--dark-bg-tertiary) !important;
+}
+
+html.dark section {
+    background-color: var(--dark-bg-primary) !important;
+}
+
+html.dark .bg-gray-900 {
+    background-color: var(--dark-bg-primary) !important;
+}
+
+/* Buttons */
+html.dark .bg-blue-600 {
+    background-color: var(--dark-accent) !important;
+}
+
+html.dark .bg-blue-600:hover,
+html.dark .hover\:bg-blue-700:hover {
+    background-color: var(--dark-accent-hover) !important;
+}
+
+html.dark .bg-indigo-600 {
+    background-color: var(--dark-accent) !important;
+}
+
+html.dark .bg-indigo-600:hover,
+html.dark .hover\:bg-indigo-700:hover {
+    background-color: var(--dark-accent-hover) !important;
+}
+
+html.dark .bg-gray-200 {
+    background-color: var(--dark-bg-tertiary) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .bg-gray-200:hover {
+    background-color: var(--dark-border) !important;
+}
+
+html.dark .text-indigo-600,
+html.dark .text-blue-600 {
+    color: var(--dark-accent) !important;
+}
+
+html.dark .hover\:text-indigo-800:hover,
+html.dark .hover\:text-blue-800:hover {
+    color: var(--dark-accent-hover) !important;
+}
+
+/* Input Fields */
+html.dark input,
+html.dark textarea,
+html.dark select {
+    background-color: var(--dark-bg-tertiary) !important;
+    border-color: var(--dark-border) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+    color: var(--dark-text-tertiary) !important;
+}
+
+html.dark input:focus,
+html.dark textarea:focus,
+html.dark select:focus {
+    border-color: var(--dark-accent) !important;
+    outline-color: var(--dark-accent) !important;
+}
+
+html.dark .focus\:ring-blue-500:focus {
+    --tw-ring-color: var(--dark-accent) !important;
+}
+
+html.dark .focus\:ring-indigo-500:focus {
+    --tw-ring-color: var(--dark-accent) !important;
+}
+
+/* Modals */
+html.dark .modal-content,
+html.dark .bg-white.rounded-lg {
+    background-color: var(--dark-bg-secondary) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .modal {
+    background: rgba(0, 0, 0, 0.8) !important;
+}
+
+html.dark .bg-black.bg-opacity-50 {
+    background-color: rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Dashboard Specific */
+html.dark .bg-gray-100 {
+    background-color: var(--dark-bg-primary) !important;
+}
+
+html.dark .shadow-md,
+html.dark .shadow-lg,
+html.dark .shadow-xl {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2) !important;
+}
+
+html.dark .stat-card {
+    background-color: var(--dark-bg-secondary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+html.dark .stat-card:hover {
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Navigation Links */
+html.dark .nav-link.active {
+    color: var(--dark-accent) !important;
+    border-bottom-color: var(--dark-accent) !important;
+}
+
+html.dark a {
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark a:hover {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Footer */
+html.dark footer {
+    background-color: var(--dark-bg-primary) !important;
+}
+
+html.dark .text-gray-400 {
+    color: var(--dark-text-tertiary) !important;
+}
+
+html.dark .border-gray-800 {
+    border-color: var(--dark-border) !important;
+}
+
+/* Admin Dashboard Specific */
+html.dark .sidebar {
+    background: linear-gradient(135deg, #4c1d95 0%, #5b21b6 100%) !important;
+}
+
+html.dark .top-bar {
+    background-color: var(--dark-bg-secondary) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .card {
+    background-color: var(--dark-bg-secondary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+html.dark .table-container {
+    background-color: var(--dark-bg-secondary) !important;
+}
+
+html.dark table {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark th {
+    background-color: var(--dark-bg-tertiary) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark td {
+    border-color: var(--dark-border) !important;
+}
+
+html.dark tr:hover {
+    background-color: var(--dark-bg-tertiary) !important;
+}
+
+/* Loading Screen */
+html.dark #loading-screen {
+    background-color: var(--dark-bg-primary) !important;
+}
+
+html.dark .animate-spin {
+    border-color: var(--dark-border) !important;
+    border-top-color: var(--dark-accent) !important;
+}
+
+/* Notification Panel */
+html.dark #notification-panel {
+    background-color: var(--dark-bg-secondary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+html.dark .divide-gray-100 > * {
+    border-color: var(--dark-border) !important;
+}
+
+/* Image Viewer */
+html.dark #image-viewer-modal {
+    background: rgba(0, 0, 0, 0.95) !important;
+}
+
+/* Rating Stars */
+html.dark .star-btn,
+html.dark .rating-star {
+    color: var(--dark-text-tertiary) !important;
+}
+
+html.dark .star-btn:hover,
+html.dark .rating-star:hover {
+    color: #fbbf24 !important;
+}
+
+/* Badge & Status */
+html.dark .bg-red-500 {
+    background-color: #dc2626 !important;
+}
+
+html.dark .bg-green-500 {
+    background-color: #16a34a !important;
+}
+
+html.dark .bg-yellow-500 {
+    background-color: #ca8a04 !important;
+}
+
+/* Scrollbar Styling for Dark Mode */
+html.dark ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+html.dark ::-webkit-scrollbar-track {
+    background: var(--dark-bg-primary);
+}
+
+html.dark ::-webkit-scrollbar-thumb {
+    background: var(--dark-bg-tertiary);
+    border-radius: 5px;
+}
+
+html.dark ::-webkit-scrollbar-thumb:hover {
+    background: var(--dark-border);
+}
+
+/* File Input Styling */
+html.dark .file\:bg-blue-50 {
+    background-color: var(--dark-bg-tertiary) !important;
+}
+
+html.dark .file\:text-blue-700 {
+    color: var(--dark-accent) !important;
+}
+
+html.dark .hover\:file\:bg-blue-100:hover {
+    background-color: var(--dark-border) !important;
+}
+
+/* Enhanced Wallet Interface Dark Mode */
+html.dark .enhanced-modal {
+    background-color: var(--dark-bg-secondary) !important;
+}
+
+html.dark .modal-header {
+    border-color: var(--dark-border) !important;
+}
+
+html.dark .modal-title {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .modal-subtitle {
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark .modal-close {
+    background-color: var(--dark-bg-tertiary) !important;
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark .modal-close:hover {
+    background-color: var(--dark-border) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+/* Admin Payment Dashboard Specific Dark Mode Styles */
+html.dark .header h1,
+html.dark .stat-value,
+html.dark .content-title,
+html.dark .payment-title,
+html.dark .payment-amount,
+html.dark .detail-value,
+html.dark .modal-title,
+html.dark .empty-state h3 {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .header p,
+html.dark .stat-label,
+html.dark .stat-change,
+html.dark .filter-label,
+html.dark .payment-user,
+html.dark .detail-label,
+html.dark .bulk-info,
+html.dark .empty-state,
+html.dark .loading,
+html.dark .modal-close {
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark .form-label {
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark .modal-close:hover {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .payment-details {
+    background-color: var(--dark-bg-tertiary) !important;
+}
+
+html.dark .bulk-actions {
+    background-color: var(--dark-bg-tertiary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+html.dark .payment-card.selected {
+    background-color: var(--dark-bg-tertiary) !important;
+    border-color: var(--dark-accent) !important;
+}
+
+html.dark .payment-type.funding {
+    background: rgba(59, 130, 246, 0.2) !important;
+    color: #93c5fd !important;
+}
+
+html.dark .payment-type.withdrawal {
+    background: rgba(251, 191, 36, 0.2) !important;
+    color: #fcd34d !important;
+}
+
+html.dark .payment-type.escrow {
+    background: rgba(139, 92, 246, 0.2) !important;
+    color: #c4b5fd !important;
+}
+
+html.dark .payment-type.subscription {
+    background: rgba(16, 185, 129, 0.2) !important;
+    color: #6ee7b7 !important;
+}
+
+html.dark .status-badge.pending {
+    background: rgba(251, 191, 36, 0.2) !important;
+    color: #fcd34d !important;
+}
+
+html.dark .status-badge.approved {
+    background: rgba(16, 185, 129, 0.2) !important;
+    color: #6ee7b7 !important;
+}
+
+html.dark .status-badge.rejected {
+    background: rgba(239, 68, 68, 0.2) !important;
+    color: #fca5a5 !important;
+}
+
+html.dark .status-badge.processing {
+    background: rgba(59, 130, 246, 0.2) !important;
+    color: #93c5fd !important;
+}
+
+html.dark .stat-change.positive {
+    color: #6ee7b7 !important;
+}
+
+html.dark .stat-change.negative {
+    color: #fca5a5 !important;
+}
+
+html.dark .empty-state i {
+    color: var(--dark-text-tertiary) !important;
+}
+
+/* Additional text color overrides */
+html.dark h1, html.dark h2, html.dark h3, html.dark h4, html.dark h5, html.dark h6 {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark p, html.dark span, html.dark div {
+    color: inherit;
+}
+
+html.dark .text-slate-600,
+html.dark .text-slate-700,
+html.dark .text-slate-800,
+html.dark .text-slate-900 {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .text-zinc-600,
+html.dark .text-zinc-700,
+html.dark .text-zinc-800,
+html.dark .text-zinc-900 {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .text-neutral-600,
+html.dark .text-neutral-700,
+html.dark .text-neutral-800,
+html.dark .text-neutral-900 {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .text-stone-600,
+html.dark .text-stone-700,
+html.dark .text-stone-800,
+html.dark .text-stone-900 {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Dashboard Supabase Specific */
+html.dark .nav-link.active {
+    color: var(--dark-accent) !important;
+    border-bottom-color: var(--dark-accent) !important;
+}
+
+/* Admin Dashboard Simplified Specific */
+html.dark .card-title,
+html.dark .stat-card h3,
+html.dark .activity-item-title {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .card-subtitle,
+html.dark .activity-item-time {
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark .activity-icon.payment {
+    background: rgba(59, 130, 246, 0.2) !important;
+    color: #93c5fd !important;
+}
+
+html.dark .activity-icon.user {
+    background: rgba(16, 185, 129, 0.2) !important;
+    color: #6ee7b7 !important;
+}
+
+html.dark .activity-icon.job {
+    background: rgba(251, 191, 36, 0.2) !important;
+    color: #fcd34d !important;
+}
+
+html.dark .activity-icon.dispute {
+    background: rgba(239, 68, 68, 0.2) !important;
+    color: #fca5a5 !important;
+}
+
+/* Wallet Interface Specific */
+html.dark .wallet-balance,
+html.dark .wallet-amount,
+html.dark .transaction-amount {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .wallet-label,
+html.dark .transaction-label {
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark .section-title {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .form-label {
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark .form-input {
+    background-color: var(--dark-bg-tertiary) !important;
+    color: var(--dark-text-primary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+html.dark .form-section {
+    background-color: var(--dark-bg-secondary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+html.dark .file-upload-area {
+    background-color: var(--dark-bg-tertiary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+html.dark .input-prefix {
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark .form-help {
+    color: var(--dark-text-tertiary) !important;
+}
+
+/* Buttons with white text should keep white text in dark mode */
+html.dark .btn-primary,
+html.dark .btn-success,
+html.dark .btn-danger,
+html.dark .btn-secondary,
+html.dark button[style*="color: white"],
+html.dark [style*="color: white"] {
+    color: white !important;
+}
+
+/* But ensure buttons with colored backgrounds are visible */
+html.dark .bg-blue-600,
+html.dark .bg-indigo-600,
+html.dark .bg-green-600,
+html.dark .bg-red-600,
+html.dark .bg-gray-600 {
+    color: white !important;
+}
+
+/* Ensure all text elements have proper color inheritance */
+html.dark * {
+    color: inherit;
+}
+
+html.dark body * {
+    color: inherit;
+}
+
+/* Fix for elements with inline styles - more specific */
+html.dark [style*="color: #1e293b"],
+html.dark [style*="color: #334155"],
+html.dark [style*="color: #64748b"],
+html.dark [style*="color: #374151"],
+html.dark [style*="color: #1d4ed8"],
+html.dark [style*="color: #333"],
+html.dark [style*="color: #666"],
+html.dark [style*="color:#1e293b"],
+html.dark [style*="color:#334155"],
+html.dark [style*="color:#64748b"],
+html.dark [style*="color:#374151"],
+html.dark [style*="color:#1d4ed8"],
+html.dark [style*="color:#333"],
+html.dark [style*="color:#666"] {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Fix for specific color values in inline styles */
+html.dark [style*="color: rgb(30, 41, 59)"],
+html.dark [style*="color: rgb(51, 65, 85)"],
+html.dark [style*="color: rgb(100, 116, 139)"],
+html.dark [style*="color: rgb(55, 65, 81)"] {
+    color: var(--dark-text-primary) !important;
+}
+
+/* General fallback for any dark text colors on dark backgrounds */
+html.dark body,
+html.dark .container,
+html.dark .main-content,
+html.dark .content,
+html.dark .page-content {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Ensure paragraphs and spans inherit proper colors */
+html.dark p:not([class*="text-"]):not([style*="color"]),
+html.dark span:not([class*="text-"]):not([style*="color"]),
+html.dark div:not([class*="text-"]):not([style*="color"]) {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Fix for elements that might have dark text on dark background */
+html.dark .bg-white,
+html.dark .bg-gray-50,
+html.dark .bg-gray-100,
+html.dark .bg-gray-200 {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Smooth transitions */
+* {
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Override for elements that shouldn't transition */
+img, svg, video, canvas, audio, iframe, embed, object {
+    transition: none;
+}
+

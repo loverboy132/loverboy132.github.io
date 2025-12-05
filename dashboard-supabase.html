@@ -1,0 +1,1581 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Dashboard - Craftnet</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script src="https://unpkg.com/feather-icons"></script>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+            rel="stylesheet"
+        />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+        <link rel="stylesheet" href="wallet-interface-styles.css">
+        <link rel="stylesheet" href="dark-mode.css">
+        <style>
+            body {
+                font-family: "Inter", sans-serif;
+                background-color: #f3f4f6;
+            }
+            .nav-link.active {
+                color: #1d4ed8;
+                border-bottom-color: #1d4ed8;
+            }
+            .stat-card {
+                transition: transform 0.2s ease-in-out,
+                    box-shadow 0.2s ease-in-out;
+            }
+            .stat-card:hover {
+                transform: translateY(-4px);
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+                    0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            }
+            .modal {
+                display: none;
+            }
+            .modal.active {
+                display: flex;
+            }
+            
+            /* Rating slider styles */
+            .slider {
+                -webkit-appearance: none;
+                appearance: none;
+                background: transparent;
+                cursor: pointer;
+            }
+            
+            .slider::-webkit-slider-track {
+                background: #e5e7eb;
+                height: 8px;
+                border-radius: 4px;
+            }
+            
+            .slider::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                background: #3b82f6;
+                height: 20px;
+                width: 20px;
+                border-radius: 50%;
+                cursor: pointer;
+            }
+            
+            .slider::-moz-range-track {
+                background: #e5e7eb;
+                height: 8px;
+                border-radius: 4px;
+                border: none;
+            }
+            
+            .slider::-moz-range-thumb {
+                background: #3b82f6;
+                height: 20px;
+                width: 20px;
+                border-radius: 50%;
+                cursor: pointer;
+                border: none;
+            }
+
+            /* Gallery Styles */
+            .line-clamp-2 {
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+
+            /* Image Viewer Styles */
+            #image-viewer-modal {
+                background: rgba(0, 0, 0, 0.95);
+            }
+
+            #image-viewer-modal img {
+                max-height: 90vh;
+                max-width: 90vw;
+            }
+
+            /* Notification Styles */
+            .notification {
+                animation: slideInRight 0.3s ease-out;
+            }
+
+            @keyframes slideInRight {
+                from {
+                    transform: translateX(100%);
+                }
+                to {
+                    transform: translateX(0);
+                }
+            }
+
+            /* Gallery Image Hover Effects */
+            .gallery-image-container {
+                position: relative;
+                overflow: hidden;
+            }
+
+            .gallery-image-container img {
+                transition: transform 0.3s ease;
+            }
+
+            .gallery-image-container:hover img {
+                transform: scale(1.05);
+            }
+
+            /* Loading States */
+            .image-loading {
+                opacity: 0.5;
+                transition: opacity 0.3s ease;
+            }
+
+            .image-loaded {
+                opacity: 1;
+            }
+        </style>
+    </head>
+    <body class="min-h-screen">
+        <div
+            id="loading-screen"
+            class="fixed inset-0 bg-white flex items-center justify-center z-50"
+        >
+            <div
+                class="animate-spin ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"
+            ></div>
+        </div>
+
+        <div id="dashboard-layout" class="min-h-screen bg-gray-100 hidden">
+            <header class="bg-white shadow-md sticky top-0 z-40">
+                <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex items-center justify-between h-16">
+                        <a
+                            href="index.html"
+                            class="flex items-center"
+                        >
+                            <img 
+                                src="photo_2025-11-29_08-43-16.jpg" 
+                                alt="Craftnet Logo" 
+                                class="h-16 w-auto"
+                            />
+                        </a>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-right">
+                                <p
+                                    id="user-name"
+                                    class="font-semibold text-gray-800 text-sm"
+                                >
+                                    Loading...
+                                </p>
+                                <p
+                                    id="user-role-info"
+                                    class="text-xs text-gray-500 capitalize"
+                                >
+                                    Loading...
+                                </p>
+                            </div>
+                            <div class="relative" id="notification-wrapper">
+                                <button
+                                    id="notification-bell"
+                                    class="relative text-gray-500 hover:text-gray-800 p-2 rounded-full hover:bg-gray-100 transition"
+                                    aria-label="Open notifications"
+                                    title="Notifications"
+                                >
+                                    <i class="fas fa-bell text-xl"></i>
+                                    <span
+                                        id="notification-badge"
+                                        class="hidden absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs font-semibold rounded-full w-5 h-5 flex items-center justify-center"
+                                    >
+                                        0
+                                    </span>
+                                </button>
+                                <div
+                                    id="notification-panel"
+                                    class="hidden absolute right-0 mt-3 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl z-50"
+                                    style="max-height: 500px; overflow-y: auto;"
+                                >
+                                    <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100 sticky top-0 bg-white">
+                                        <p class="text-sm font-semibold text-gray-800">
+                                            Notifications
+                                        </p>
+                                        <button
+                                            id="mark-all-notifications"
+                                            class="text-xs text-blue-600 hover:underline"
+                                        >
+                                            Mark all read
+                                        </button>
+                                    </div>
+                                    <div
+                                        id="notification-list"
+                                        class="divide-y divide-gray-100"
+                                    >
+                                        <p class="text-sm text-gray-500 p-4 text-center">
+                                            No notifications yet.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                            <img
+                                id="user-avatar"
+                                class="w-10 h-10 rounded-full object-cover"
+                                src="https://placehold.co/100x100/EBF4FF/3B82F6?text=C"
+                                alt="User profile photo"
+                            />
+                            <button
+                                id="logout-button"
+                                class="text-gray-500 hover:text-gray-800 p-2 rounded-full hover:bg-gray-100"
+                            >
+                                <i data-feather="log-out" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <nav
+                        id="main-nav"
+                        class="flex space-x-4 sm:space-x-8 border-t border-gray-200 -mb-px overflow-x-auto"
+                    ></nav>
+                </div>
+            </header>
+
+            <main
+                id="main-content"
+                class="container mx-auto p-4 sm:p-6 lg:p-8"
+            >
+            </main>
+        </div>
+
+        <div
+            id="upload-modal"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4"
+        >
+            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+                <h3 class="text-2xl font-bold mb-6">Upload Your Work</h3>
+                <form id="upload-work-form">
+                    <div class="mb-4">
+                        <label
+                            for="upload-title"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Title</label
+                        >
+                        <input
+                            type="text"
+                            id="upload-title"
+                            placeholder="e.g., Sunset over the Hills"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                            required
+                        />
+                    </div>
+                    <div class="mb-4">
+                        <label
+                            for="upload-description"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Description</label
+                        >
+                        <textarea
+                            id="upload-description"
+                            rows="3"
+                            placeholder="A short description of your work..."
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                            required
+                        ></textarea>
+                    </div>
+                    <div class="mb-6">
+                        <label
+                            for="upload-file"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Image File</label
+                        >
+                        <input
+                            type="file"
+                            id="upload-file"
+                            accept="image/*"
+                            class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            required
+                        />
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button
+                            type="button"
+                            id="cancel-upload"
+                            class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            id="submit-upload"
+                            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+                        >
+                            <span
+                                id="upload-spinner"
+                                class="hidden animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"
+                            ></span>
+                            Upload
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div
+            id="payment-modal"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4"
+        ></div>
+
+        <div
+            id="edit-profile-modal"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4"
+        >
+            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+                <h3 class="text-2xl font-bold mb-6">Edit Your Profile</h3>
+                <form id="edit-profile-form">
+                    <div class="mb-4">
+                        <label
+                            for="edit-name"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Full Name</label
+                        >
+                        <input
+                            type="text"
+                            id="edit-name"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                            required
+                        />
+                    </div>
+                    <div class="mb-4">
+                        <label
+                            for="edit-creative-type"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            id="edit-type-label"
+                            >Creative Type</label
+                        >
+                        <select
+                            id="edit-creative-type"
+                            required
+                            class="w-full px-3 py-2 border border-gray-300 bg-white rounded-md focus:outline-none focus:ring-blue-500"
+                        >
+                            <option>Photographer</option>
+                            <option>Designer</option>
+                            <option>Artisan</option>
+                            <option>Student</option>
+                            <option>Programmer</option>
+                            <option>Other</option>
+                        </select>
+                    </div>
+                    <div class="mb-6">
+                        <label
+                            for="edit-description"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >About Me</label
+                        >
+                        <textarea
+                            id="edit-description"
+                            rows="4"
+                            placeholder="Tell others about yourself, your skills, and what you're looking for..."
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 resize-none"
+                        ></textarea>
+                    </div>
+                    <div class="flex justify-end space-x-4">
+                        <button
+                            type="button"
+                            id="cancel-edit-profile"
+                            class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            id="submit-edit-profile"
+                            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+                        >
+                            <span
+                                id="edit-spinner"
+                                class="hidden animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"
+                            ></span>
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Delete Post Confirmation Modal -->
+        <div
+            id="delete-post-modal"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4"
+        >
+            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+                <h3 class="text-2xl font-bold mb-6 text-red-600">
+                    Delete Post
+                </h3>
+                <p class="text-gray-700 mb-6">
+                    Are you sure you want to delete "<span
+                        id="delete-post-title"
+                    ></span
+                    >"? This action cannot be undone.
+                </p>
+                <div class="flex justify-end space-x-4">
+                    <button
+                        type="button"
+                        id="cancel-delete-post"
+                        class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        id="confirm-delete-post"
+                        class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 flex items-center"
+                    >
+                        <span
+                            id="delete-spinner"
+                            class="hidden animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"
+                        ></span>
+                        Delete Post
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Profile Modal -->
+        <div
+            id="user-profile-modal"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4"
+        >
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-2xl font-bold text-gray-900">
+                            Connect
+                        </h3>
+                        <button
+                            id="close-user-profile-modal"
+                            class="text-gray-400 hover:text-gray-600"
+                        >
+                            <i data-feather="x" class="w-6 h-6"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="p-6">
+                    <div class="flex items-center mb-6">
+                        <img
+                            id="modal-user-avatar"
+                            src=""
+                            alt=""
+                            class="w-16 h-16 rounded-full mr-4"
+                        />
+                        <div>
+                            <h4
+                                id="modal-user-name"
+                                class="text-xl font-bold text-gray-900"
+                            ></h4>
+                            <p id="modal-user-role" class="text-gray-600"></p>
+                            <p
+                                id="modal-user-location"
+                                class="text-sm text-gray-500"
+                            ></p>
+                        </div>
+                    </div>
+
+                    <div id="modal-user-description" class="mb-6">
+                        <h5 class="font-semibold text-gray-900 mb-2">About</h5>
+                        <div
+                            id="modal-description-content"
+                            class="bg-gray-50 p-4 rounded-lg"
+                        >
+                            <p class="text-gray-700 text-sm">
+                                No description available.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="flex space-x-3">
+                        <button
+                            id="modal-connect-btn"
+                            class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-medium"
+                        >
+                            Connect
+                        </button>
+                        <button
+                            id="modal-view-gallery-btn"
+                            class="flex-1 bg-gray-600 text-white py-2 px-4 rounded-lg hover:bg-gray-700 font-medium"
+                        >
+                            View Gallery
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gallery View Modal -->
+        <div
+            id="gallery-view-modal"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4"
+        >
+            <div
+                class="bg-white rounded-lg shadow-xl w-full max-w-6xl max-h-[90vh] overflow-hidden"
+            >
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <img
+                                id="gallery-user-avatar"
+                                src=""
+                                alt=""
+                                class="w-12 h-12 rounded-full mr-4"
+                            />
+                            <div>
+                                <h3
+                                    id="gallery-user-name"
+                                    class="text-2xl font-bold text-gray-900"
+                                ></h3>
+                                <p
+                                    id="gallery-user-info"
+                                    class="text-gray-600"
+                                ></p>
+                            </div>
+                        </div>
+                        <button
+                            id="close-gallery-modal"
+                            class="text-gray-400 hover:text-gray-600"
+                        >
+                            <i data-feather="x" class="w-6 h-6"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                    <div
+                        id="gallery-content"
+                        class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                    >
+                        <!-- Gallery items will be loaded here -->
+                    </div>
+                    <div id="gallery-loading" class="text-center py-12">
+                        <div
+                            class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"
+                        ></div>
+                        <p class="text-gray-600 mt-4">Loading gallery...</p>
+                    </div>
+                    <div id="gallery-empty" class="text-center py-12 hidden">
+                        <i
+                            data-feather="image"
+                            class="w-16 h-16 text-gray-300 mx-auto mb-4"
+                        ></i>
+                        <h3 class="text-xl font-semibold text-gray-700 mb-2">
+                            No works yet
+                        </h3>
+                        <p class="text-gray-500">
+                            This apprentice hasn't uploaded any works to their
+                            gallery yet.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Job Review Modal -->
+        <div
+            id="job-review-modal"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4"
+        >
+            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold">Review Completed Job</h3>
+                    <button
+                        id="close-review-modal"
+                        class="text-gray-400 hover:text-gray-600"
+                    >
+                        <i data-feather="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+
+                <div id="review-job-details" class="mb-6">
+                    <!-- Job details will be loaded here -->
+                </div>
+
+                <form id="job-review-form">
+                    <div class="mb-6">
+                        <label
+                            class="block text-sm font-medium text-gray-700 mb-3"
+                            >Review Decision</label
+                        >
+                        <div class="space-y-3">
+                            <label class="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="review-decision"
+                                    value="approve"
+                                    class="mr-3"
+                                    required
+                                />
+                                <span class="text-green-700 font-medium"
+                                    >Approve & Pay</span
+                                >
+                                <span class="text-sm text-gray-500 ml-2"
+                                    >- Job meets requirements, release
+                                    payment</span
+                                >
+                            </label>
+                            <label class="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="review-decision"
+                                    value="reject"
+                                    class="mr-3"
+                                    required
+                                />
+                                <span class="text-red-700 font-medium"
+                                    >Reject & Return</span
+                                >
+                                <span class="text-sm text-gray-500 ml-2"
+                                    >- Job needs revisions, return to
+                                    apprentice</span
+                                >
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label
+                            for="review-notes"
+                            class="block text-sm font-medium text-gray-700 mb-2"
+                            >Review Notes</label
+                        >
+                        <textarea
+                            id="review-notes"
+                            rows="4"
+                            placeholder="Provide feedback on the completed work..."
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                            required
+                        ></textarea>
+                    </div>
+
+                    <!-- Rating Section (only shown when approving) -->
+                    <div class="mb-6" id="rating-section" style="display: none;">
+                        <label class="block text-sm font-medium text-gray-700 mb-3">
+                            Rate the Apprentice (1-5 Stars) - Required for Approval
+                        </label>
+                        <div class="flex items-center space-x-2 mb-3">
+                            <div class="flex space-x-1" id="star-rating">
+                                <button type="button" class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="1">★</button>
+                                <button type="button" class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="2">★</button>
+                                <button type="button" class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="3">★</button>
+                                <button type="button" class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="4">★</button>
+                                <button type="button" class="star-btn text-2xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="5">★</button>
+                            </div>
+                            <span id="rating-text" class="text-sm text-gray-600 ml-2">Select a rating</span>
+                            <input type="hidden" id="rating-slider" value="0">
+                        </div>
+                        <div class="mt-3">
+                            <label for="rating-comment" class="block text-sm font-medium text-gray-700 mb-2">
+                                Rating Comment (Optional)
+                            </label>
+                            <textarea
+                                id="rating-comment"
+                                rows="2"
+                                placeholder="Add a comment about your rating..."
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                            ></textarea>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-4">
+                        <button
+                            type="button"
+                            id="cancel-review"
+                            class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            id="submit-review"
+                            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+                        >
+                            <span
+                                id="review-spinner"
+                                class="hidden animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"
+                            ></span>
+                            Submit Review
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Progress Update Submission Modal -->
+        <div
+            id="progress-update-modal"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4"
+        >
+            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold">Submit Progress Update</h3>
+                    <button
+                        id="close-progress-update-modal"
+                        class="text-gray-400 hover:text-gray-600"
+                    >
+                        <i data-feather="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+
+                <form id="progress-update-form">
+                    <div class="mb-4">
+                        <label
+                            for="progress-title"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Update Title</label
+                        >
+                        <input
+                            type="text"
+                            id="progress-title"
+                            placeholder="e.g., Completed initial design mockups"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                            required
+                        />
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label
+                            for="progress-description"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Description</label
+                        >
+                        <textarea
+                            id="progress-description"
+                            rows="4"
+                            placeholder="Describe what you've accomplished and any challenges faced..."
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                            required
+                        ></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label
+                            for="progress-file"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Upload File (Optional)</label
+                        >
+                        <input
+                            type="file"
+                            id="progress-file"
+                            accept="image/*,.pdf,.doc,.docx"
+                            class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                    </div>
+
+                    <div class="mb-6">
+                        <label
+                            for="progress-link"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >External Link (Optional)</label
+                        >
+                        <input
+                            type="url"
+                            id="progress-link"
+                            placeholder="https://example.com/your-work"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                        />
+                    </div>
+
+                    <div class="flex justify-end space-x-4">
+                        <button
+                            type="button"
+                            id="cancel-progress-update"
+                            class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            id="submit-progress-update"
+                            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+                        >
+                            <span
+                                id="progress-update-spinner"
+                                class="hidden animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"
+                            ></span>
+                            Submit Update
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Final Work Submission Modal -->
+        <div
+            id="final-work-modal"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4"
+        >
+            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold">Submit Final Work</h3>
+                    <button
+                        id="close-final-work-modal"
+                        class="text-gray-400 hover:text-gray-600"
+                    >
+                        <i data-feather="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+
+                <form id="final-work-form">
+                    <div class="mb-4">
+                        <label
+                            for="final-title"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Work Title</label
+                        >
+                        <input
+                            type="text"
+                            id="final-title"
+                            placeholder="e.g., Complete Website Design"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                            required
+                        />
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label
+                            for="final-description"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Description</label
+                        >
+                        <textarea
+                            id="final-description"
+                            rows="4"
+                            placeholder="Describe your completed work and deliverables..."
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                            required
+                        ></textarea>
+                    </div>
+
+                    <div class="mb-4">
+                        <label
+                            for="final-file"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Upload Final Work</label
+                        >
+                        <input
+                            type="file"
+                            id="final-file"
+                            accept="image/*,.pdf,.doc,.docx,.zip"
+                            class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            required
+                        />
+                    </div>
+
+                    <div class="mb-6">
+                        <label
+                            for="final-link"
+                            class="block text-sm font-medium text-gray-700 mb-1"
+                            >Project Link (Optional)</label
+                        >
+                        <input
+                            type="url"
+                            id="final-link"
+                            placeholder="https://example.com/final-project"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                        />
+                    </div>
+
+                    <div class="flex justify-end space-x-4">
+                        <button
+                            type="button"
+                            id="cancel-final-work"
+                            class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            id="submit-final-work"
+                            class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center"
+                        >
+                            <span
+                                id="final-work-spinner"
+                                class="hidden animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"
+                            ></span>
+                            Submit Final Work
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Progress Update Feedback Modal -->
+        <div
+            id="progress-feedback-modal"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4"
+        >
+            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold">Review Progress Update</h3>
+                    <button
+                        id="close-progress-feedback-modal"
+                        class="text-gray-400 hover:text-gray-600"
+                    >
+                        <i data-feather="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+
+                <div id="progress-update-details" class="mb-6">
+                    <!-- Progress update details will be loaded here -->
+                </div>
+
+                <form id="progress-feedback-form">
+                    <div class="mb-6">
+                        <label
+                            class="block text-sm font-medium text-gray-700 mb-3"
+                            >Feedback Decision</label
+                        >
+                        <div class="space-y-3">
+                            <label class="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="feedback-decision"
+                                    value="approve"
+                                    class="mr-3"
+                                    required
+                                />
+                                <span class="text-green-700 font-medium"
+                                    >✅ Approve Update</span
+                                >
+                                <span class="text-sm text-gray-500 ml-2"
+                                    >- Good progress, continue working</span
+                                >
+                            </label>
+                            <label class="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="feedback-decision"
+                                    value="needs_changes"
+                                    class="mr-3"
+                                    required
+                                />
+                                <span class="text-red-700 font-medium"
+                                    >❌ Needs Changes</span
+                                >
+                                <span class="text-sm text-gray-500 ml-2"
+                                    >- Requires revisions before continuing</span
+                                >
+                            </label>
+                            <label class="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="feedback-decision"
+                                    value="remark"
+                                    class="mr-3"
+                                    required
+                                />
+                                <span class="text-blue-700 font-medium"
+                                    >💬 Leave Remark</span
+                                >
+                                <span class="text-sm text-gray-500 ml-2"
+                                    >- Add comments without changing status</span
+                                >
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label
+                            for="feedback-remarks"
+                            class="block text-sm font-medium text-gray-700 mb-2"
+                            >Feedback & Remarks</label
+                        >
+                        <textarea
+                            id="feedback-remarks"
+                            rows="4"
+                            placeholder="Provide detailed feedback on the progress update..."
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                            required
+                        ></textarea>
+                    </div>
+
+                    <div class="flex justify-end space-x-4">
+                        <button
+                            type="button"
+                            id="cancel-progress-feedback"
+                            class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            id="submit-progress-feedback"
+                            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+                        >
+                            <span
+                                id="progress-feedback-spinner"
+                                class="hidden animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"
+                            ></span>
+                            Submit Feedback
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Final Submission Review Modal -->
+        <div
+            id="final-submission-review-modal"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4"
+        >
+            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold">Review Final Submission</h3>
+                    <button
+                        id="close-final-submission-review-modal"
+                        class="text-gray-400 hover:text-gray-600"
+                    >
+                        <i data-feather="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+
+                <div id="final-submission-details" class="mb-6">
+                    <!-- Final submission details will be loaded here -->
+                </div>
+
+                <form id="final-submission-review-form">
+                    <div class="mb-6">
+                        <label
+                            class="block text-sm font-medium text-gray-700 mb-3"
+                            >Review Decision</label
+                        >
+                        <div class="space-y-3">
+                            <label class="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="final-review-decision"
+                                    value="approve"
+                                    class="mr-3"
+                                    required
+                                />
+                                <span class="text-green-700 font-medium"
+                                    >✅ Approve Submission</span
+                                >
+                                <span class="text-sm text-gray-500 ml-2"
+                                    >- Work meets requirements, job complete</span
+                                >
+                            </label>
+                            <label class="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="final-review-decision"
+                                    value="request_revision"
+                                    class="mr-3"
+                                    required
+                                />
+                                <span class="text-orange-700 font-medium"
+                                    >🔄 Request Revision</span
+                                >
+                                <span class="text-sm text-gray-500 ml-2"
+                                    >- Needs changes before approval</span
+                                >
+                            </label>
+                            <label class="flex items-center">
+                                <input
+                                    type="radio"
+                                    name="final-review-decision"
+                                    value="dispute"
+                                    class="mr-3"
+                                    required
+                                />
+                                <span class="text-red-700 font-medium"
+                                    >⚠️ Dispute</span
+                                >
+                                <span class="text-sm text-gray-500 ml-2"
+                                    >- Serious issues requiring resolution</span
+                                >
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label
+                            for="final-review-notes"
+                            class="block text-sm font-medium text-gray-700 mb-2"
+                            >Review Notes</label
+                        >
+                        <textarea
+                            id="final-review-notes"
+                            rows="4"
+                            placeholder="Provide detailed review notes..."
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                            required
+                        ></textarea>
+                    </div>
+
+                    <div class="flex justify-end space-x-4">
+                        <button
+                            type="button"
+                            id="cancel-final-submission-review"
+                            class="bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            id="submit-final-review"
+                            class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+                        >
+                            <span
+                                id="final-review-spinner"
+                                class="hidden animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"
+                            ></span>
+                            Submit Review
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Rating Modal -->
+        <div
+            id="rating-modal"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50 p-4"
+        >
+            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-2xl">
+                <div class="flex items-center justify-between mb-6">
+                    <h3 class="text-2xl font-bold">Rate Apprentice</h3>
+                    <button
+                        id="close-rating-modal"
+                        class="text-gray-400 hover:text-gray-600"
+                    >
+                        <i data-feather="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+
+                <div id="rating-job-details" class="mb-6">
+                    <!-- Job details will be loaded here -->
+                </div>
+
+                <form id="rating-form" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-3">
+                            How would you rate this apprentice's work?
+                        </label>
+                        <div class="flex items-center space-x-2">
+                            <button type="button" class="rating-star text-3xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="1">★</button>
+                            <button type="button" class="rating-star text-3xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="2">★</button>
+                            <button type="button" class="rating-star text-3xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="3">★</button>
+                            <button type="button" class="rating-star text-3xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="4">★</button>
+                            <button type="button" class="rating-star text-3xl text-gray-300 hover:text-yellow-400 transition-colors" data-rating="5">★</button>
+                        </div>
+                        <span id="rating-text" class="text-sm text-gray-600 ml-2">Select a rating</span>
+                        <input type="hidden" id="rating-input" value="0" required>
+                    </div>
+
+                    <div>
+                        <label for="rating-comment-input" class="block text-sm font-medium text-gray-700 mb-2">
+                            Rating Comment (Optional)
+                        </label>
+                        <textarea
+                            id="rating-comment-input"
+                            rows="3"
+                            placeholder="Add a comment about your rating..."
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                        ></textarea>
+                    </div>
+
+                    <div class="flex justify-end space-x-3">
+                        <button
+                            type="button"
+                            id="cancel-rating"
+                            class="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            id="submit-rating"
+                            class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                        >
+                            <span id="rating-spinner" class="hidden mr-2">
+                                <i data-feather="loader" class="w-4 h-4 animate-spin"></i>
+                            </span>
+                            Submit Rating
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    <!-- Dispute Submission Modal -->
+    <div id="dispute-modal" class="modal">
+        <div class="modal-content bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-900">Submit Dispute</h2>
+                <button id="close-dispute-modal" class="text-gray-400 hover:text-gray-600">
+                    <i data-feather="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <div id="dispute-job-details" class="mb-6 p-4 bg-gray-50 rounded-lg">
+                <!-- Job details will be loaded here -->
+            </div>
+
+            <form id="dispute-form" class="space-y-6">
+                <div>
+                    <label for="dispute-type" class="block text-sm font-medium text-gray-700 mb-2">
+                        Dispute Type <span class="text-red-500">*</span>
+                    </label>
+                    <select
+                        id="dispute-type"
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                    >
+                        <option value="">Select dispute type</option>
+                        <option value="payment">Payment Issue</option>
+                        <option value="delivery">Delivery/Quality Issue</option>
+                        <option value="fraud">Fraud/Suspicious Activity</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="dispute-description" class="block text-sm font-medium text-gray-700 mb-2">
+                        Description <span class="text-red-500">*</span>
+                    </label>
+                    <textarea
+                        id="dispute-description"
+                        rows="5"
+                        placeholder="Please provide a detailed description of the dispute..."
+                        required
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                    ></textarea>
+                </div>
+
+                <div>
+                    <label for="dispute-evidence" class="block text-sm font-medium text-gray-700 mb-2">
+                        Evidence (Files, Screenshots, etc.)
+                    </label>
+                    <input
+                        type="file"
+                        id="dispute-evidence"
+                        multiple
+                        accept="image/*,.pdf,.doc,.docx"
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"
+                    />
+                    <p class="text-xs text-gray-500 mt-1">You can upload multiple files (images, PDFs, documents). Max 50MB total.</p>
+                    <div id="dispute-evidence-preview" class="mt-2 space-y-2"></div>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button
+                        type="button"
+                        id="cancel-dispute"
+                        class="px-4 py-2 text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        id="submit-dispute"
+                        class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 flex items-center"
+                    >
+                        <span id="dispute-spinner" class="hidden mr-2">
+                            <i data-feather="loader" class="w-4 h-4 animate-spin"></i>
+                        </span>
+                        Submit Dispute
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+        <!-- Profile Setup Modal - Apprentice -->
+        <div
+            id="profile-setup-modal-apprentice"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center p-4 overflow-y-auto"
+            style="z-index: 9999;"
+        >
+            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-3xl my-8 max-h-[90vh] overflow-y-auto">
+                <h3 class="text-2xl font-bold mb-6">Complete Your Profile</h3>
+                <p class="text-sm text-gray-600 mb-6">Please complete your profile to access all features.</p>
+                <form id="profile-setup-form-apprentice">
+                    <!-- Profile Picture -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Profile Picture</label>
+                        <div class="flex items-center space-x-4">
+                            <img id="apprentice-avatar-preview" src="https://placehold.co/100x100/EBF4FF/3B82F6?text=U" alt="Avatar preview" class="w-20 h-20 rounded-full object-cover border-2 border-gray-300">
+                            <div>
+                                <input type="file" id="apprentice-avatar-input" accept="image/*" class="text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                <p class="text-xs text-gray-500 mt-1">JPG, PNG, GIF or WEBP (max 5MB)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Full Name -->
+                    <div class="mb-4">
+                        <label for="apprentice-name" class="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                        <input type="text" id="apprentice-name" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                    </div>
+
+                    <!-- Email -->
+                    <div class="mb-4">
+                        <label for="apprentice-email" class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                        <input type="email" id="apprentice-email" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                    </div>
+
+                    <!-- Username (moved below email so it's always visible on screen) -->
+                    <div class="mb-4">
+                        <label for="apprentice-username" class="block text-sm font-medium text-gray-700 mb-1">Username *</label>
+                        <input type="text" id="apprentice-username" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                    </div>
+
+                    <!-- Phone -->
+                    <div class="mb-4">
+                        <label for="apprentice-phone" class="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                        <input type="tel" id="apprentice-phone" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                    </div>
+
+                    <!-- Bio -->
+                    <div class="mb-4">
+                        <label for="apprentice-bio" class="block text-sm font-medium text-gray-700 mb-1">Short Bio *</label>
+                        <textarea id="apprentice-bio" rows="3" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"></textarea>
+                    </div>
+
+                    <!-- Skill Category -->
+                    <div class="mb-4">
+                        <label for="apprentice-skill-category" class="block text-sm font-medium text-gray-700 mb-1">Skill Category *</label>
+                        <select id="apprentice-skill-category" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                            <option value="">Select a category</option>
+                            <option value="Photography">Photography</option>
+                            <option value="Design">Design</option>
+                            <option value="Artisan">Artisan</option>
+                            <option value="Programming">Programming</option>
+                            <option value="Writing">Writing</option>
+                            <option value="Video Production">Video Production</option>
+                            <option value="Music">Music</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <!-- Sub-skills -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Sub-skills (select multiple)</label>
+                        <div id="apprentice-sub-skills" class="flex flex-wrap gap-2 border border-gray-300 rounded-md p-3 min-h-[60px]">
+                            <!-- Sub-skills will be populated dynamically based on skill category -->
+                        </div>
+                        <input type="hidden" id="apprentice-sub-skills-selected" value="">
+                    </div>
+
+                    <!-- Years of Experience -->
+                    <div class="mb-4">
+                        <label for="apprentice-experience" class="block text-sm font-medium text-gray-700 mb-1">Years of Experience *</label>
+                        <input type="number" id="apprentice-experience" min="0" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                    </div>
+
+                    <!-- Portfolio Links -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Portfolio Links (optional)</label>
+                        <div id="apprentice-portfolio-links">
+                            <div class="flex gap-2 mb-2">
+                                <input type="url" placeholder="https://example.com/portfolio" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                                <button type="button" class="remove-portfolio-link text-red-600 hover:text-red-800 px-3">Remove</button>
+                            </div>
+                        </div>
+                        <button type="button" id="add-portfolio-link" class="text-sm text-blue-600 hover:text-blue-800">+ Add Link</button>
+                    </div>
+
+                    <!-- Education -->
+                    <div class="mb-4">
+                        <label for="apprentice-education" class="block text-sm font-medium text-gray-700 mb-1">Education / Training *</label>
+                        <textarea id="apprentice-education" rows="3" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"></textarea>
+                    </div>
+
+                    <!-- Certifications -->
+                    <div class="mb-4">
+                        <label for="apprentice-certifications" class="block text-sm font-medium text-gray-700 mb-1">Certifications (optional)</label>
+                        <textarea id="apprentice-certifications" rows="2" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"></textarea>
+                        <input type="file" id="apprentice-certifications-file" accept=".pdf,.jpg,.jpeg,.png" class="mt-2 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        <p class="text-xs text-gray-500 mt-1">PDF, JPG or PNG (max 10MB)</p>
+                    </div>
+
+                    <!-- Preferred Job Type -->
+                    <div class="mb-4">
+                        <label for="apprentice-job-type" class="block text-sm font-medium text-gray-700 mb-1">Preferred Job Type *</label>
+                        <select id="apprentice-job-type" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                            <option value="">Select job type</option>
+                            <option value="Full-time">Full-time</option>
+                            <option value="Part-time">Part-time</option>
+                            <option value="Contract">Contract</option>
+                            <option value="Freelance">Freelance</option>
+                            <option value="Project-based">Project-based</option>
+                        </select>
+                    </div>
+
+                    <!-- Availability -->
+                    <div class="mb-4">
+                        <label for="apprentice-availability" class="block text-sm font-medium text-gray-700 mb-1">Availability *</label>
+                        <select id="apprentice-availability" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                            <option value="">Select availability</option>
+                            <option value="Available immediately">Available immediately</option>
+                            <option value="Available in 1 week">Available in 1 week</option>
+                            <option value="Available in 2 weeks">Available in 2 weeks</option>
+                            <option value="Available in 1 month">Available in 1 month</option>
+                            <option value="Not currently available">Not currently available</option>
+                        </select>
+                    </div>
+
+                    <!-- Resume Upload -->
+                    <div class="mb-6">
+                        <label for="apprentice-resume" class="block text-sm font-medium text-gray-700 mb-1">Resume (optional)</label>
+                        <input type="file" id="apprentice-resume" accept=".pdf,.doc,.docx,.txt" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                        <p class="text-xs text-gray-500 mt-1">PDF, DOC, DOCX or TXT (max 10MB)</p>
+                    </div>
+
+                    <div id="apprentice-profile-error" class="hidden text-red-600 text-sm mb-4"></div>
+
+                    <div class="flex justify-end space-x-4">
+                        <button type="submit" id="submit-apprentice-profile" onclick="handleApprenticeProfileSubmit(); return false;" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center">
+                            <span id="apprentice-profile-spinner" class="hidden animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+                            Complete Profile
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Profile Setup Modal - Member -->
+        <div
+            id="profile-setup-modal-member"
+            class="modal fixed inset-0 bg-black bg-opacity-50 items-center justify-center p-4 overflow-y-auto"
+            style="z-index: 9999;"
+        >
+            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-3xl my-8 max-h-[90vh] overflow-y-auto">
+                <h3 class="text-2xl font-bold mb-6">Complete Your Business Profile</h3>
+                <p class="text-sm text-gray-600 mb-6">Please complete your profile to access all features.</p>
+                <form id="profile-setup-form-member">
+                    <!-- Logo/Profile Photo -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Business Logo / Profile Photo</label>
+                        <div class="flex items-center space-x-4">
+                            <img id="member-logo-preview" src="https://placehold.co/100x100/EBF4FF/3B82F6?text=B" alt="Logo preview" class="w-20 h-20 rounded-full object-cover border-2 border-gray-300">
+                            <div>
+                                <input type="file" id="member-logo-input" accept="image/*" class="text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                                <p class="text-xs text-gray-500 mt-1">JPG, PNG, GIF or WEBP (max 5MB)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Business Name -->
+                    <div class="mb-4">
+                        <label for="member-business-name" class="block text-sm font-medium text-gray-700 mb-1">Business Name / Full Name *</label>
+                        <input type="text" id="member-business-name" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                    </div>
+
+                    <!-- Email -->
+                    <div class="mb-4">
+                        <label for="member-email" class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                        <input type="email" id="member-email" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                    </div>
+
+                    <!-- Phone -->
+                    <div class="mb-4">
+                        <label for="member-phone" class="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                        <input type="tel" id="member-phone" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                    </div>
+
+                    <!-- Business Description -->
+                    <div class="mb-4">
+                        <label for="member-description" class="block text-sm font-medium text-gray-700 mb-1">Business Description *</label>
+                        <textarea id="member-description" rows="4" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500"></textarea>
+                    </div>
+
+                    <!-- Industry -->
+                    <div class="mb-4">
+                        <label for="member-industry" class="block text-sm font-medium text-gray-700 mb-1">Industry / Category *</label>
+                        <select id="member-industry" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                            <option value="">Select industry</option>
+                            <option value="Photography">Photography</option>
+                            <option value="Design">Design</option>
+                            <option value="Artisan">Artisan</option>
+                            <option value="Technology">Technology</option>
+                            <option value="Media & Entertainment">Media & Entertainment</option>
+                            <option value="Fashion">Fashion</option>
+                            <option value="Food & Beverage">Food & Beverage</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <!-- Services Offered -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Services Offered (select multiple)</label>
+                        <div id="member-services" class="flex flex-wrap gap-2 border border-gray-300 rounded-md p-3 min-h-[60px]">
+                            <!-- Services will be populated dynamically -->
+                        </div>
+                        <input type="hidden" id="member-services-selected" value="">
+                    </div>
+
+                    <!-- Location -->
+                    <div class="mb-4">
+                        <label for="member-location" class="block text-sm font-medium text-gray-700 mb-1">Location *</label>
+                        <input type="text" id="member-location" required class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                    </div>
+
+                    <!-- Website / Social Links -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Website / Social Links (optional)</label>
+                        <div id="member-website-links">
+                            <div class="flex gap-2 mb-2">
+                                <input type="url" placeholder="https://example.com" class="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                                <button type="button" class="remove-website-link text-red-600 hover:text-red-800 px-3">Remove</button>
+                            </div>
+                        </div>
+                        <button type="button" id="add-website-link" class="text-sm text-blue-600 hover:text-blue-800">+ Add Link</button>
+                    </div>
+
+                    <!-- Project Categories -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Project Categories (select multiple)</label>
+                        <div id="member-project-categories" class="flex flex-wrap gap-2 border border-gray-300 rounded-md p-3 min-h-[60px]">
+                            <!-- Project categories will be populated dynamically -->
+                        </div>
+                        <input type="hidden" id="member-project-categories-selected" value="">
+                    </div>
+
+                    <!-- Budget Range -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Budget Range (optional)</label>
+                        <div class="flex gap-4">
+                            <div class="flex-1">
+                                <label for="member-budget-min" class="block text-xs text-gray-600 mb-1">Minimum (₦)</label>
+                                <input type="number" id="member-budget-min" min="0" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                            </div>
+                            <div class="flex-1">
+                                <label for="member-budget-max" class="block text-xs text-gray-600 mb-1">Maximum (₦)</label>
+                                <input type="number" id="member-budget-max" min="0" step="0.01" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="member-profile-error" class="hidden text-red-600 text-sm mb-4"></div>
+
+                    <div class="flex justify-end space-x-4">
+                        <button type="submit" id="submit-member-profile" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center">
+                            <span id="member-profile-spinner" class="hidden animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></span>
+                            Complete Profile
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+        <script type="module" src="dashboard-supabase.js"></script>
+        <script type="module" src="manual-payment-system.js"></script>
+        <script type="module" src="wallet-interface.js"></script>
+        <script type="module" src="payment-notifications.js"></script>
+        <script>
+            // Inject notification styles when page loads
+            document.addEventListener('DOMContentLoaded', function() {
+                if (window.injectNotificationStyles) {
+                    window.injectNotificationStyles();
+                }
+            });
+        </script>
+        <script src="dark-mode.js"></script>
+    </body>
+</html>
