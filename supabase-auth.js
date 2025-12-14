@@ -1217,6 +1217,39 @@ export async function checkStorageBucket(bucketName) {
 // Create a new job request
 export async function createJobRequest(userId, jobData) {
     try {
+        // Check subscription plan and monthly job limit for free plan users
+        const userProfile = await getUserProfile(userId);
+        const subscriptionPlan = userProfile?.subscription_plan || "free";
+        
+        if (subscriptionPlan === "free") {
+            // Get the start and end of current month
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+            
+            // Count jobs created this month by this user
+            const { data: monthlyJobs, error: countError } = await supabase
+                .from("job_requests")
+                .select("id", { count: "exact", head: false })
+                .eq("client_id", userId)
+                .gte("created_at", startOfMonth.toISOString())
+                .lte("created_at", endOfMonth.toISOString());
+            
+            if (countError) {
+                console.error("Error counting monthly jobs:", countError);
+                // Don't block job creation if count fails, but log it
+            } else {
+                const jobCount = monthlyJobs?.length || 0;
+                if (jobCount >= 3) {
+                    throw new Error(
+                        "Free plan members can post up to 3 jobs per month. " +
+                        "You have reached your monthly limit. " +
+                        "Upgrade to Creative plan to post unlimited jobs."
+                    );
+                }
+            }
+        }
+        
         // Get user wallet to check balance
         const wallet = await getUserWallet(userId);
         if (!wallet) {
@@ -2894,7 +2927,9 @@ export async function getDisputeEvidenceSignedUrl(evidenceReference, expiresIn =
 // Get all disputes for admin
 export async function getAllDisputes() {
     try {
-        const { data, error } = await supabase
+        // First, try with explicit foreign key (preferred method)
+        let data, error;
+        const query = supabase
             .from("disputes")
             .select(`
                 *,
@@ -2907,23 +2942,61 @@ export async function getAllDisputes() {
                 member:profiles!disputes_member_id_fkey (
                     id,
                     email,
-                    full_name,
                     name
                 ),
                 apprentice:profiles!disputes_apprentice_id_fkey (
                     id,
                     email,
-                    full_name,
                     name
                 ),
                 raised_by_profile:profiles!disputes_raised_by_fkey (
                     id,
                     email,
-                    full_name,
                     name
                 )
             `)
             .order('created_at', { ascending: false });
+
+        const result = await query;
+        data = result.data;
+        error = result.error;
+
+        // If foreign key error, fallback to alternative query method
+        if (error && error.code === 'PGRST200' && error.message?.includes('disputes_raised_by_fkey')) {
+            console.warn('Foreign key constraint missing, using alternative query method');
+            
+            // Use implicit foreign key syntax or fetch profiles separately
+            const fallbackResult = await supabase
+                .from("disputes")
+                .select(`
+                    *,
+                    job_requests (
+                        id,
+                        title,
+                        description,
+                        status
+                    ),
+                    member:profiles!member_id (
+                        id,
+                        email,
+                        name
+                    ),
+                    apprentice:profiles!apprentice_id (
+                        id,
+                        email,
+                        name
+                    ),
+                    raised_by_profile:profiles!raised_by (
+                        id,
+                        email,
+                        name
+                    )
+                `)
+                .order('created_at', { ascending: false });
+
+            if (fallbackResult.error) throw fallbackResult.error;
+            return fallbackResult.data || [];
+        }
 
         if (error) throw error;
         return data || [];
@@ -3471,6 +3544,23 @@ export async function createWithdrawalRequest(userId, pointsRequested, payoutMet
             throw new Error("Unable to create withdrawal request: missing user information.");
         }
 
+        // Calculate total deduction including fees
+        const withdrawalFeePoints = 2;
+        const totalDeductionPoints = pointsRequested + withdrawalFeePoints;
+
+        // Check if user has sufficient balance BEFORE creating the request
+        const wallet = await getUserWallet(userId);
+        if (!wallet) {
+            throw new Error("Unable to retrieve your wallet. Please try again.");
+        }
+
+        const availablePoints = wallet.balance_points ?? 0;
+        if (availablePoints < totalDeductionPoints) {
+            throw new Error(
+                `Insufficient points balance. You requested ${pointsRequested} points, but with the ${withdrawalFeePoints} point fee, you need ${totalDeductionPoints} points total. You have ${availablePoints.toFixed(2)} pts available.`
+            );
+        }
+
         // Always try the RPC first (bypasses RLS if it exists)
         try {
             const { data, error } = await supabase.rpc('create_withdrawal_request', {
@@ -3492,11 +3582,8 @@ export async function createWithdrawalRequest(userId, pointsRequested, payoutMet
             // If the RPC is missing (42883) or failed, fall back to direct insert
             console.warn('create_withdrawal_request RPC unavailable, falling back to direct insert:', rpcError);
         }
-
-        const withdrawalFeePoints = 2;
         const { ngn: amountNgn } = convertPointsToCurrency(pointsRequested);
         const { ngn: withdrawalFeeNgn } = convertPointsToCurrency(withdrawalFeePoints);
-        const totalDeductionPoints = pointsRequested + withdrawalFeePoints;
         const totalDeductionNgn = amountNgn + withdrawalFeeNgn;
         const supportsExtendedWithdrawalColumns = await withdrawalExtendedColumnsAvailable();
 
@@ -3532,19 +3619,37 @@ export async function createWithdrawalRequest(userId, pointsRequested, payoutMet
             .select('*')
             .single());
 
-        if (insertError && referencesMissingWithdrawalExtendedColumns(insertError)) {
-            console.warn('Extended withdrawal columns missing in schema, retrying without them.');
-            const fallbackPayload = { ...withdrawalInsertPayload };
-            delete fallbackPayload.withdrawal_fee_points;
-            delete fallbackPayload.withdrawal_fee_ngn;
-            delete fallbackPayload.total_deduction_points;
-            delete fallbackPayload.total_deduction_ngn;
+        if (insertError) {
+            if (referencesMissingWithdrawalExtendedColumns(insertError)) {
+                console.warn('Extended withdrawal columns missing in schema, retrying without them.');
+                const fallbackPayload = { ...withdrawalInsertPayload };
+                delete fallbackPayload.withdrawal_fee_points;
+                delete fallbackPayload.withdrawal_fee_ngn;
+                delete fallbackPayload.total_deduction_points;
+                delete fallbackPayload.total_deduction_ngn;
 
-            ({ data: newRequest, error: insertError } = await supabase
-                .from('wallet_withdrawal_requests')
-                .insert(fallbackPayload)
-                .select('*')
-                .single());
+                ({ data: newRequest, error: insertError } = await supabase
+                    .from('wallet_withdrawal_requests')
+                    .insert(fallbackPayload)
+                    .select('*')
+                    .single());
+            } else if (
+                !supportsExtendedWithdrawalColumns &&
+                referencesWithdrawalExtendedColumnsNotNull(insertError)
+            ) {
+                console.warn('Extended withdrawal columns enforced by schema, retrying with them.');
+                withdrawalInsertPayload.withdrawal_fee_points = withdrawalFeePoints;
+                withdrawalInsertPayload.withdrawal_fee_ngn = withdrawalFeeNgn;
+                withdrawalInsertPayload.total_deduction_points = totalDeductionPoints;
+                withdrawalInsertPayload.total_deduction_ngn = totalDeductionNgn;
+                cachedWithdrawalExtendedColumnsAvailable = true;
+
+                ({ data: newRequest, error: insertError } = await supabase
+                    .from('wallet_withdrawal_requests')
+                    .insert(withdrawalInsertPayload)
+                    .select('*')
+                    .single());
+            }
         }
 
         if (insertError) {
@@ -3982,10 +4087,6 @@ export function getReferralCommissionPercentage(subscriptionTier) {
     switch (subscriptionTier) {
         case 'creative':
             return 10;
-        case 'entrepreneur':
-            return 20;
-        case 'visionary':
-            return 30;
         default:
             return 0;
     }
@@ -4013,6 +4114,33 @@ function referencesMissingWithdrawalExtendedColumns(error) {
     );
 }
 
+function referencesWithdrawalExtendedColumnsNotNull(error) {
+    // Check for NOT NULL constraint violation (error code 23502)
+    if (error?.code === '23502') {
+        const message = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
+        // Check if the error is about any of the extended withdrawal columns
+        return (
+            message.includes('withdrawal_fee_ngn') ||
+            message.includes('withdrawal_fee_points') ||
+            message.includes('total_deduction_points') ||
+            message.includes('total_deduction_ngn')
+        );
+    }
+    
+    // Also check message for null value violations
+    const message = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
+    return (
+        (message.includes('"withdrawal_fee_ngn"') ||
+         message.includes('"withdrawal_fee_points"') ||
+         message.includes('"total_deduction_points"') ||
+         message.includes('"total_deduction_ngn"') ||
+         message.includes('withdrawal_fee_ngn') ||
+         message.includes('withdrawal_fee_points') ||
+         message.includes('total_deduction_points') ||
+         message.includes('total_deduction_ngn'))
+    ) && message.includes('null value');
+}
+
 let cachedWithdrawalExtendedColumnsAvailable;
 async function withdrawalExtendedColumnsAvailable() {
     if (typeof cachedWithdrawalExtendedColumnsAvailable === 'boolean') {
@@ -4036,6 +4164,328 @@ async function withdrawalExtendedColumnsAvailable() {
         console.warn('Unable to verify withdrawal fee columns, assuming unavailable.', error);
         cachedWithdrawalExtendedColumnsAvailable = false;
         return false;
+    }
+}
+
+// ==================== ADMIN USER MANAGEMENT FUNCTIONS ====================
+
+// Get all users with their statistics and activities (for admin)
+export async function getAllUsersWithStats(role = null, limit = 100, offset = 0, search = '') {
+    try {
+        let query = supabase
+            .from('profiles')
+            .select('*');
+
+        if (role) {
+            query = query.eq('role', role);
+        }
+
+        if (search) {
+            query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%,username.ilike.%${search}%`);
+        }
+
+        const { data: profiles, error } = await query
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limit - 1);
+
+        if (error) throw error;
+
+        // Get stats and wallets for each user
+        const profilesWithStats = await Promise.all(
+            (profiles || []).map(async (profile) => {
+                const stats = await getUserActivityStats(profile.id, profile.role);
+                
+                // Get wallet separately
+                const { data: walletData } = await supabase
+                    .from('user_wallets')
+                    .select('*')
+                    .eq('user_id', profile.id)
+                    .single();
+                
+                return {
+                    ...profile,
+                    stats,
+                    wallet: walletData ? [walletData] : null
+                };
+            })
+        );
+
+        // Get total count
+        let countQuery = supabase
+            .from('profiles')
+            .select('*', { count: 'exact', head: true });
+
+        if (role) {
+            countQuery = countQuery.eq('role', role);
+        }
+
+        if (search) {
+            countQuery = countQuery.or(`name.ilike.%${search}%,email.ilike.%${search}%,username.ilike.%${search}%`);
+        }
+
+        const { count, error: countError } = await countQuery;
+
+        if (countError) throw countError;
+
+        return {
+            users: profilesWithStats,
+            total: count || 0
+        };
+    } catch (error) {
+        console.error('Error fetching users with stats:', error);
+        throw error;
+    }
+}
+
+// Get user activity statistics
+export async function getUserActivityStats(userId, role) {
+    try {
+        const stats = {
+            totalJobs: 0,
+            activeJobs: 0,
+            completedJobs: 0,
+            totalApplications: 0,
+            pendingApplications: 0,
+            totalEarnings: 0,
+            totalSpent: 0,
+            walletBalance: 0,
+            lastActivity: null
+        };
+
+        if (role === 'apprentice') {
+            // Get job applications
+            const { count: totalApps, error: appsError } = await supabase
+                .from('job_applications')
+                .select('*', { count: 'exact', head: true })
+                .eq('apprentice_id', userId);
+
+            if (!appsError) {
+                stats.totalApplications = totalApps || 0;
+
+                const { count: pendingApps } = await supabase
+                    .from('job_applications')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('apprentice_id', userId)
+                    .eq('status', 'pending');
+
+                stats.pendingApplications = pendingApps || 0;
+            }
+
+            // Get jobs assigned
+            const { data: assignedJobs, error: jobsError } = await supabase
+                .from('job_requests')
+                .select('id, status, created_at, updated_at')
+                .eq('assigned_apprentice_id', userId);
+
+            if (!jobsError && assignedJobs) {
+                stats.totalJobs = assignedJobs.length;
+                stats.activeJobs = assignedJobs.filter(j => j.status === 'in_progress').length;
+                stats.completedJobs = assignedJobs.filter(j => j.status === 'completed').length;
+
+                // Get last activity
+                const lastJobUpdate = assignedJobs
+                    .map(j => j.updated_at || j.created_at)
+                    .sort()
+                    .reverse()[0];
+                if (lastJobUpdate) {
+                    stats.lastActivity = lastJobUpdate;
+                }
+            }
+
+            // Get earnings from profile
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('total_earnings')
+                .eq('id', userId)
+                .single();
+
+            if (profile) {
+                stats.totalEarnings = profile.total_earnings || 0;
+            }
+        } else if (role === 'member') {
+            // Get jobs created
+            const { data: createdJobs, error: jobsError } = await supabase
+                .from('job_requests')
+                .select('id, status, created_at, updated_at')
+                .eq('client_id', userId);
+
+            if (!jobsError && createdJobs) {
+                stats.totalJobs = createdJobs.length;
+                stats.activeJobs = createdJobs.filter(j => j.status === 'in_progress').length;
+                stats.completedJobs = createdJobs.filter(j => j.status === 'completed').length;
+
+                // Get last activity
+                const lastJobUpdate = createdJobs
+                    .map(j => j.updated_at || j.created_at)
+                    .sort()
+                    .reverse()[0];
+                if (lastJobUpdate) {
+                    stats.lastActivity = lastJobUpdate;
+                }
+            }
+
+            // Get total spent (from funding requests)
+            const { data: fundingRequests } = await supabase
+                .from('funding_requests')
+                .select('amount_ngn, status')
+                .eq('user_id', userId)
+                .eq('status', 'approved');
+
+            if (fundingRequests) {
+                stats.totalSpent = fundingRequests.reduce((sum, req) => sum + (req.amount_ngn || 0), 0);
+            }
+        }
+
+        // Get wallet balance
+        const { data: wallet } = await supabase
+            .from('user_wallets')
+            .select('balance_ngn, balance_points')
+            .eq('user_id', userId)
+            .single();
+
+        if (wallet) {
+            stats.walletBalance = wallet.balance_ngn || 0;
+        }
+
+        return stats;
+    } catch (error) {
+        console.error('Error fetching user activity stats:', error);
+        return {
+            totalJobs: 0,
+            activeJobs: 0,
+            completedJobs: 0,
+            totalApplications: 0,
+            pendingApplications: 0,
+            totalEarnings: 0,
+            totalSpent: 0,
+            walletBalance: 0,
+            lastActivity: null
+        };
+    }
+}
+
+// Get user activities (recent actions)
+export async function getUserActivities(userId, limit = 50) {
+    try {
+        const activities = [];
+
+        // Get job activities
+        const { data: jobs } = await supabase
+            .from('job_requests')
+            .select('id, title, status, created_at, updated_at, client_id, assigned_apprentice_id')
+            .or(`client_id.eq.${userId},assigned_apprentice_id.eq.${userId}`)
+            .order('updated_at', { ascending: false })
+            .limit(20);
+
+        if (jobs) {
+            jobs.forEach(job => {
+                activities.push({
+                    id: `job-${job.id}`,
+                    type: 'job',
+                    action: job.client_id === userId ? 'created_job' : 'assigned_job',
+                    title: job.title,
+                    status: job.status,
+                    timestamp: job.updated_at || job.created_at,
+                    metadata: { jobId: job.id }
+                });
+            });
+        }
+
+        // Get application activities (for apprentices)
+        const { data: applications } = await supabase
+            .from('job_applications')
+            .select('id, status, created_at, updated_at, job_request_id, job_requests(title)')
+            .eq('apprentice_id', userId)
+            .order('updated_at', { ascending: false })
+            .limit(20);
+
+        if (applications) {
+            applications.forEach(app => {
+                activities.push({
+                    id: `app-${app.id}`,
+                    type: 'application',
+                    action: `application_${app.status}`,
+                    title: app.job_requests?.title || 'Job Application',
+                    status: app.status,
+                    timestamp: app.updated_at || app.created_at,
+                    metadata: { applicationId: app.id, jobId: app.job_request_id }
+                });
+            });
+        }
+
+        // Get wallet transactions
+        const { data: transactions } = await supabase
+            .from('wallet_transactions')
+            .select('id, transaction_type, amount_ngn, description, created_at, status')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (transactions) {
+            transactions.forEach(trans => {
+                activities.push({
+                    id: `trans-${trans.id}`,
+                    type: 'transaction',
+                    action: trans.transaction_type,
+                    title: trans.description || `${trans.transaction_type} transaction`,
+                    status: trans.status,
+                    timestamp: trans.created_at,
+                    metadata: { 
+                        transactionId: trans.id,
+                        amount: trans.amount_ngn 
+                    }
+                });
+            });
+        }
+
+        // Sort by timestamp and limit
+        activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        return activities.slice(0, limit);
+    } catch (error) {
+        console.error('Error fetching user activities:', error);
+        return [];
+    }
+}
+
+// Get detailed user information
+export async function getUserDetails(userId) {
+    try {
+        const { data: profile, error: profileError } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', userId)
+            .single();
+
+        if (profileError) throw profileError;
+
+        const stats = await getUserActivityStats(userId, profile.role);
+        const activities = await getUserActivities(userId, 100);
+        
+        // Get wallet info
+        const { data: wallet } = await supabase
+            .from('user_wallets')
+            .select('*')
+            .eq('user_id', userId)
+            .single();
+
+        // Get recent transactions
+        const { data: recentTransactions } = await supabase
+            .from('wallet_transactions')
+            .select('*')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        return {
+            profile,
+            stats,
+            activities,
+            wallet: wallet || null,
+            recentTransactions: recentTransactions || []
+        };
+    } catch (error) {
+        console.error('Error fetching user details:', error);
+        throw error;
     }
 }
 

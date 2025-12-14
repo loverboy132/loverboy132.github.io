@@ -323,10 +323,14 @@ export async function createWithdrawalRequest(amountPoints, bankDetails) {
             throw new Error("Unable to retrieve your wallet. Please try again.");
         }
 
+        // Calculate total deduction including fees
+        const withdrawalFeePoints = 2;
+        const totalDeductionPoints = amountPoints + withdrawalFeePoints;
+        
         const availablePoints = wallet.balance_points ?? 0;
-        if (availablePoints < amountPoints) {
+        if (availablePoints < totalDeductionPoints) {
             throw new Error(
-                `Insufficient points balance. You have ${availablePoints.toFixed(2)} pts available.`
+                `Insufficient points balance. You requested ${amountPoints} points, but with the ${withdrawalFeePoints} point fee, you need ${totalDeductionPoints} points total. You have ${availablePoints.toFixed(2)} pts available.`
             );
         }
 
@@ -354,9 +358,7 @@ export async function createWithdrawalRequest(amountPoints, bankDetails) {
 
         // Insert directly into table
         const amountNgn = pointsToNgn(amountPoints);
-        const withdrawalFeePoints = 2;
         const withdrawalFeeNgn = pointsToNgn(withdrawalFeePoints);
-        const totalDeductionPoints = amountPoints + withdrawalFeePoints;
         const totalDeductionNgn = amountNgn + withdrawalFeeNgn;
         const supportsExtendedWithdrawalColumns = await withdrawalExtendedColumnsAvailable();
 
@@ -1136,8 +1138,30 @@ export async function approveWithdrawalRequest(requestId, bankTransactionId = nu
             throw new Error(`Withdrawal request is already ${withdrawalRequest.status}`);
         }
 
+        // Calculate total deduction including fees (needed for validation and notification)
+        const feePoints = withdrawalRequest.withdrawal_fee_points ?? 2; // Default fee is 2 points
+        const feeNgn = withdrawalRequest.withdrawal_fee_ngn ?? pointsToNgn(feePoints);
+        const pointsToDeduct = withdrawalRequest.total_deduction_points ?? (withdrawalRequest.amount_points + feePoints);
+        const ngnToDeduct = withdrawalRequest.total_deduction_ngn ?? (withdrawalRequest.amount_ngn + feeNgn);
+
+        if (!pointsToDeduct || pointsToDeduct <= 0) {
+            throw new Error('Withdrawal request has invalid amount. Please verify the request data.');
+        }
+
+        // Get user wallet to check balance BEFORE processing
+        const wallet = await getUserWallet(withdrawalRequest.user_id);
+        if (!wallet) {
+            throw new Error('User wallet not found');
+        }
+
+        // Check if user has enough balance (including fees)
+        if ((wallet.balance_points || 0) < pointsToDeduct) {
+            throw new Error(`User does not have sufficient balance. Required: ${pointsToDeduct} points, Available: ${wallet.balance_points || 0} points`);
+        }
+
         // Try to call the RPC function first (if it exists)
         let rpcSucceeded = false;
+        let rpcUpdatedStatus = false;
         try {
             const { data, error } = await supabase.rpc('approve_withdrawal_request', {
                 request_uuid: requestId,
@@ -1149,6 +1173,22 @@ export async function approveWithdrawalRequest(requestId, bankTransactionId = nu
             }
             if (data && !error) {
                 rpcSucceeded = true;
+                // Check if RPC updated the withdrawal request status
+                const { data: updatedRequest } = await supabase
+                    .from('wallet_withdrawal_requests')
+                    .select('status')
+                    .eq('id', requestId)
+                    .single();
+                
+                rpcUpdatedStatus = updatedRequest?.status === 'approved';
+                
+                // Verify that RPC actually deducted points by checking wallet balance
+                const updatedWallet = await getUserWallet(withdrawalRequest.user_id);
+                if (updatedWallet && (updatedWallet.balance_points || 0) >= (wallet.balance_points || 0)) {
+                    // RPC didn't deduct points, we need to do it manually
+                    console.warn('RPC approved but did not deduct points, deducting manually...');
+                    rpcSucceeded = false;
+                }
             }
         } catch (rpcError) {
             // If RPC function doesn't exist or fails, we'll handle it manually
@@ -1156,27 +1196,8 @@ export async function approveWithdrawalRequest(requestId, bankTransactionId = nu
             rpcSucceeded = false;
         }
 
-        // If RPC didn't handle it, do it manually
-        if (!rpcSucceeded) {
-            // Get user wallet
-            const wallet = await getUserWallet(withdrawalRequest.user_id);
-            
-            // Check if user has enough balance
-            if (wallet.balance_points < withdrawalRequest.amount_points) {
-                throw new Error('User does not have sufficient balance');
-            }
-
-            // Determine how much to deduct (include fees if stored)
-            const pointsToDeduct = withdrawalRequest.total_deduction_points ?? withdrawalRequest.amount_points;
-            const ngnToDeduct = withdrawalRequest.total_deduction_ngn ?? withdrawalRequest.amount_ngn;
-            const feePoints = (withdrawalRequest.withdrawal_fee_points ?? 0);
-            const feeNgn = (withdrawalRequest.withdrawal_fee_ngn ?? 0);
-
-            if (!pointsToDeduct || pointsToDeduct <= 0) {
-                throw new Error('Withdrawal request has invalid amount. Please verify the request data.');
-            }
-
-            // Update withdrawal request status
+        // Update withdrawal request status if RPC didn't already update it
+        if (!rpcUpdatedStatus) {
             const updateData = {
                 status: 'approved',
                 processed_at: new Date().toISOString(),
@@ -1195,48 +1216,148 @@ export async function approveWithdrawalRequest(requestId, bankTransactionId = nu
             const { error: updateError } = await supabase
                 .from('wallet_withdrawal_requests')
                 .update(updateData)
-                .eq('id', requestId);
+                .eq('id', requestId)
+                .eq('status', 'pending'); // Only update if still pending
 
             if (updateError) {
-                throw new Error('Failed to update withdrawal request status: ' + updateError.message);
+                // If update failed because status changed, check if it's already approved
+                const { data: currentRequest } = await supabase
+                    .from('wallet_withdrawal_requests')
+                    .select('status')
+                    .eq('id', requestId)
+                    .single();
+                
+                if (currentRequest?.status !== 'approved') {
+                    throw new Error('Failed to update withdrawal request status: ' + updateError.message);
+                }
+                // If already approved, continue to deduct points
+            }
+        }
+
+        // Always verify and deduct points (RPC might have updated status but not deducted)
+        // Check if transaction already exists to prevent double-deduction
+        const { data: existingTransaction, error: checkError } = await supabase
+            .from('wallet_transactions')
+            .select('id')
+            .eq('user_id', withdrawalRequest.user_id)
+            .eq('transaction_type', 'withdrawal')
+            .eq('reference', bankTransactionId || `WR-${requestId}`)
+            .single();
+
+        // Only deduct if no transaction record exists (prevents double-deduction)
+        if (!existingTransaction || checkError?.code === 'PGRST116') {
+            console.log(`[Withdrawal Approval] Deducting ${pointsToDeduct} points for withdrawal request ${requestId}`);
+            
+            // Get fresh wallet balance
+            const currentWallet = await getUserWallet(withdrawalRequest.user_id);
+            if (!currentWallet) {
+                throw new Error('User wallet not found');
             }
 
-            // Deduct from wallet balance
-            const { error: walletUpdateError } = await supabase
-                .from('user_wallets')
-                .update({
-                    balance_points: (wallet.balance_points || 0) - pointsToDeduct,
-                    balance_ngn: (wallet.balance_ngn || 0) - ngnToDeduct,
-                    total_withdrawn: (wallet.total_withdrawn || 0) + ngnToDeduct
-                })
-                .eq('user_id', withdrawalRequest.user_id);
+            console.log(`[Withdrawal Approval] Current balance: ${currentWallet.balance_points} points, Deducting: ${pointsToDeduct} points`);
+
+            // Verify user still has sufficient balance
+            if ((currentWallet.balance_points || 0) < pointsToDeduct) {
+                throw new Error(`User balance insufficient. Required: ${pointsToDeduct} points, Available: ${currentWallet.balance_points || 0} points`);
+            }
+
+            // Deduct points from wallet using RPC function (bypasses RLS)
+            const newBalance = (currentWallet.balance_points || 0) - pointsToDeduct;
+            const newBalanceNgn = (currentWallet.balance_ngn || 0) - ngnToDeduct;
+            const newTotalWithdrawn = (currentWallet.total_withdrawn || 0) + ngnToDeduct;
+            
+            let updatedWallet = null;
+            let walletUpdateError = null;
+            
+            // Try RPC function first (bypasses RLS)
+            try {
+                const { data: rpcUpdatedWallet, error: rpcError } = await supabase
+                    .rpc('update_user_wallet', {
+                        p_user_id: withdrawalRequest.user_id,
+                        p_balance_ngn: newBalanceNgn,
+                        p_balance_points: newBalance,
+                        p_total_deposited: null, // Don't change total_deposited
+                        p_total_withdrawn: newTotalWithdrawn
+                    });
+
+                if (rpcError) {
+                    if (rpcError.code === '42883') {
+                        console.warn('[Withdrawal Approval] RPC function update_user_wallet does not exist, falling back to direct update');
+                        walletUpdateError = null; // Reset to try fallback
+                    } else {
+                        console.error('[Withdrawal Approval] RPC function error:', rpcError);
+                        walletUpdateError = rpcError;
+                    }
+                } else if (rpcUpdatedWallet) {
+                    const walletData = Array.isArray(rpcUpdatedWallet) ? rpcUpdatedWallet[0] : rpcUpdatedWallet;
+                    if (walletData && walletData.user_id) {
+                        console.log('[Withdrawal Approval] Wallet updated successfully via RPC');
+                        updatedWallet = walletData;
+                    }
+                }
+            } catch (rpcErr) {
+                console.warn('[Withdrawal Approval] RPC call failed, falling back to direct update:', rpcErr);
+                walletUpdateError = null; // Reset to try fallback
+            }
+
+            // Fallback to direct update if RPC doesn't exist or failed
+            if (!updatedWallet && !walletUpdateError) {
+                const { data: directUpdatedWallet, error: directError } = await supabase
+                    .from('user_wallets')
+                    .update({
+                        balance_points: newBalance,
+                        balance_ngn: newBalanceNgn,
+                        total_withdrawn: newTotalWithdrawn,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('user_id', withdrawalRequest.user_id)
+                    .select();
+
+                if (directError) {
+                    console.error('[Withdrawal Approval] Direct wallet update error:', directError);
+                    walletUpdateError = directError;
+                } else if (directUpdatedWallet && directUpdatedWallet.length > 0) {
+                    updatedWallet = directUpdatedWallet[0];
+                }
+            }
 
             if (walletUpdateError) {
                 throw new Error('Failed to update wallet balance: ' + walletUpdateError.message);
             }
 
-            // Create wallet transaction record
+            // Verify the update actually worked
+            const verifyWallet = await getUserWallet(withdrawalRequest.user_id);
+            if (verifyWallet && Math.abs((verifyWallet.balance_points || 0) - newBalance) > 0.01) {
+                console.error(`[Withdrawal Approval] WARNING: Wallet update verification failed! Expected balance: ${newBalance}, Actual balance: ${verifyWallet.balance_points}`);
+                throw new Error(`Wallet balance verification failed. Expected: ${newBalance}, Got: ${verifyWallet.balance_points}. This may be due to RLS policies. Please ensure the update_user_wallet RPC function exists.`);
+            }
+
+            console.log(`[Withdrawal Approval] Wallet updated successfully. New balance: ${verifyWallet?.balance_points || updatedWallet?.balance_points || newBalance} points`);
+
+            // Create wallet transaction record (without metadata column if it doesn't exist)
+            const transactionData = {
+                user_id: withdrawalRequest.user_id,
+                transaction_type: 'withdrawal',
+                amount_ngn: -ngnToDeduct,
+                amount_points: -pointsToDeduct,
+                description: `Withdrawal approved - Request ID: ${requestId}`,
+                reference: bankTransactionId || `WR-${requestId}`,
+                status: 'completed'
+            };
+
             const { error: transactionError } = await supabase
                 .from('wallet_transactions')
-                .insert({
-                    user_id: withdrawalRequest.user_id,
-                    transaction_type: 'withdrawal',
-                    amount_ngn: -ngnToDeduct,
-                    amount_points: -pointsToDeduct,
-                    description: `Withdrawal approved - Request ID: ${requestId}`,
-                    reference: bankTransactionId || `WR-${requestId}`,
-                    status: 'completed',
-                    metadata: {
-                        withdrawal_request_id: requestId,
-                        approved_by: user.id,
-                        bank_transaction_id: bankTransactionId
-                    }
-                });
+                .insert(transactionData);
 
             if (transactionError) {
-                console.warn('Failed to create wallet transaction record:', transactionError);
-                // Don't fail the approval if transaction record fails
+                console.error('[Withdrawal Approval] Transaction creation error:', transactionError);
+                // Don't fail the approval if transaction record fails - wallet was already updated
+                console.warn('[Withdrawal Approval] Failed to create wallet transaction record. Wallet was updated but transaction record missing.');
+            } else {
+                console.log(`[Withdrawal Approval] Transaction record created successfully`);
             }
+        } else {
+            console.log('Points already deducted (transaction record exists), skipping deduction step');
         }
 
         // Send notification (non-blocking - don't fail approval if notification fails)
@@ -1935,12 +2056,29 @@ async function withdrawalExtendedColumnsAvailable() {
 }
 
 function referencesWithdrawalExtendedColumnsNotNull(error) {
+    // Check for NOT NULL constraint violation (error code 23502)
+    if (error?.code === '23502') {
+        const message = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
+        // Check if the error is about any of the extended withdrawal columns
+        return (
+            message.includes('withdrawal_fee_ngn') ||
+            message.includes('withdrawal_fee_points') ||
+            message.includes('total_deduction_points') ||
+            message.includes('total_deduction_ngn')
+        );
+    }
+    
+    // Also check message for null value violations
     const message = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
     return (
-        message.includes('"withdrawal_fee_ngn"') ||
-        message.includes('"withdrawal_fee_points"') ||
-        message.includes('"total_deduction_points"') ||
-        message.includes('"total_deduction_ngn"')
+        (message.includes('"withdrawal_fee_ngn"') ||
+         message.includes('"withdrawal_fee_points"') ||
+         message.includes('"total_deduction_points"') ||
+         message.includes('"total_deduction_ngn"') ||
+         message.includes('withdrawal_fee_ngn') ||
+         message.includes('withdrawal_fee_points') ||
+         message.includes('total_deduction_points') ||
+         message.includes('total_deduction_ngn'))
     ) && message.includes('null value');
 }
 

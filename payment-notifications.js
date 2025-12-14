@@ -110,22 +110,174 @@ async function createNotificationRecord({
 
     const resolvedActorId = actorId || (await getCurrentUserId());
 
-    const { data, error } = await supabase.rpc("create_notification", {
-        p_actor_id: resolvedActorId,
-        p_user_id: userId,
-        p_type: type,
-        p_title: title,
-        p_message: message,
-        p_metadata: metadata,
-        p_channels: channels,
-    });
+    // Try RPC first (preferred). If missing or fails, fall back to direct insert
+    try {
+        const { data, error } = await supabase.rpc("create_notification", {
+            p_actor_id: resolvedActorId,
+            p_user_id: userId,
+            p_type: type,
+            p_title: title,
+            p_message: message,
+            p_metadata: metadata,
+            p_channels: channels,
+        });
 
-    if (error) {
-        console.error("Failed to create notification:", error);
-        throw error;
+        if (error) {
+            // Log RPC error details for debugging
+            console.warn("RPC create_notification error:", {
+                code: error.code,
+                message: error.message,
+                details: error.details,
+                hint: error.hint
+            });
+            throw error;
+        }
+
+        return data;
+    } catch (error) {
+        // Check if it's an RLS error or function missing error
+        const isRlsError = error?.code === "42501" || error?.message?.includes("row-level security");
+        const isFunctionMissing = error?.code === "42883" || error?.message?.includes("does not exist");
+        
+        if (isRlsError) {
+            console.warn("RPC create_notification failed due to RLS policy. This should not happen with SECURITY DEFINER. Falling back to direct insert:", error);
+        } else if (isFunctionMissing) {
+            console.warn("RPC create_notification function not found. Falling back to direct insert:", error);
+        } else {
+            console.warn("RPC create_notification failed, using direct insert:", error);
+        }
+
+        const { data: fallbackData, error: insertError } = await supabase
+            .from("notifications")
+            .insert({
+                user_id: userId,
+                delivery_channels: channels,
+                type,
+                title,
+                message,
+                metadata,
+            })
+            .select("*")
+            .single();
+
+        if (insertError) {
+            // Check for RLS policy violation
+            const isRlsError = insertError?.code === "42501" || 
+                              insertError?.message?.includes("row-level security") ||
+                              insertError?.message?.includes("violates row-level security policy");
+            
+            if (isRlsError) {
+                console.error(
+                    "RLS policy violation when inserting notification. " +
+                    "Please run supabase/fix-notifications-rls-policy.sql to add INSERT policy. " +
+                    "Error details:",
+                    insertError
+                );
+                // Try to provide helpful error message
+                throw new Error(
+                    "Notification creation failed due to database security policy. " +
+                    "Please contact support or run the database migration: fix-notifications-rls-policy.sql"
+                );
+            }
+            
+            // Check for missing columns
+            const missingActorColumn =
+                insertError?.code === "PGRST204" ||
+                insertError?.message?.includes("actor_id");
+            const missingChannelsColumn =
+                insertError?.code === "PGRST204" ||
+                insertError?.message?.includes("channels") ||
+                insertError?.message?.includes("delivery_channels");
+            const missingIsReadColumn =
+                insertError?.code === "PGRST204" ||
+                insertError?.message?.includes("is_read");
+            const missingMetadataColumn =
+                insertError?.code === "PGRST204" ||
+                insertError?.message?.includes("metadata");
+
+            if (missingActorColumn || missingChannelsColumn || missingIsReadColumn || missingMetadataColumn) {
+                console.warn(
+                    "Notifications table missing expected columns, retrying with minimal payload",
+                    { missingActorColumn, missingChannelsColumn, missingIsReadColumn, missingMetadataColumn }
+                );
+                
+                // First retry: minimal columns only (user, type, title, message) - omit metadata if missing
+                const minimalPayload = {
+                    user_id: userId,
+                    type,
+                    title,
+                    message,
+                };
+                
+                // Only include metadata if the column exists (not in the error message)
+                if (!missingMetadataColumn) {
+                    minimalPayload.metadata = metadata;
+                }
+                
+                const { data: retryData, error: retryError } = await supabase
+                    .from("notifications")
+                    .insert(minimalPayload)
+                    .select("*")
+                    .single();
+
+                if (!retryError) {
+                    return retryData;
+                }
+
+                // If still failing because of read column naming, try using "read" instead of is_read
+                const missingReadOnRetry =
+                    retryError?.code === "PGRST204" ||
+                    retryError?.message?.includes("is_read") ||
+                    retryError?.message?.includes('"read"');
+
+                if (missingReadOnRetry) {
+                    console.warn(
+                        'Notifications table uses "read" instead of is_read; retrying with read=false'
+                    );
+                    
+                    const readPayload = {
+                        user_id: userId,
+                        type,
+                        title,
+                        message,
+                        read: false,
+                    };
+                    
+                    // Only include metadata if the column exists
+                    if (!missingMetadataColumn) {
+                        readPayload.metadata = metadata;
+                    }
+                    
+                    const { data: retryData2, error: retryError2 } = await supabase
+                        .from("notifications")
+                        .insert(readPayload)
+                        .select("*")
+                        .single();
+
+                    if (!retryError2) {
+                        return retryData2;
+                    }
+
+                    console.error(
+                        "Fallback notification insert (with read=false) failed:",
+                        retryError2
+                    );
+                    throw retryError2;
+                }
+
+                console.error(
+                    "Fallback notification insert (minimal) failed:",
+                    retryError
+                );
+                throw retryError;
+            }
+
+            console.error("Fallback notification insert failed:", insertError);
+            throw insertError;
+        }
+
+        return fallbackData;
     }
-
-    return data;
 }
 
 // Public API
@@ -529,18 +681,27 @@ export async function markAllNotificationsAsRead(userId) {
 }
 
 export async function getUnreadNotificationCount(userId) {
-    const { count, error } = await supabase
-        .from("notifications")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("is_read", false);
+    try {
+        const { count, error } = await supabase
+            .from("notifications")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", userId)
+            .eq("is_read", false);
 
-    if (error) {
-        console.error("Error counting unread notifications:", error);
+        if (error) {
+            throw error;
+        }
+
+        return count || 0;
+    } catch (error) {
+        console.warn("Error counting unread notifications:", {
+            message: error?.message,
+            code: error?.code,
+            details: error?.details,
+            hint: error?.hint,
+        });
         return 0;
     }
-
-    return count || 0;
 }
 
 export function subscribeToNotifications(userId, { onInsert, onError } = {}) {

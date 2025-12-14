@@ -1,0 +1,21 @@
+Craftnet Development Fix List (Final Instructions)
+•	Fix notification bell and email notifications for all activities (payments, admin replies, messages, job updates, disputes, withdrawals).
+•	Fix wallet, withdrawal, and escrow issues; ensure money dispatch to apprentice works correctly; apply 10% commission only on money released to apprentice; remove “Add Funds” from apprentice.
+•	fix “undefined error” on apprentice dashboard.
+•	Add automated payment response: “Payment processing… funds will be issued within 24 hours.”
+•	Fix and complete the dispute system, rating system, and job review flow.
+•	Complete referral system tracking, rewards, and display.
+•	Integrate Flutterwave links for subscription, wallet funding, and job funding.
+•	Add advanced and detailed profile setup (skills, experience, bio, links).
+•	Create individual profile pages when clicking any user (Member or Apprentice).
+•	Add “Upload CV” to job applications and generate an automatic Craftnet ID Card/CV from user profile info.
+•	Fix UI/UX issues: blurry fonts, mobile design, payment layout, leaderboard, help center, contact form, and auto-scroll for top navigation icons.
+•	Redesign visitors page and login page to be more detailed and professional.
+•	Upgrade admin dashboard with full analytics and better controls.
+•	Add “Change Password” option inside settings.
+•	Add “Delete Account” feature with full data removal.
+•	Keep only one subscription plan (Creative – ₦1500) to unlock all premium features.
+•	Improve help center and contact form; include problem categories; add automated response (“We will review within 72 hours”).
+•	Run full website testing after fixes: payments, dashboard, disputes, profile, notifications, member-to-apprentice flow, admin features.
+•	Fix any additional issues discovered during testing.
+•	Delete all initial user accounts and data before relaunch. Start with a clean database.

@@ -141,23 +141,6 @@ const subscriptionPlans = {
             "explore",
         ],
     },
-    entrepreneur: {
-        name: "Entrepreneur",
-        price: 12000,
-        unlocks: [
-            "home",
-            "gallery",
-            "refer",
-            "followers",
-            "subscription",
-            "earnings",
-            "leaderboard",
-            "find_apprentices",
-            "profile",
-            "explore",
-        ],
-    },
-    visionary: { name: "Visionary", price: 37500, unlocks: ["*"] },
 };
 
 // --- TABS CONFIGURATION ---
@@ -858,9 +841,6 @@ const apprenticeContentTemplates = {
                 <p class="text-gray-600">Showcase your skills and work samples</p>
             </div>
             <div class="flex space-x-3">
-                <button id="test-storage-gallery-btn" class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 text-sm">
-                    <i data-feather="database" class="w-4 h-4 inline mr-2"></i>Test Storage
-                </button>
                 <button id="open-upload-modal" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
                     <i data-feather="plus" class="w-4 h-4 inline mr-2"></i>Upload Work
                 </button>
@@ -1396,9 +1376,6 @@ const memberContentTemplates = {
                 <p class="text-gray-600">Showcase your creative work</p>
             </div>
             <div class="flex space-x-3">
-                <button id="test-storage-gallery-btn" class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 text-sm">
-                    <i data-feather="database" class="w-4 h-4 inline mr-2"></i>Test Storage
-                </button>
                 <button id="open-upload-modal" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
                     <i data-feather="plus" class="w-4 h-4 inline mr-2"></i>Upload Work
                 </button>
@@ -1476,9 +1453,6 @@ const memberContentTemplates = {
                     <h3 class="text-xl font-semibold text-gray-700 mb-2">No work uploaded yet</h3>
                     <p class="text-gray-500 mb-6">Start showcasing your creative work to get discovered</p>
                     <div class="space-y-4">
-                        <button id="test-storage-empty-gallery-btn" class="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 text-sm mx-2">
-                            <i data-feather="database" class="w-4 h-4 inline mr-2"></i>Test Storage First
-                        </button>
                         <button id="gallery-upload-btn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 mx-2">
                             Upload Your First Work
                         </button>
@@ -1868,14 +1842,6 @@ const memberContentTemplates = {
                             <span class="text-sm">Creative (₦1,500/mo)</span>
                             <span class="font-semibold text-blue-600">10%</span>
                         </div>
-                        <div class="flex justify-between items-center p-2 bg-green-50 rounded">
-                            <span class="text-sm">Entrepreneur (₦12,000/mo)</span>
-                            <span class="font-semibold text-green-600">20%</span>
-                        </div>
-                        <div class="flex justify-between items-center p-2 bg-purple-50 rounded">
-                            <span class="text-sm">Visionary (₦37,500/mo)</span>
-                            <span class="font-semibold text-purple-600">30%</span>
-                        </div>
                     </div>
                 </div>
                 <div>
@@ -1909,6 +1875,29 @@ const memberContentTemplates = {
             completedJobs: 0,
             totalSpent: 0,
         };
+        
+        // Count monthly jobs for free plan users
+        let monthlyJobCount = 0;
+        const subscriptionPlan = userData?.subscription_plan || "free";
+        
+        if (subscriptionPlan === "free") {
+            try {
+                const now = new Date();
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+                
+                const { data: monthlyJobs } = await supabase
+                    .from("job_requests")
+                    .select("id")
+                    .eq("client_id", userData.id)
+                    .gte("created_at", startOfMonth.toISOString())
+                    .lte("created_at", endOfMonth.toISOString());
+                
+                monthlyJobCount = monthlyJobs?.length || 0;
+            } catch (error) {
+                console.error("Error counting monthly jobs:", error);
+            }
+        }
 
         try {
             myJobRequests = await getClientJobRequests(userData.id);
@@ -1977,6 +1966,22 @@ const memberContentTemplates = {
             <div class="p-6 border-b border-gray-200">
                 <h3 class="text-xl font-bold text-gray-900">Create New Job Request</h3>
                 <p class="text-gray-600">Post a new job for skilled apprentices to apply</p>
+                ${
+                    subscriptionPlan === "free"
+                        ? `
+                        <div class="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p class="text-sm text-yellow-800">
+                                <i data-feather="info" class="w-4 h-4 inline mr-1"></i>
+                                <strong>Free Plan Limit:</strong> You have posted <strong>${monthlyJobCount} of 3</strong> jobs this month.
+                                ${monthlyJobCount >= 3 
+                                    ? '<span class="text-red-600 font-semibold"> You have reached your monthly limit. Upgrade to Creative plan for unlimited job postings.</span>'
+                                    : ` You can post ${3 - monthlyJobCount} more job${3 - monthlyJobCount === 1 ? '' : 's'} this month.`
+                                }
+                            </p>
+                        </div>
+                        `
+                        : ""
+                }
             </div>
             <div class="p-6">
                 <form id="create-job-form" class="space-y-6">
@@ -2041,9 +2046,17 @@ const memberContentTemplates = {
                     
                     <div class="flex justify-end">
                         <button type="submit" id="create-job-btn"
-                            class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium flex items-center">
+                            class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium flex items-center ${
+                                subscriptionPlan === "free" && monthlyJobCount >= 3 
+                                    ? "opacity-50 cursor-not-allowed" 
+                                    : ""
+                            }"
+                            ${subscriptionPlan === "free" && monthlyJobCount >= 3 ? "disabled" : ""}>
                             <i data-feather="plus" class="w-4 h-4 mr-2"></i>
-                            Create Job Request
+                            ${subscriptionPlan === "free" && monthlyJobCount >= 3 
+                                ? "Monthly Limit Reached" 
+                                : "Create Job Request"
+                            }
                         </button>
                     </div>
                 </form>
@@ -2618,36 +2631,6 @@ function attachDynamicEventListeners(tabId, userData) {
                 galleryUploadBtn.addEventListener("click", () =>
                     uploadModal.classList.add("active")
                 );
-            }
-
-            // Add test storage button listener
-            const testStorageBtn = document.getElementById(
-                "test-storage-gallery-btn"
-            );
-            if (testStorageBtn) {
-                testStorageBtn.addEventListener("click", async () => {
-                    testStorageBtn.disabled = true;
-                    testStorageBtn.textContent = "Testing...";
-
-                    const success = await testStorageConfiguration();
-
-                    if (success) {
-                        showNotification(
-                            "Storage test completed successfully! Check console for details.",
-                            "success"
-                        );
-                    } else {
-                        showNotification(
-                            "Storage test failed. Check console for details.",
-                            "error"
-                        );
-                    }
-
-                    testStorageBtn.disabled = false;
-                    testStorageBtn.innerHTML =
-                        '<i data-feather="database" class="w-4 h-4 inline mr-2"></i>Test Storage';
-                    feather.replace();
-                });
             }
         }
 
@@ -3881,12 +3864,28 @@ async function initializeNotificationCenter(userData) {
 async function refreshNotifications() {
     if (!notificationState.userId) return;
     try {
-        const [items, unread] = await Promise.all([
+        const [itemsResult, unreadResult] = await Promise.allSettled([
             getUserNotifications(notificationState.userId, 20, 0),
             getUnreadNotificationCount(notificationState.userId),
         ]);
-        notificationState.items = items;
-        notificationState.unreadCount = unread;
+
+        if (itemsResult.status === "fulfilled") {
+            notificationState.items = itemsResult.value || [];
+        } else {
+            console.error("Failed to load notifications list:", itemsResult.reason);
+        }
+
+        if (unreadResult.status === "fulfilled") {
+            notificationState.unreadCount = unreadResult.value || 0;
+        } else {
+            console.error(
+                "Failed to load unread notification count:",
+                unreadResult.reason
+            );
+            // Keep existing count or fall back to 0
+            notificationState.unreadCount = notificationState.unreadCount || 0;
+        }
+
         renderNotificationList();
         updateNotificationBadge();
     } catch (error) {

@@ -1,6 +1,13 @@
 // admin-dashboard-simplified.js - Simplified Admin Dashboard
 import { supabase } from "./supabase-auth.js";
-import { getAllDisputes, updateDisputeStatus, getDisputeEvidenceSignedUrl } from "./supabase-auth.js";
+import { 
+    getAllDisputes, 
+    updateDisputeStatus, 
+    getDisputeEvidenceSignedUrl,
+    getAllUsersWithStats,
+    getUserDetails,
+    getUserActivities
+} from "./supabase-auth.js";
 import {
     getUserNotifications,
     markNotificationAsRead,
@@ -29,6 +36,19 @@ let currentDisputeFilters = {
     search: ''
 };
 let currentDispute = null;
+
+// User management state
+let allUsers = [];
+let filteredUsers = [];
+let currentUserFilters = {
+    role: '',
+    search: '',
+    sortBy: 'created_at',
+    sortOrder: 'desc'
+};
+let currentPage = 1;
+let usersPerPage = 20;
+let usersRealtimeChannel = null;
 
 // Notification state
 const notificationState = {
@@ -130,7 +150,7 @@ async function loadUsersData() {
         // Get recent user registrations
         const { data: recentUsers, error: recentError } = await supabase
             .from('profiles')
-            .select('id, full_name, email, created_at')
+            .select('id, name, email, created_at')
             .order('created_at', { ascending: false })
             .limit(5);
 
@@ -222,7 +242,7 @@ async function loadPaymentsData() {
         // Recent funding requests
         const { data: recentFunding, error: recentFundingError } = await supabase
             .from('funding_requests')
-            .select('id, amount_ngn, created_at, profiles(full_name, email)')
+            .select('id, amount_ngn, created_at, profiles(name, email)')
             .order('created_at', { ascending: false })
             .limit(3);
 
@@ -367,9 +387,11 @@ function navigateToSection(sectionId) {
     if (targetSection) {
         targetSection.classList.add('active');
         
-        // Load disputes when navigating to disputes section
+        // Load section-specific data
         if (sectionId === 'disputes') {
             loadDisputes();
+        } else if (sectionId === 'users') {
+            loadUsers();
         }
     }
 
@@ -450,10 +472,21 @@ function setupEventListeners() {
         }
     });
 
+    // Handle Enter key in search inputs
+    const userSearchInput = document.getElementById('user-search-input');
+    if (userSearchInput) {
+        userSearchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                applyUserFilters();
+            }
+        });
+    }
+
     // Close modals when clicking outside
     document.addEventListener('click', (e) => {
         const disputeModal = document.getElementById('dispute-detail-modal');
         const resolveModal = document.getElementById('resolve-dispute-modal');
+        const userDetailModal = document.getElementById('user-detail-modal');
         
         if (disputeModal && e.target === disputeModal) {
             closeDisputeModal();
@@ -462,6 +495,10 @@ function setupEventListeners() {
         if (resolveModal && e.target === resolveModal) {
             closeResolveModal();
         }
+        
+        if (userDetailModal && e.target === userDetailModal) {
+            closeUserDetailModal();
+        }
     });
 
     // Close modals with Escape key
@@ -469,6 +506,7 @@ function setupEventListeners() {
         if (e.key === 'Escape') {
             closeDisputeModal();
             closeResolveModal();
+            closeUserDetailModal();
         }
     });
 }
@@ -1148,6 +1186,456 @@ window.addEventListener("beforeunload", () => {
     }
 });
 
+// ==================== USER MANAGEMENT FUNCTIONS ====================
+
+// Load users data
+async function loadUsers() {
+    try {
+        const container = document.getElementById('users-container');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #64748b;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 16px;"></i>
+                <p>Loading users...</p>
+            </div>
+        `;
+
+        const offset = (currentPage - 1) * usersPerPage;
+        const result = await getAllUsersWithStats(
+            currentUserFilters.role || null,
+            usersPerPage,
+            offset,
+            currentUserFilters.search
+        );
+
+        allUsers = result.users || [];
+        filteredUsers = [...allUsers];
+
+        updateUsersStats();
+        displayUsers();
+        setupUsersRealtime();
+
+    } catch (error) {
+        console.error('Error loading users:', error);
+        const container = document.getElementById('users-container');
+        if (container) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #ef4444;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 16px;"></i>
+                    <p>Failed to load users: ${error.message}</p>
+                    <button onclick="loadUsers()" class="btn btn-primary" style="margin-top: 16px; padding: 10px 16px; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 500; cursor: pointer; background: #3b82f6; color: white;">
+                        <i class="fas fa-sync-alt"></i> Retry
+                    </button>
+                </div>
+            `;
+        }
+        showNotification('Failed to load users', 'error');
+    }
+}
+
+// Update user statistics
+function updateUsersStats() {
+    const totalUsers = allUsers.length;
+    const totalMembers = allUsers.filter(u => u.role === 'member').length;
+    const totalApprentices = allUsers.filter(u => u.role === 'apprentice').length;
+    const activeUsers = allUsers.filter(u => {
+        const lastActivity = u.stats?.lastActivity;
+        if (!lastActivity) return false;
+        const daysSinceActivity = (new Date() - new Date(lastActivity)) / (1000 * 60 * 60 * 24);
+        return daysSinceActivity <= 30;
+    }).length;
+
+    const totalEl = document.getElementById('users-total-count');
+    const membersEl = document.getElementById('users-members-count');
+    const apprenticesEl = document.getElementById('users-apprentices-count');
+    const activeEl = document.getElementById('users-active-count');
+
+    if (totalEl) totalEl.textContent = totalUsers;
+    if (membersEl) membersEl.textContent = totalMembers;
+    if (apprenticesEl) apprenticesEl.textContent = totalApprentices;
+    if (activeEl) activeEl.textContent = activeUsers;
+}
+
+// Display users
+function displayUsers() {
+    const container = document.getElementById('users-container');
+    if (!container) return;
+
+    if (filteredUsers.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px; color: #64748b;">
+                <i class="fas fa-inbox" style="font-size: 4rem; margin-bottom: 16px; color: #cbd5e1;"></i>
+                <h3 style="font-size: 1.5rem; margin-bottom: 8px; color: #374151;">No Users Found</h3>
+                <p>No users match your current filters.</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = filteredUsers.map(user => {
+        const stats = user.stats || {};
+        const roleColor = user.role === 'apprentice' 
+            ? { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' }
+            : { bg: '#d1fae5', text: '#065f46', border: '#10b981' };
+        
+        const avatarInitials = (user.name || user.email || 'U')
+            .split(' ')
+            .map(n => n[0])
+            .join('')
+            .toUpperCase()
+            .substring(0, 2);
+
+        const wallet = user.wallet && user.wallet[0] ? user.wallet[0] : null;
+
+        return `
+            <div class="user-card" style="border: 1px solid #e5e7eb; border-left: 4px solid ${roleColor.border}; border-radius: 12px; padding: 20px; margin-bottom: 16px; background: white; transition: all 0.2s; cursor: pointer;" 
+                 onclick="viewUserDetails('${user.id}')"
+                 onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+                 onmouseout="this.style.boxShadow='none'">
+                <div style="display: flex; gap: 16px; align-items: flex-start;">
+                    <div style="width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 1.25rem; flex-shrink: 0;">
+                        ${avatarInitials}
+                    </div>
+                    <div style="flex: 1;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                            <div>
+                                <h3 style="font-size: 1.1rem; font-weight: 600; color: #1e293b; margin-bottom: 4px;">
+                                    ${user.full_name || user.name || user.email || 'No Name'}
+                                </h3>
+                                <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 4px;">
+                                    ${user.email || 'No email'}
+                                </p>
+                                ${user.username ? `<p style="color: #94a3b8; font-size: 0.85rem;">@${user.username}</p>` : ''}
+                            </div>
+                            <span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 500; background: ${roleColor.bg}; color: ${roleColor.text};">
+                                ${user.role === 'apprentice' ? 'Apprentice' : 'Member'}
+                            </span>
+                        </div>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 12px; padding: 12px; background: #f8fafc; border-radius: 8px;">
+                            ${user.role === 'apprentice' ? `
+                                <div>
+                                    <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">Jobs</div>
+                                    <div style="font-size: 0.9rem; color: #1e293b; font-weight: 600;">${stats.totalJobs || 0}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">Applications</div>
+                                    <div style="font-size: 0.9rem; color: #1e293b; font-weight: 600;">${stats.totalApplications || 0}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">Earnings</div>
+                                    <div style="font-size: 0.9rem; color: #1e293b; font-weight: 600;">₦${(stats.totalEarnings || 0).toLocaleString()}</div>
+                                </div>
+                            ` : `
+                                <div>
+                                    <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">Jobs Created</div>
+                                    <div style="font-size: 0.9rem; color: #1e293b; font-weight: 600;">${stats.totalJobs || 0}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">Total Spent</div>
+                                    <div style="font-size: 0.9rem; color: #1e293b; font-weight: 600;">₦${(stats.totalSpent || 0).toLocaleString()}</div>
+                                </div>
+                                <div>
+                                    <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">Active Jobs</div>
+                                    <div style="font-size: 0.9rem; color: #1e293b; font-weight: 600;">${stats.activeJobs || 0}</div>
+                                </div>
+                            `}
+                            <div>
+                                <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">Wallet Balance</div>
+                                <div style="font-size: 0.9rem; color: #1e293b; font-weight: 600;">₦${(wallet?.balance_ngn || stats.walletBalance || 0).toLocaleString()}</div>
+                            </div>
+                            ${stats.lastActivity ? `
+                                <div>
+                                    <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 4px;">Last Activity</div>
+                                    <div style="font-size: 0.9rem; color: #1e293b; font-weight: 500;">${formatTimeAgo(stats.lastActivity)}</div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div style="display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; padding-top: 16px; border-top: 1px solid #e5e7eb;">
+                    <button onclick="event.stopPropagation(); viewUserDetails('${user.id}')" 
+                            class="btn btn-primary" 
+                            style="padding: 8px 16px; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer; background: #3b82f6; color: white;">
+                        <i class="fas fa-eye"></i> View Details
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // Add pagination if needed
+    updateUsersPagination();
+}
+
+// Setup real-time subscription for users
+function setupUsersRealtime() {
+    // Cleanup existing subscription
+    if (usersRealtimeChannel) {
+        supabase.removeChannel(usersRealtimeChannel);
+        usersRealtimeChannel = null;
+    }
+
+    // Subscribe to profile changes
+    usersRealtimeChannel = supabase
+        .channel('admin-users-changes')
+        .on(
+            'postgres_changes',
+            {
+                event: '*',
+                schema: 'public',
+                table: 'profiles'
+            },
+            (payload) => {
+                console.log('User change detected:', payload);
+                // Reload users when there's a change
+                loadUsers();
+            }
+        )
+        .subscribe();
+}
+
+// Apply user filters
+function applyUserFilters() {
+    const role = document.getElementById('user-role-filter')?.value || '';
+    const search = document.getElementById('user-search-input')?.value || '';
+    
+    currentUserFilters.role = role;
+    currentUserFilters.search = search;
+    currentPage = 1;
+    
+    loadUsers();
+}
+
+// Clear user filters
+function clearUserFilters() {
+    if (document.getElementById('user-role-filter')) document.getElementById('user-role-filter').value = '';
+    if (document.getElementById('user-search-input')) document.getElementById('user-search-input').value = '';
+    
+    currentUserFilters = {
+        role: '',
+        search: '',
+        sortBy: 'created_at',
+        sortOrder: 'desc'
+    };
+    currentPage = 1;
+    
+    loadUsers();
+}
+
+// Update pagination
+function updateUsersPagination() {
+    // This would need total count from the API - simplified for now
+    const paginationEl = document.getElementById('users-pagination');
+    if (paginationEl) {
+        paginationEl.innerHTML = `
+            <div style="display: flex; justify-content: center; gap: 8px; margin-top: 20px;">
+                <button onclick="changeUsersPage(${currentPage - 1})" 
+                        ${currentPage <= 1 ? 'disabled' : ''}
+                        class="btn btn-secondary" 
+                        style="padding: 8px 16px; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 500; cursor: pointer; background: #6b7280; color: white; ${currentPage <= 1 ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
+                    <i class="fas fa-chevron-left"></i> Previous
+                </button>
+                <span style="padding: 8px 16px; display: flex; align-items: center; color: #64748b;">
+                    Page ${currentPage}
+                </span>
+                <button onclick="changeUsersPage(${currentPage + 1})" 
+                        ${filteredUsers.length < usersPerPage ? 'disabled' : ''}
+                        class="btn btn-secondary" 
+                        style="padding: 8px 16px; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 500; cursor: pointer; background: #6b7280; color: white; ${filteredUsers.length < usersPerPage ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
+                    Next <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        `;
+    }
+}
+
+// Change users page
+function changeUsersPage(page) {
+    if (page < 1) return;
+    currentPage = page;
+    loadUsers();
+}
+
+// View user details
+async function viewUserDetails(userId) {
+    try {
+        showNotification('Loading user details...', 'info');
+        const userDetails = await getUserDetails(userId);
+        
+        const modal = document.getElementById('user-detail-modal');
+        const content = document.getElementById('user-detail-content');
+        
+        if (!modal || !content) {
+            showNotification('Modal elements not found', 'error');
+            return;
+        }
+
+        const { profile, stats, activities, wallet, recentTransactions } = userDetails;
+        const roleColor = profile.role === 'apprentice' 
+            ? { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' }
+            : { bg: '#d1fae5', text: '#065f46', border: '#10b981' };
+
+        content.innerHTML = `
+            <div style="display: grid; gap: 24px;">
+                <!-- Profile Header -->
+                <div style="display: flex; gap: 20px; padding: 20px; background: #f8fafc; border-radius: 12px; border-left: 4px solid ${roleColor.border};">
+                    <div style="width: 80px; height: 80px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 2rem; flex-shrink: 0;">
+                        ${(profile.full_name || profile.name || profile.email || 'U').charAt(0).toUpperCase()}
+                    </div>
+                    <div style="flex: 1;">
+                        <h3 style="font-size: 1.5rem; font-weight: 600; color: #1e293b; margin-bottom: 8px;">
+                            ${profile.full_name || profile.name || profile.email || 'No Name'}
+                        </h3>
+                        <p style="color: #64748b; margin-bottom: 4px;">${profile.email || 'No email'}</p>
+                        ${profile.username ? `<p style="color: #94a3b8;">@${profile.username}</p>` : ''}
+                        <span style="display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 500; background: ${roleColor.bg}; color: ${roleColor.text}; margin-top: 8px;">
+                            ${profile.role === 'apprentice' ? 'Apprentice' : 'Member'}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Statistics -->
+                <div>
+                    <h4 style="margin-bottom: 16px; color: #1e293b; font-size: 1.1rem; font-weight: 600;">Statistics</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                        ${profile.role === 'apprentice' ? `
+                            <div style="padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">Total Jobs</div>
+                                <div style="font-size: 1.5rem; font-weight: 600; color: #1e293b;">${stats.totalJobs || 0}</div>
+                            </div>
+                            <div style="padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">Applications</div>
+                                <div style="font-size: 1.5rem; font-weight: 600; color: #1e293b;">${stats.totalApplications || 0}</div>
+                            </div>
+                            <div style="padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">Total Earnings</div>
+                                <div style="font-size: 1.5rem; font-weight: 600; color: #10b981;">₦${(stats.totalEarnings || 0).toLocaleString()}</div>
+                            </div>
+                        ` : `
+                            <div style="padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">Jobs Created</div>
+                                <div style="font-size: 1.5rem; font-weight: 600; color: #1e293b;">${stats.totalJobs || 0}</div>
+                            </div>
+                            <div style="padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">Total Spent</div>
+                                <div style="font-size: 1.5rem; font-weight: 600; color: #ef4444;">₦${(stats.totalSpent || 0).toLocaleString()}</div>
+                            </div>
+                            <div style="padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                                <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">Active Jobs</div>
+                                <div style="font-size: 1.5rem; font-weight: 600; color: #1e293b;">${stats.activeJobs || 0}</div>
+                            </div>
+                        `}
+                        <div style="padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                            <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 8px;">Wallet Balance</div>
+                            <div style="font-size: 1.5rem; font-weight: 600; color: #1e293b;">₦${(wallet?.balance_ngn || stats.walletBalance || 0).toLocaleString()}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Activities Timeline -->
+                <div>
+                    <h4 style="margin-bottom: 16px; color: #1e293b; font-size: 1.1rem; font-weight: 600;">Recent Activities</h4>
+                    <div style="max-height: 400px; overflow-y: auto; padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                        ${activities.length > 0 ? activities.map(activity => `
+                            <div style="display: flex; gap: 12px; padding: 12px; border-bottom: 1px solid #f1f5f9; align-items: flex-start;">
+                                <div style="width: 40px; height: 40px; border-radius: 50%; background: ${getActivityColor(activity.type)}; display: flex; align-items: center; justify-content: center; color: white; flex-shrink: 0;">
+                                    <i class="fas fa-${getActivityIcon(activity.type)}"></i>
+                                </div>
+                                <div style="flex: 1;">
+                                    <div style="font-weight: 500; color: #1e293b; margin-bottom: 4px;">${activity.title}</div>
+                                    <div style="font-size: 0.85rem; color: #64748b;">${formatTimeAgo(activity.timestamp)}</div>
+                                </div>
+                                <span style="padding: 4px 8px; border-radius: 12px; font-size: 0.75rem; background: #f1f5f9; color: #64748b;">
+                                    ${activity.status}
+                                </span>
+                            </div>
+                        `).join('') : '<p style="text-align: center; color: #64748b; padding: 20px;">No activities found</p>'}
+                    </div>
+                </div>
+
+                <!-- Profile Details -->
+                <div>
+                    <h4 style="margin-bottom: 16px; color: #1e293b; font-size: 1.1rem; font-weight: 600;">Profile Information</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; padding: 16px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                        <div>
+                            <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 4px;">Phone</div>
+                            <div style="color: #1e293b; font-weight: 500;">${profile.phone || 'N/A'}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 4px;">Location</div>
+                            <div style="color: #1e293b; font-weight: 500;">${profile.location || profile.business_location || 'N/A'}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 4px;">Joined</div>
+                            <div style="color: #1e293b; font-weight: 500;">${new Date(profile.created_at).toLocaleDateString()}</div>
+                        </div>
+                        ${profile.role === 'apprentice' ? `
+                            <div>
+                                <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 4px;">Skill Category</div>
+                                <div style="color: #1e293b; font-weight: 500;">${profile.skill_category || profile.skill || 'N/A'}</div>
+                            </div>
+                        ` : `
+                            <div>
+                                <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 4px;">Business Name</div>
+                                <div style="color: #1e293b; font-weight: 500;">${profile.business_name || 'N/A'}</div>
+                            </div>
+                        `}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        modal.style.display = 'flex';
+        modal.style.alignItems = 'center';
+        modal.style.justifyContent = 'center';
+        
+    } catch (error) {
+        console.error('Error loading user details:', error);
+        showNotification(`Failed to load user details: ${error.message}`, 'error');
+    }
+}
+
+// Helper functions for activities
+function getActivityIcon(type) {
+    const icons = {
+        'job': 'briefcase',
+        'application': 'file-alt',
+        'transaction': 'money-bill-wave'
+    };
+    return icons[type] || 'circle';
+}
+
+function getActivityColor(type) {
+    const colors = {
+        'job': '#3b82f6',
+        'application': '#10b981',
+        'transaction': '#f59e0b'
+    };
+    return colors[type] || '#6b7280';
+}
+
+// Close user detail modal
+function closeUserDetailModal() {
+    const modal = document.getElementById('user-detail-modal');
+    if (modal) modal.style.display = 'none';
+}
+
+// Refresh users
+function refreshUsers() {
+    loadUsers();
+    showNotification('Users refreshed', 'success');
+}
+
+// Cleanup realtime on page unload
+window.addEventListener('beforeunload', () => {
+    if (usersRealtimeChannel) {
+        supabase.removeChannel(usersRealtimeChannel);
+        usersRealtimeChannel = null;
+    }
+});
+
 // Make functions globally available
 window.navigateToSection = navigateToSection;
 window.toggleSidebar = toggleSidebar;
@@ -1162,4 +1650,11 @@ window.closeDisputeModal = closeDisputeModal;
 window.openResolveModal = openResolveModal;
 window.closeResolveModal = closeResolveModal;
 window.confirmResolveDispute = confirmResolveDispute;
+window.loadUsers = loadUsers;
+window.applyUserFilters = applyUserFilters;
+window.clearUserFilters = clearUserFilters;
+window.changeUsersPage = changeUsersPage;
+window.viewUserDetails = viewUserDetails;
+window.closeUserDetailModal = closeUserDetailModal;
+window.refreshUsers = refreshUsers;
 
