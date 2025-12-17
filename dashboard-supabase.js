@@ -108,6 +108,56 @@ const mainNav = document.getElementById("main-nav");
 const notificationBell = document.getElementById("notification-bell");
 const notificationPanel = document.getElementById("notification-panel");
 const notificationList = document.getElementById("notification-list");
+
+// Helper function to generate fallback avatar (data URI) when placehold.co times out
+function generateFallbackAvatar(text, size = 100) {
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    
+    // Background color
+    ctx.fillStyle = '#EBF4FF';
+    ctx.fillRect(0, 0, size, size);
+    
+    // Text
+    ctx.fillStyle = '#3B82F6';
+    ctx.font = `bold ${size * 0.4}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText((text || 'U').charAt(0).toUpperCase(), size / 2, size / 2);
+    
+    return canvas.toDataURL();
+}
+
+// Helper function to set avatar with fallback
+function setAvatarWithFallback(imgElement, text, size = 100) {
+    if (!imgElement) return;
+    
+    const fallbackSrc = generateFallbackAvatar(text, size);
+    const placeholderUrl = `https://placehold.co/${size}x${size}/EBF4FF/3B82F6?text=${(text || 'U').charAt(0).toUpperCase()}`;
+    
+    // Set placeholder first
+    imgElement.src = placeholderUrl;
+    
+    // Add error handler to use fallback if placeholder times out
+    imgElement.onerror = function() {
+        console.warn(`Placeholder image timed out, using fallback for: ${text}`);
+        this.onerror = null; // Prevent infinite loop
+        this.src = fallbackSrc;
+    };
+    
+    // Also set a timeout to switch to fallback if image doesn't load in 3 seconds
+    const timeout = setTimeout(() => {
+        if (imgElement.complete === false || imgElement.naturalWidth === 0) {
+            console.warn(`Placeholder image taking too long, using fallback for: ${text}`);
+            imgElement.src = fallbackSrc;
+        }
+    }, 3000);
+    
+    // Clear timeout if image loads successfully
+    imgElement.onload = () => clearTimeout(timeout);
+}
 const notificationBadge = document.getElementById("notification-badge");
 const notificationWrapper = document.getElementById("notification-wrapper");
 const markAllNotificationsBtn = document.getElementById(
@@ -4410,11 +4460,27 @@ async function renderDashboard(user, userData) {
         console.log("Rendering dashboard for user:", userData);
         console.log("User role:", userData?.role);
 
-        // Ensure loading screen is hidden
+        // FORCE hide loading screen immediately - use multiple methods to ensure it's hidden
         if (loadingScreen) {
             loadingScreen.classList.add("hidden");
+            loadingScreen.style.display = "none";
+            loadingScreen.style.visibility = "hidden";
+            loadingScreen.style.opacity = "0";
+            loadingScreen.style.zIndex = "-1";
+            console.log("✅ Loading screen forcefully hidden");
         } else {
             console.warn("Loading screen element not found");
+        }
+
+        // Show dashboard layout IMMEDIATELY - before any content loads
+        if (dashboardLayout) {
+            dashboardLayout.classList.remove("hidden");
+            dashboardLayout.style.display = "";
+            dashboardLayout.style.visibility = "";
+            dashboardLayout.style.opacity = "";
+            console.log("✅ Dashboard layout shown immediately");
+        } else {
+            console.error("Dashboard layout element not found!");
         }
 
         // Universal header setup
@@ -4425,8 +4491,7 @@ async function renderDashboard(user, userData) {
         }
         
         if (userAvatarEl) {
-            const initials = (userData.name || "U").charAt(0).toUpperCase();
-            userAvatarEl.src = `https://placehold.co/100x100/EBF4FF/3B82F6?text=${initials}`;
+            setAvatarWithFallback(userAvatarEl, userData.name || "U", 100);
         } else {
             console.warn("User avatar element not found");
         }
@@ -4454,24 +4519,11 @@ async function renderDashboard(user, userData) {
             await switchContent("home", userData);
         }
 
-        // Show dashboard layout - CRITICAL: This must happen
+        // Dashboard layout should already be shown above, but ensure it's visible
         if (dashboardLayout) {
             dashboardLayout.classList.remove("hidden");
-            console.log("Dashboard layout shown");
-        } else {
-            console.error("Dashboard layout element not found!");
-            // Try to show something anyway
-            document.body.innerHTML = `
-                <div class="min-h-screen bg-gray-100 p-8">
-                    <div class="text-center py-12">
-                        <p class="text-red-500 mb-4">Dashboard layout element not found. Please refresh the page.</p>
-                        <button onclick="location.reload()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-                            Refresh Page
-                        </button>
-                    </div>
-                </div>
-            `;
-            return;
+            dashboardLayout.style.display = "";
+            console.log("✅ Dashboard layout confirmed visible");
         }
         
         // Setup event listeners
@@ -5289,13 +5341,20 @@ function copyToClipboard(text) {
 async function initializeDashboard() {
     // Safety timeout: Always hide loading screen after 10 seconds
     const safetyTimeout = setTimeout(() => {
-        console.warn("⚠️ Dashboard initialization taking too long, forcing loading screen to hide");
-        if (loadingScreen) {
-            loadingScreen.classList.add("hidden");
-        }
-        if (dashboardLayout) {
-            dashboardLayout.classList.remove("hidden");
-        }
+            console.warn("⚠️ Dashboard initialization taking too long, forcing loading screen to hide");
+            if (loadingScreen) {
+                loadingScreen.classList.add("hidden");
+                loadingScreen.style.display = "none";
+                loadingScreen.style.visibility = "hidden";
+                loadingScreen.style.opacity = "0";
+                loadingScreen.style.zIndex = "-1";
+            }
+            if (dashboardLayout) {
+                dashboardLayout.classList.remove("hidden");
+                dashboardLayout.style.display = "";
+                dashboardLayout.style.visibility = "";
+                dashboardLayout.style.opacity = "";
+            }
     }, 10000);
 
     try {
@@ -5365,9 +5424,18 @@ async function initializeDashboard() {
             console.log("User profile loaded:", userData);
         } catch (error) {
             console.error("Error loading user profile:", error);
-            // Show error but still try to render
-            loadingScreen.classList.add("hidden");
-            dashboardLayout.classList.remove("hidden");
+            // Show error but still try to render - FORCE hide loading screen
+            if (loadingScreen) {
+                loadingScreen.classList.add("hidden");
+                loadingScreen.style.display = "none";
+                loadingScreen.style.visibility = "hidden";
+                loadingScreen.style.opacity = "0";
+                loadingScreen.style.zIndex = "-1";
+            }
+            if (dashboardLayout) {
+                dashboardLayout.classList.remove("hidden");
+                dashboardLayout.style.display = "";
+            }
             mainContent.innerHTML = `
                 <div class="text-center py-12">
                     <p class="text-red-500 mb-4">Error loading profile: ${error.message}</p>
@@ -5399,10 +5467,19 @@ async function initializeDashboard() {
                 console.log("Profile setup modal shown");
             } catch (error) {
                 console.error("Error showing profile setup modal:", error);
-                // Fallback: show dashboard anyway with a warning
+                // Fallback: show dashboard anyway with a warning - FORCE hide loading screen
                 console.log("Falling back to dashboard display");
-                loadingScreen.classList.add("hidden");
-                dashboardLayout.classList.remove("hidden");
+                if (loadingScreen) {
+                    loadingScreen.classList.add("hidden");
+                    loadingScreen.style.display = "none";
+                    loadingScreen.style.visibility = "hidden";
+                    loadingScreen.style.opacity = "0";
+                    loadingScreen.style.zIndex = "-1";
+                }
+                if (dashboardLayout) {
+                    dashboardLayout.classList.remove("hidden");
+                    dashboardLayout.style.display = "";
+                }
                 await renderDashboard(user, userData);
                 if (mainContent) {
                     mainContent.innerHTML = `
@@ -5418,10 +5495,23 @@ async function initializeDashboard() {
 
         console.log("Profile is completed, rendering dashboard");
 
-        // Hide loading screen immediately before rendering
+        // FORCE hide loading screen immediately before rendering
         if (loadingScreen) {
             loadingScreen.classList.add("hidden");
-            console.log("✅ Loading screen hidden before rendering");
+            loadingScreen.style.display = "none";
+            loadingScreen.style.visibility = "hidden";
+            loadingScreen.style.opacity = "0";
+            loadingScreen.style.zIndex = "-1";
+            console.log("✅ Loading screen forcefully hidden before rendering");
+        }
+
+        // Show dashboard layout immediately
+        if (dashboardLayout) {
+            dashboardLayout.classList.remove("hidden");
+            dashboardLayout.style.display = "";
+            dashboardLayout.style.visibility = "";
+            dashboardLayout.style.opacity = "";
+            console.log("✅ Dashboard layout shown before rendering");
         }
 
         // Render dashboard
@@ -5443,12 +5533,17 @@ async function initializeDashboard() {
         } catch (error) {
             console.error("Error rendering dashboard:", error);
             console.error("Error stack:", error.stack);
-            // Ensure loading screen is hidden and show error
+            // Ensure loading screen is FORCE hidden and show error
             if (loadingScreen) {
                 loadingScreen.classList.add("hidden");
+                loadingScreen.style.display = "none";
+                loadingScreen.style.visibility = "hidden";
+                loadingScreen.style.opacity = "0";
+                loadingScreen.style.zIndex = "-1";
             }
             if (dashboardLayout) {
                 dashboardLayout.classList.remove("hidden");
+                dashboardLayout.style.display = "";
             }
             if (mainContent) {
                 mainContent.innerHTML = `
@@ -5467,10 +5562,21 @@ async function initializeDashboard() {
         console.error("Error stack:", error.stack);
         clearTimeout(safetyTimeout); // Clear safety timeout on error
 
-        // Always hide loading screen on error
+        // Always FORCE hide loading screen on error
         if (loadingScreen) {
             loadingScreen.classList.add("hidden");
-            console.log("✅ Loading screen hidden (init error)");
+            loadingScreen.style.display = "none";
+            loadingScreen.style.visibility = "hidden";
+            loadingScreen.style.opacity = "0";
+            loadingScreen.style.zIndex = "-1";
+            console.log("✅ Loading screen forcefully hidden (init error)");
+        }
+
+        // Always show dashboard layout on error
+        if (dashboardLayout) {
+            dashboardLayout.classList.remove("hidden");
+            dashboardLayout.style.display = "";
+            console.log("✅ Dashboard layout shown (init error)");
         }
 
         // Check if it's an auth error
@@ -5542,7 +5648,7 @@ async function showUserProfileModal(userId, userName) {
 
         // Set user info
         const initials = (userProfile.name || "U").charAt(0).toUpperCase();
-        avatar.src = `https://placehold.co/100x100/EBF4FF/3B82F6?text=${initials}`;
+        setAvatarWithFallback(avatar, userProfile.name || "U", 100);
         avatar.alt = userProfile.name;
         name.textContent = userProfile.name || "Unknown User";
         role.textContent =
@@ -7181,9 +7287,7 @@ async function handleGalleryView(userId, userName) {
         galleryUserInfo.textContent = `${userProfile.skill || "Apprentice"} • ${
             userProfile.location || "Unknown location"
         }`;
-        galleryUserAvatar.src = `https://placehold.co/48x48/EBF4FF/3B82F6?text=${userName
-            .charAt(0)
-            .toUpperCase()}`;
+        setAvatarWithFallback(galleryUserAvatar, userName, 48);
         galleryUserAvatar.alt = userName;
 
         // Show modal
