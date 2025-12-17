@@ -90,7 +90,7 @@
             </a>
         </div>
         <h2 class="text-3xl font-bold text-center text-gray-900 mb-6">Sign in to your account</h2>
-        <form id="login-form">
+        <form id="login-form" onsubmit="return false;">
             <div class="mb-4">
                 <label for="email" class="block text-gray-700 font-semibold mb-2">Email Address</label>
                 <input type="email" id="login-email" name="email" class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="yourname@example.com" required>
@@ -112,6 +112,13 @@
         </p>
     </div>
     <script type="module">
+        // Remove credentials from URL if present (security issue)
+        if (window.location.search.includes('email=') || window.location.search.includes('password=')) {
+            console.warn('⚠️ Credentials detected in URL - removing for security');
+            const cleanUrl = window.location.pathname;
+            window.history.replaceState({}, document.title, cleanUrl);
+        }
+
         // Add error handling for module imports
         let handleLogin, showError;
         
@@ -122,42 +129,51 @@
             console.log('✅ Auth module loaded successfully');
         } catch (importError) {
             console.error('❌ Failed to load auth module:', importError);
-            document.getElementById('login-error').textContent = 'Failed to load authentication module. Please refresh the page.';
-            document.getElementById('login-error').classList.remove('hidden-view', 'hidden');
+            const errorEl = document.getElementById('login-error');
+            if (errorEl) {
+                errorEl.textContent = 'Failed to load authentication module. Please refresh the page.';
+                errorEl.classList.remove('hidden-view', 'hidden');
+            }
             throw importError;
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('✅ Login page loaded');
+        // Setup form handler - don't wait for DOMContentLoaded
+        function setupLoginForm() {
+            console.log('✅ Setting up login form handler');
             
             const loginForm = document.getElementById('login-form');
-            const loginButton = document.getElementById('login-button');
-            const buttonText = document.getElementById('login-button-text');
-            const spinner = document.getElementById('login-spinner');
 
             if (!loginForm) {
                 console.error('❌ Login form not found');
+                // Retry after a short delay if DOM isn't ready
+                setTimeout(setupLoginForm, 100);
                 return;
             }
 
+            // Attach event listener directly (no need to clone)
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 
                 console.log('📝 Login form submitted');
                 
-                buttonText.textContent = 'Signing in...';
-                spinner.classList.remove('hidden');
-                loginButton.disabled = true;
-
+                // Re-get elements in case DOM changed
                 const emailEl = document.getElementById('login-email');
                 const passwordEl = document.getElementById('login-password');
+                const loginBtn = document.getElementById('login-button');
+                const btnText = document.getElementById('login-button-text');
+                const spinEl = document.getElementById('login-spinner');
+                
+                btnText.textContent = 'Signing in...';
+                spinEl.classList.remove('hidden');
+                loginBtn.disabled = true;
                 
                 if (!emailEl || !passwordEl) {
                     console.error('❌ Form fields missing');
                     showError('login-error', 'Form fields are missing. Please refresh the page.');
-                    buttonText.textContent = 'Sign in';
-                    spinner.classList.add('hidden');
-                    loginButton.disabled = false;
+                    btnText.textContent = 'Sign in';
+                    spinEl.classList.add('hidden');
+                    loginBtn.disabled = false;
                     return;
                 }
                 
@@ -166,9 +182,9 @@
                 
                 if (!email || !password) {
                     showError('login-error', 'Please enter both email and password.');
-                    buttonText.textContent = 'Sign in';
-                    spinner.classList.add('hidden');
-                    loginButton.disabled = false;
+                    btnText.textContent = 'Sign in';
+                    spinEl.classList.add('hidden');
+                    loginBtn.disabled = false;
                     return;
                 }
                 
@@ -189,9 +205,12 @@
                     });
                     
                     // The error is already handled in handleLogin, but we need to reset the button state
-                    buttonText.textContent = 'Sign in';
-                    spinner.classList.add('hidden');
-                    loginButton.disabled = false;
+                    const btnText = document.getElementById('login-button-text');
+                    const spinEl = document.getElementById('login-spinner');
+                    const loginBtn = document.getElementById('login-button');
+                    btnText.textContent = 'Sign in';
+                    spinEl.classList.add('hidden');
+                    loginBtn.disabled = false;
                     
                     // Show error if not already shown
                     if (error?.message && !error.message.includes('EMAIL_NOT_VERIFIED')) {
@@ -199,7 +218,16 @@
                     }
                 }
             });
-        });
+            
+            console.log('✅ Login form handler attached');
+        }
+
+        // Try to setup immediately, or wait for DOM
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', setupLoginForm);
+        } else {
+            setupLoginForm();
+        }
     </script>
     <script src="dark-mode.js"></script>
 </body>
