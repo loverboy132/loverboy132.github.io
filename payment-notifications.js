@@ -1,6 +1,22 @@
 // payment-notifications.js - Unified Notification Service
 import { supabase } from "./supabase-client.js";
-import { ENV_CONFIG } from "./env.js";
+// Load ENV_CONFIG with fallback for production
+let ENV_CONFIG;
+try {
+    const envModule = await import("./env.js");
+    ENV_CONFIG = envModule.ENV_CONFIG;
+} catch {
+    try {
+        const prodModule = await import("./env.production.js");
+        ENV_CONFIG = prodModule.ENV_CONFIG;
+    } catch {
+        // Fallback
+        ENV_CONFIG = {
+            EMAIL_FUNCTION_NAME: "send-notification-email",
+            ENABLE_EMAIL_NOTIFICATIONS: false,
+        };
+    }
+}
 
 const DEFAULT_CHANNELS = ["in_app"];
 const EMAIL_FUNCTION_NAME =

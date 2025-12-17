@@ -1,5 +1,23 @@
 // dashboard-supabase.js - Fixed version
-import { ENV_CONFIG } from "./env.js";
+// Load ENV_CONFIG with fallback for production
+let ENV_CONFIG;
+try {
+    const envModule = await import("./env.js");
+    ENV_CONFIG = envModule.ENV_CONFIG;
+} catch {
+    try {
+        const prodModule = await import("./env.production.js");
+        ENV_CONFIG = prodModule.ENV_CONFIG;
+    } catch {
+        // Fallback
+        ENV_CONFIG = {
+            SUPABASE_URL: "https://xmffdlciwrvuycnsgezb.supabase.co",
+            SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhtZmZkbGNpd3J2dXljbnNnZXpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUwMjUzMzQsImV4cCI6MjA3MDYwMTMzNH0.bBPsRDAljy2WDkw9K6faOFDYrJ7F8EJT5F4cqdI4MQQ",
+            FLUTTERWAVE_FUNCTION_URL: "https://xmffdlciwrvuycnsgezb.functions.supabase.co/flutterwave-init-payment",
+            SITE_URL: "https://loverboy132.github.io",
+        };
+    }
+}
 import {
     supabase,
     handleLogout,

@@ -298,12 +298,16 @@ export async function handleLogin(email, password) {
         }
 
         // Redirect based on user role
+        // Use absolute paths to avoid issues on GitHub Pages
+        const basePath = window.location.pathname.split('/').filter(p => p && p !== 'index.html' && !p.endsWith('.html'))[0];
+        const baseUrl = basePath ? `/${basePath}` : '';
+        
         if (profile.role === 'admin') {
             console.log("Admin user detected, redirecting to admin dashboard");
-            window.location.href = "admin-dashboard-simplified.html";
+            window.location.href = `${baseUrl}/admin-dashboard-simplified.html`;
         } else {
             console.log("Regular user detected, redirecting to dashboard");
-            window.location.href = "dashboard-supabase.html";
+            window.location.href = `${baseUrl}/dashboard-supabase.html`;
         }
     } catch (error) {
         console.error("Login error:", error);

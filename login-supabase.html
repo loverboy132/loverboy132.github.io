@@ -112,59 +112,95 @@
         </p>
     </div>
     <script type="module">
-        import { handleLogin, showError } from './supabase-auth.js';
+        // Add error handling for module imports
+        let handleLogin, showError;
+        
+        try {
+            const authModule = await import('./supabase-auth.js');
+            handleLogin = authModule.handleLogin;
+            showError = authModule.showError;
+            console.log('✅ Auth module loaded successfully');
+        } catch (importError) {
+            console.error('❌ Failed to load auth module:', importError);
+            document.getElementById('login-error').textContent = 'Failed to load authentication module. Please refresh the page.';
+            document.getElementById('login-error').classList.remove('hidden-view', 'hidden');
+            throw importError;
+        }
 
         document.addEventListener('DOMContentLoaded', () => {
+            console.log('✅ Login page loaded');
+            
             const loginForm = document.getElementById('login-form');
             const loginButton = document.getElementById('login-button');
             const buttonText = document.getElementById('login-button-text');
             const spinner = document.getElementById('login-spinner');
 
-            if (loginForm) {
-                loginForm.addEventListener('submit', async (e) => {
-                    e.preventDefault();
-                    
-                    buttonText.textContent = 'Signing in...';
-                    spinner.classList.remove('hidden');
-                    loginButton.disabled = true;
-
-                    const emailEl = document.getElementById('login-email');
-                    const passwordEl = document.getElementById('login-password');
-                    
-                    if (!emailEl || !passwordEl) {
-                        showError('login-error', 'Form fields are missing. Please refresh the page.');
-                        buttonText.textContent = 'Sign in';
-                        spinner.classList.add('hidden');
-                        loginButton.disabled = false;
-                        return;
-                    }
-                    
-                    const email = emailEl.value.trim();
-                    const password = passwordEl.value;
-                    
-                    if (!email || !password) {
-                        showError('login-error', 'Please enter both email and password.');
-                        buttonText.textContent = 'Sign in';
-                        spinner.classList.add('hidden');
-                        loginButton.disabled = false;
-                        return;
-                    }
-                    
-                    try {
-                        console.log("Attempting login for:", email);
-                        await handleLogin(email, password);
-                        console.log("Login successful, should redirect now");
-                    } catch (error) {
-                        console.error("Login failed:", error);
-                        // The error is already handled in handleLogin, but we need to reset the button state
-                        buttonText.textContent = 'Sign in';
-                        spinner.classList.add('hidden');
-                        loginButton.disabled = false;
-                    }
-                });
+            if (!loginForm) {
+                console.error('❌ Login form not found');
+                return;
             }
+
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                console.log('📝 Login form submitted');
+                
+                buttonText.textContent = 'Signing in...';
+                spinner.classList.remove('hidden');
+                loginButton.disabled = true;
+
+                const emailEl = document.getElementById('login-email');
+                const passwordEl = document.getElementById('login-password');
+                
+                if (!emailEl || !passwordEl) {
+                    console.error('❌ Form fields missing');
+                    showError('login-error', 'Form fields are missing. Please refresh the page.');
+                    buttonText.textContent = 'Sign in';
+                    spinner.classList.add('hidden');
+                    loginButton.disabled = false;
+                    return;
+                }
+                
+                const email = emailEl.value.trim();
+                const password = passwordEl.value;
+                
+                if (!email || !password) {
+                    showError('login-error', 'Please enter both email and password.');
+                    buttonText.textContent = 'Sign in';
+                    spinner.classList.add('hidden');
+                    loginButton.disabled = false;
+                    return;
+                }
+                
+                try {
+                    console.log("🔐 Attempting login for:", email);
+                    console.log("📍 Current URL:", window.location.href);
+                    
+                    await handleLogin(email, password);
+                    
+                    console.log("✅ Login successful, redirect should happen now");
+                    // Don't reset button - redirect should happen
+                } catch (error) {
+                    console.error("❌ Login failed:", error);
+                    console.error("Error details:", {
+                        message: error?.message,
+                        code: error?.code,
+                        stack: error?.stack
+                    });
+                    
+                    // The error is already handled in handleLogin, but we need to reset the button state
+                    buttonText.textContent = 'Sign in';
+                    spinner.classList.add('hidden');
+                    loginButton.disabled = false;
+                    
+                    // Show error if not already shown
+                    if (error?.message && !error.message.includes('EMAIL_NOT_VERIFIED')) {
+                        showError('login-error', error.message || 'Login failed. Please try again.');
+                    }
+                }
+            });
         });
     </script>
     <script src="dark-mode.js"></script>
 </body>
-</html>`
+</html>

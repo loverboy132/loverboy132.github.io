@@ -1,6 +1,23 @@
 // wallet-interface.js - User Wallet Interface
 import { supabase } from "./supabase-auth.js";
-import { ENV_CONFIG } from "./env.js";
+// Load ENV_CONFIG with fallback for production
+let ENV_CONFIG;
+try {
+    const envModule = await import("./env.js");
+    ENV_CONFIG = envModule.ENV_CONFIG;
+} catch {
+    try {
+        const prodModule = await import("./env.production.js");
+        ENV_CONFIG = prodModule.ENV_CONFIG;
+    } catch {
+        // Fallback
+        ENV_CONFIG = {
+            SUPABASE_URL: "https://xmffdlciwrvuycnsgezb.supabase.co",
+            FLUTTERWAVE_FUNCTION_URL: "https://xmffdlciwrvuycnsgezb.functions.supabase.co/flutterwave-init-payment",
+            SITE_URL: "https://loverboy132.github.io",
+        };
+    }
+}
 import { 
     getUserWallet, 
     getWalletTransactions, 
