@@ -5323,20 +5323,19 @@ async function initializeDashboard() {
             return;
         }
 
-        // Use absolute URL for GitHub Pages
-        const baseUrl = 'https://loverboy132.github.io';
-        const loginUrl = `${baseUrl}/login-supabase.html`;
+        // Use relative URLs - works both locally and on GitHub Pages
+        const loginUrl = 'login-supabase.html';
 
         // Set up auth state listener
         supabase.auth.onAuthStateChange((event, session) => {
             console.log("Auth state changed:", event, session ? "session exists" : "no session");
             if (event === 'SIGNED_OUT' || !session) {
-                window.location.href = loginUrl;
+                window.location.replace(loginUrl);
             }
         });
 
         // Wait a moment for any pending auth state changes
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, 300));
 
         // Check authentication with session
         console.log('🔍 Checking session...');
@@ -5344,13 +5343,13 @@ async function initializeDashboard() {
         
         if (sessionError) {
             console.error("❌ Session error:", sessionError);
-            window.location.href = loginUrl;
+            window.location.replace(loginUrl);
             return;
         }
 
         if (!session || !session.user) {
             console.log("❌ No authenticated session, redirecting to login");
-            window.location.href = loginUrl;
+            window.location.replace(loginUrl);
             return;
         }
 
@@ -5477,8 +5476,7 @@ async function initializeDashboard() {
         // Check if it's an auth error
         if (error.message && (error.message.includes("JWT") || error.message.includes("auth"))) {
             console.log("Authentication error, redirecting to login");
-            const baseUrl = 'https://loverboy132.github.io';
-            window.location.href = `${baseUrl}/login-supabase.html`;
+            window.location.replace('login-supabase.html');
             return;
         }
 

@@ -277,8 +277,8 @@ export async function handleLogin(email, password) {
             throw verificationError;
         }
 
-        // Wait a moment for the session to be established
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Wait longer for the session to be fully established and persisted
+        await new Promise(resolve => setTimeout(resolve, 500));
         
         // Verify the session is established before redirecting
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
@@ -288,6 +288,7 @@ export async function handleLogin(email, password) {
         }
 
         console.log('✅ User logged in:', user.email);
+        console.log('✅ Session verified:', session.user.id);
         console.log('🔄 Checking user role for redirect...');
 
         // Check user's role to determine redirect destination
@@ -297,13 +298,12 @@ export async function handleLogin(email, password) {
             .eq('id', session.user.id)
             .single();
 
-        // Use absolute URL for GitHub Pages
-        const baseUrl = 'https://loverboy132.github.io';
-
+        // Use relative URLs - works both locally and on GitHub Pages
         if (loginProfileError) {
             console.warn("Could not fetch user profile, defaulting to regular dashboard");
             console.log('🔄 Redirecting to dashboard...');
-            window.location.href = `${baseUrl}/dashboard-supabase.html`;
+            // Use window.location.replace to avoid back button issues
+            window.location.replace('dashboard-supabase.html');
             return;
         }
 
@@ -311,11 +311,11 @@ export async function handleLogin(email, password) {
         if (profile.role === 'admin') {
             console.log("Admin user detected, redirecting to admin dashboard");
             console.log('🔄 Redirecting to admin dashboard...');
-            window.location.href = `${baseUrl}/admin-dashboard-simplified.html`;
+            window.location.replace('admin-dashboard-simplified.html');
         } else {
             console.log("Regular user detected, redirecting to dashboard");
             console.log('🔄 Redirecting to dashboard...');
-            window.location.href = `${baseUrl}/dashboard-supabase.html`;
+            window.location.replace('dashboard-supabase.html');
         }
     } catch (error) {
         console.error("Login error:", error);
