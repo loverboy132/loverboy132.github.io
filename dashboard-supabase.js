@@ -4511,18 +4511,20 @@ async function renderDashboard(user, userData) {
             }
         }
 
-        console.log("Dashboard rendered successfully");
+        console.log("✅ Dashboard rendered successfully");
     } catch (error) {
-        console.error("Error rendering dashboard:", error);
+        console.error("❌ Error rendering dashboard:", error);
         console.error("Error stack:", error.stack);
         
         // Always hide loading screen and show dashboard
         if (loadingScreen) {
             loadingScreen.classList.add("hidden");
+            console.log("✅ Loading screen hidden (error case)");
         }
         
         if (dashboardLayout) {
             dashboardLayout.classList.remove("hidden");
+            console.log("✅ Dashboard layout shown (error case)");
         }
         
         // Show error message
@@ -5285,8 +5287,19 @@ function copyToClipboard(text) {
 
 // --- Main Initialization ---
 async function initializeDashboard() {
+    // Safety timeout: Always hide loading screen after 10 seconds
+    const safetyTimeout = setTimeout(() => {
+        console.warn("⚠️ Dashboard initialization taking too long, forcing loading screen to hide");
+        if (loadingScreen) {
+            loadingScreen.classList.add("hidden");
+        }
+        if (dashboardLayout) {
+            dashboardLayout.classList.remove("hidden");
+        }
+    }, 10000);
+
     try {
-        console.log("Initializing dashboard...");
+        console.log("🚀 Initializing dashboard...");
         console.log("DOM elements check:", {
             loadingScreen: !!loadingScreen,
             dashboardLayout: !!dashboardLayout,
@@ -5295,6 +5308,7 @@ async function initializeDashboard() {
 
         // Ensure we have required DOM elements
         if (!loadingScreen || !dashboardLayout || !mainContent) {
+            clearTimeout(safetyTimeout);
             console.error("Required DOM elements not found!");
             document.body.innerHTML = `
                 <div class="min-h-screen bg-gray-100 p-8">
@@ -5309,11 +5323,15 @@ async function initializeDashboard() {
             return;
         }
 
+        // Use absolute URL for GitHub Pages
+        const baseUrl = 'https://loverboy132.github.io';
+        const loginUrl = `${baseUrl}/login-supabase.html`;
+
         // Set up auth state listener
         supabase.auth.onAuthStateChange((event, session) => {
             console.log("Auth state changed:", event, session ? "session exists" : "no session");
             if (event === 'SIGNED_OUT' || !session) {
-                window.location.href = "login-supabase.html";
+                window.location.href = loginUrl;
             }
         });
 
@@ -5321,19 +5339,22 @@ async function initializeDashboard() {
         await new Promise(resolve => setTimeout(resolve, 200));
 
         // Check authentication with session
+        console.log('🔍 Checking session...');
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
         if (sessionError) {
-            console.error("Session error:", sessionError);
-            window.location.href = "login-supabase.html";
+            console.error("❌ Session error:", sessionError);
+            window.location.href = loginUrl;
             return;
         }
 
         if (!session || !session.user) {
-            console.log("No authenticated session, redirecting to login");
-            window.location.href = "login-supabase.html";
+            console.log("❌ No authenticated session, redirecting to login");
+            window.location.href = loginUrl;
             return;
         }
+
+        console.log('✅ Session found, user:', session.user.email);
 
         const user = session.user;
         console.log("User authenticated:", user.id);
@@ -5398,11 +5419,18 @@ async function initializeDashboard() {
 
         console.log("Profile is completed, rendering dashboard");
 
+        // Hide loading screen immediately before rendering
+        if (loadingScreen) {
+            loadingScreen.classList.add("hidden");
+            console.log("✅ Loading screen hidden before rendering");
+        }
+
         // Render dashboard
         try {
             console.log("About to render dashboard for user:", userData?.role);
             await renderDashboard(user, userData);
-            console.log("Dashboard rendered successfully");
+            console.log("✅ Dashboard rendered successfully");
+            clearTimeout(safetyTimeout); // Clear safety timeout on success
 
             // Start real-time updates for apprentices
             if (userData.role === "apprentice") {
@@ -5436,18 +5464,21 @@ async function initializeDashboard() {
             }
         }
     } catch (error) {
-        console.error("Dashboard initialization error:", error);
+        console.error("❌ Dashboard initialization error:", error);
         console.error("Error stack:", error.stack);
+        clearTimeout(safetyTimeout); // Clear safety timeout on error
 
         // Always hide loading screen on error
         if (loadingScreen) {
             loadingScreen.classList.add("hidden");
+            console.log("✅ Loading screen hidden (init error)");
         }
 
         // Check if it's an auth error
         if (error.message && (error.message.includes("JWT") || error.message.includes("auth"))) {
             console.log("Authentication error, redirecting to login");
-            window.location.href = "login-supabase.html";
+            const baseUrl = 'https://loverboy132.github.io';
+            window.location.href = `${baseUrl}/login-supabase.html`;
             return;
         }
 
