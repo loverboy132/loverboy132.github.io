@@ -1,4 +1,6 @@
 // dashboard-supabase.js - Fixed version
+console.log('📄 Dashboard script file loaded');
+
 // Load ENV_CONFIG with fallback for production
 let ENV_CONFIG;
 try {
@@ -5339,6 +5341,10 @@ function copyToClipboard(text) {
 
 // --- Main Initialization ---
 async function initializeDashboard() {
+    console.log('🚀 initializeDashboard() called');
+    console.log('📊 Current URL:', window.location.href);
+    console.log('📊 Document ready state:', document.readyState);
+    
     // Safety timeout: Always hide loading screen after 10 seconds
     const safetyTimeout = setTimeout(() => {
             console.warn("⚠️ Dashboard initialization taking too long, forcing loading screen to hide");
@@ -5682,7 +5688,9 @@ async function showUserProfileModal(userId, userName) {
 }
 
 // --- Event Listeners for Modals ---
+console.log('📋 Dashboard script: Setting up DOMContentLoaded handlers...');
 document.addEventListener("DOMContentLoaded", () => {
+    console.log('✅ Dashboard: DOMContentLoaded fired');
     // Close modals when clicking outside
     window.addEventListener("click", (e) => {
         if (e.target.classList.contains("modal")) {
@@ -5836,10 +5844,24 @@ document.addEventListener("DOMContentLoaded", () => {
     }, true); // Use capture phase to catch errors early
 
     // Initialize dashboard
-    initializeDashboard();
+    console.log('🚀 Dashboard: About to call initializeDashboard()...');
+    initializeDashboard().catch(error => {
+        console.error('❌ Dashboard: initializeDashboard() failed:', error);
+        // Force show dashboard even on error
+        if (loadingScreen) {
+            loadingScreen.style.display = 'none';
+            loadingScreen.classList.add('hidden');
+        }
+        if (dashboardLayout) {
+            dashboardLayout.classList.remove('hidden');
+            dashboardLayout.style.display = '';
+        }
+    });
     
     // Set up auto-acknowledgment
+    console.log('✅ Dashboard: Setting up auto-acknowledgment...');
     setupAutoAcknowledgment();
+    console.log('✅ Dashboard: All initialization started');
 });
 
 // --- Gallery Delete Button Setup ---
