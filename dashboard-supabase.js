@@ -5818,6 +5818,23 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
+    // Add global error handler for images to prevent timeouts from blocking the page
+    document.addEventListener('error', (e) => {
+        if (e.target.tagName === 'IMG' && e.target.src && e.target.src.includes('placehold.co')) {
+            console.warn('Placeholder image timed out:', e.target.src);
+            // Extract text from URL if possible, or use 'U' as default
+            const match = e.target.src.match(/text=([^&]+)/);
+            const text = match ? decodeURIComponent(match[1]) : 'U';
+            const sizeMatch = e.target.src.match(/(\d+)x\d+/);
+            const size = sizeMatch ? parseInt(sizeMatch[1]) : 100;
+            
+            // Only set fallback if not already set (prevent infinite loop)
+            if (!e.target.src.startsWith('data:')) {
+                e.target.src = generateFallbackAvatar(text, size);
+            }
+        }
+    }, true); // Use capture phase to catch errors early
+
     // Initialize dashboard
     initializeDashboard();
     
