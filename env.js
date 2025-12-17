@@ -11,6 +11,9 @@ export const ENV_CONFIG = {
     PAYSTACK_PUBLIC_KEY: "pk_test_YOUR_ACTUAL_PUBLIC_KEY_HERE", // Replace with your actual Paystack public key
     PAYSTACK_SECRET_KEY: "sk_test_YOUR_ACTUAL_SECRET_KEY_HERE", // Only for server-side
 
+    // Flutterwave Configuration
+    FLUTTERWAVE_SECRET_HASH: "set-this-to-your-webhook-secret",
+
     // Site Configuration
     SITE_URL: "http://localhost:3000", // Update this to your actual domain
     SITE_NAME: "Craftiva",
