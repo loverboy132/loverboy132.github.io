@@ -1,4 +1,5 @@
 // dashboard-supabase.js - Fixed version
+import { ENV_CONFIG } from "./env.js";
 import {
     supabase,
     handleLogout,
@@ -955,7 +956,10 @@ const apprenticeContentTemplates = {
             
             <div class="wallet-actions flex gap-4 justify-center flex-wrap">
                 <button id="add-funds-btn" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center">
-                    <i class="fas fa-plus mr-2"></i> Add Funds
+                    <i class="fas fa-plus mr-2"></i> Add Funds (Bank Transfer)
+                </button>
+                <button id="add-funds-flutterwave-btn" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center">
+                    <i class="fas fa-credit-card mr-2"></i> Add Funds (Flutterwave)
                 </button>
                 <button id="withdraw-funds-btn" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center">
                     <i class="fas fa-money-bill-wave mr-2"></i> Withdraw
@@ -4814,6 +4818,10 @@ function createSubscriptionPaymentModal() {
                         <i data-feather="credit-card" class="w-5 h-5 mr-2"></i>
                         Pay with Wallet Balance
                     </button>
+                    <button id="pay-flutterwave-btn" class="w-full bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 flex items-center justify-center">
+                        <i data-feather="external-link" class="w-5 h-5 mr-2"></i>
+                        Pay with Flutterwave
+                    </button>
                     <button id="pay-manually-btn" class="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 flex items-center justify-center">
                         <i data-feather="bank" class="w-5 h-5 mr-2"></i>
                         Manual Bank Transfer
@@ -4832,6 +4840,7 @@ function createSubscriptionPaymentModal() {
     // Add event listeners
     const closeBtn = modal.querySelector('#close-subscription-modal');
     const walletBtn = modal.querySelector('#pay-with-wallet-btn');
+    const flutterwaveBtn = modal.querySelector('#pay-flutterwave-btn');
     const manualBtn = modal.querySelector('#pay-manually-btn');
     
     closeBtn.addEventListener('click', () => {
@@ -4842,6 +4851,12 @@ function createSubscriptionPaymentModal() {
         const planKey = modal.dataset.planKey;
         const planPrice = parseFloat(modal.dataset.planPrice);
         processWalletPayment(planKey, planPrice);
+    });
+    
+    flutterwaveBtn.addEventListener('click', () => {
+        const planKey = modal.dataset.planKey;
+        const planPrice = parseFloat(modal.dataset.planPrice);
+        processFlutterwaveSubscriptionPayment(planKey, planPrice);
     });
     
     manualBtn.addEventListener('click', () => {
@@ -4905,6 +4920,59 @@ async function processWalletPayment(planKey, planPrice) {
     } catch (error) {
         console.error("Error processing wallet payment:", error);
         showNotification("Failed to process payment. Please try again.", "error");
+    }
+}
+
+async function processFlutterwaveSubscriptionPayment(planKey, planPrice) {
+    try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
+            showNotification("Please log in to continue", "error");
+            return;
+        }
+
+        if (!planPrice || planPrice <= 0) {
+            showNotification("Invalid subscription amount. Please try again.", "error");
+            return;
+        }
+
+        const flutterwaveUrl = ENV_CONFIG.FLUTTERWAVE_FUNCTION_URL || 
+            `${ENV_CONFIG.SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co')}/flutterwave-init-payment`;
+        
+        const response = await fetch(flutterwaveUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                    amount: planPrice,
+                    type: "subscription",
+                }),
+            });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || `Payment initialization failed (${response.status})`);
+        }
+
+        const data = await response.json();
+
+        if (!data.success || !data.payment_url) {
+            throw new Error(data.error || "Failed to get payment URL from Flutterwave");
+        }
+
+        // Redirect user to Flutterwave checkout
+        window.location.href = data.payment_url;
+    } catch (error) {
+        console.error("Error initializing Flutterwave subscription payment:", error);
+        const errorMessage = error?.message || "Failed to start Flutterwave payment. Please try again.";
+        showNotification(errorMessage, "error");
+        
+        // Log error for debugging
+        if (ENV_CONFIG.DEBUG_MODE) {
+            console.error("Flutterwave subscription payment error details:", error);
+        }
     }
 }
 
@@ -6169,25 +6237,35 @@ async function handleJobCreation() {
             return;
         }
 
-        await createJobRequest(user.id, jobData);
-        showNotification("Job request created successfully!", "success");
+        try {
+            await createJobRequest(user.id, jobData);
+            showNotification("Job request created successfully!", "success");
 
-        // Refresh wallet balance if wallet interface is available
-        if (window.initializeWalletInterface) {
-            try {
-                await window.initializeWalletInterface();
-            } catch (walletError) {
-                console.warn("Failed to refresh wallet balance:", walletError);
+            // Refresh wallet balance if wallet interface is available
+            if (window.initializeWalletInterface) {
+                try {
+                    await window.initializeWalletInterface();
+                } catch (walletError) {
+                    console.warn("Failed to refresh wallet balance:", walletError);
+                }
             }
-        }
 
-        // Reset form
-        form.reset();
+            // Reset form
+            form.reset();
 
-        // Refresh the jobs tab
-        const jobsTab = document.querySelector('[data-tab="jobs"]');
-        if (jobsTab) {
-            jobsTab.click();
+            // Refresh the jobs tab
+            const jobsTab = document.querySelector('[data-tab="jobs"]');
+            if (jobsTab) {
+                jobsTab.click();
+            }
+        } catch (error) {
+            // Check if error is due to insufficient funds
+            if (error.message && error.message.includes("Insufficient funds")) {
+                // Show modal to fund job via Flutterwave
+                showJobFundingModal(jobData, error.message);
+            } else {
+                throw error; // Re-throw other errors
+            }
         }
     } catch (error) {
         console.error("Error creating job:", error);
@@ -6195,6 +6273,147 @@ async function handleJobCreation() {
             error.message || "Failed to create job request",
             "error"
         );
+    }
+}
+
+// Show job funding modal when wallet balance is insufficient
+async function showJobFundingModal(jobData, errorMessage) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.id = 'job-funding-modal';
+    
+    const escrowAmount = jobData.budgetMax;
+    
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-900">Fund Job via Flutterwave</h3>
+                <button id="close-job-funding-modal" class="text-gray-400 hover:text-gray-600">
+                    <i data-feather="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            
+            <div class="mb-6">
+                <p class="text-gray-600 mb-4">${errorMessage}</p>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <p class="text-sm text-blue-800 mb-2"><strong>Job Details:</strong></p>
+                    <p class="text-sm text-blue-900"><strong>Title:</strong> ${jobData.title}</p>
+                    <p class="text-sm text-blue-900"><strong>Required Amount:</strong> ₦${escrowAmount.toLocaleString()}</p>
+                </div>
+                <p class="text-sm text-gray-600">
+                    You can fund this job directly via Flutterwave. The job will be created and funded once payment is confirmed.
+                </p>
+            </div>
+            
+            <div class="space-y-3">
+                <button id="fund-job-flutterwave-btn" class="w-full bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 flex items-center justify-center font-semibold">
+                    <i data-feather="credit-card" class="w-5 h-5 mr-2"></i>
+                    Pay ₦${escrowAmount.toLocaleString()} with Flutterwave
+                </button>
+                <button id="cancel-job-funding-btn" class="w-full bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300 font-semibold">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Add event listeners
+    const closeBtn = modal.querySelector('#close-job-funding-modal');
+    const cancelBtn = modal.querySelector('#cancel-job-funding-btn');
+    const fundBtn = modal.querySelector('#fund-job-flutterwave-btn');
+    
+    closeBtn.addEventListener('click', () => modal.remove());
+    cancelBtn.addEventListener('click', () => modal.remove());
+    
+    fundBtn.addEventListener('click', async () => {
+        await processJobFundingPayment(jobData, escrowAmount);
+        modal.remove();
+    });
+    
+    // Close on outside click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+    
+    if (window.feather) window.feather.replace();
+}
+
+// Process job funding payment via Flutterwave
+async function processJobFundingPayment(jobData, amount) {
+    try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+            showNotification("Please log in to continue", "error");
+            return;
+        }
+
+        // First, create the job with pending_funding status
+        const { data: job, error: jobError } = await supabase
+            .from("job_requests")
+            .insert({
+                client_id: user.id,
+                title: jobData.title,
+                description: jobData.description,
+                budget_min: jobData.budgetMin,
+                budget_max: jobData.budgetMax,
+                escrow_amount: amount,
+                skills_required: jobData.skillsRequired,
+                location: jobData.location,
+                deadline: jobData.deadline,
+                status: "pending_funding", // Special status for jobs awaiting payment
+                escrow_status: "pending",
+                locked: false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+
+        if (jobError || !job) {
+            throw new Error("Failed to create job: " + (jobError?.message || "Unknown error"));
+        }
+
+        // Now initiate Flutterwave payment with the job_id
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !session) {
+            // Delete the job if payment initiation fails
+            await supabase.from("job_requests").delete().eq("id", job.id);
+            showNotification("Please log in to continue", "error");
+            return;
+        }
+
+        const flutterwaveUrl = ENV_CONFIG.FLUTTERWAVE_FUNCTION_URL || 
+            `${ENV_CONFIG.SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co')}/flutterwave-init-payment`;
+
+        const response = await fetch(flutterwaveUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({
+                amount: amount,
+                type: "job_funding",
+                job_id: job.id,
+                description: `Job funding: ${jobData.title}`,
+            }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            // Delete the job if payment initiation fails
+            await supabase.from("job_requests").delete().eq("id", job.id);
+            throw new Error(data.error || "Failed to start Flutterwave payment");
+        }
+
+        // Redirect to Flutterwave checkout
+        window.location.href = data.payment_url;
+    } catch (error) {
+        console.error("Error initializing Flutterwave job funding payment:", error);
+        showNotification(error.message || "Failed to start Flutterwave payment. Please try again.", "error");
     }
 }
 

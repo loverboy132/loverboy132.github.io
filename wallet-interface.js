@@ -1,5 +1,6 @@
 // wallet-interface.js - User Wallet Interface
 import { supabase } from "./supabase-auth.js";
+import { ENV_CONFIG } from "./env.js";
 import { 
     getUserWallet, 
     getWalletTransactions, 
@@ -200,6 +201,12 @@ function setupWalletEventListeners() {
         addFundsBtn.addEventListener('click', showAddFundsModal);
     }
 
+    // Add funds via Flutterwave button
+    const addFundsFlutterwaveBtn = document.getElementById('add-funds-flutterwave-btn');
+    if (addFundsFlutterwaveBtn) {
+        addFundsFlutterwaveBtn.addEventListener('click', startFlutterwaveWalletFunding);
+    }
+
     // Withdraw funds button
     const withdrawBtn = document.getElementById('withdraw-funds-btn');
     if (withdrawBtn) {
@@ -210,6 +217,65 @@ function setupWalletEventListeners() {
     const viewTransactionsBtn = document.getElementById('view-transactions-btn');
     if (viewTransactionsBtn) {
         viewTransactionsBtn.addEventListener('click', showTransactionsModal);
+    }
+}
+
+// Start Flutterwave wallet funding (online payment)
+async function startFlutterwaveWalletFunding() {
+    try {
+        const {
+            data: { session },
+            error: sessionError,
+        } = await supabase.auth.getSession();
+
+        if (sessionError || !session) {
+            showNotification('Please log in to continue', 'error');
+            return;
+        }
+
+        const amountInput = window.prompt('Enter amount to fund (NGN):\nMinimum: ₦1,000');
+        if (!amountInput) return;
+
+        const amount = parseFloat(amountInput);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            showNotification('Please enter a valid amount', 'error');
+            return;
+        }
+
+        if (amount < 1000) {
+            showNotification('Minimum funding amount is ₦1,000', 'error');
+            return;
+        }
+
+        const flutterwaveUrl = ENV_CONFIG.FLUTTERWAVE_FUNCTION_URL || 
+            `${ENV_CONFIG.SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co')}/flutterwave-init-payment`;
+        
+        const response = await fetch(flutterwaveUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                    amount,
+                    type: 'wallet_funding',
+                }),
+            });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(data.error || 'Failed to start Flutterwave payment');
+        }
+
+        // Redirect to Flutterwave checkout
+        window.location.href = data.payment_url;
+    } catch (error) {
+        console.error('Error initializing Flutterwave wallet funding:', error);
+        showNotification(
+            error?.message || 'Failed to start Flutterwave payment. Please try again.',
+            'error'
+        );
     }
 }
 
@@ -335,6 +401,32 @@ function createAddFundsModal(bankAccounts) {
                             Transfer to Craftnet Account
                         </h4>
                         
+                        <!-- Flutterwave Virtual Account -->
+                        <div class="bank-account-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-bottom: 1rem;">
+                            <div class="bank-logo">
+                                <i class="fas fa-credit-card"></i>
+                            </div>
+                            <div class="bank-info">
+                                <h5 class="bank-name" style="color: white;">Flutterwave Virtual Account (Recommended)</h5>
+                                <div class="account-details">
+                                    <div class="account-field">
+                                        <span class="field-label" style="color: rgba(255,255,255,0.9);">Bank:</span>
+                                        <span class="field-value" style="color: white;">Sterling Bank</span>
+                                    </div>
+                                    <div class="account-field">
+                                        <span class="field-label" style="color: rgba(255,255,255,0.9);">Account Number:</span>
+                                        <span class="field-value account-number" onclick="copyToClipboard('8817564174')" style="color: white; cursor: pointer;">
+                                            8817564174
+                                            <i class="fas fa-copy copy-icon"></i>
+                                        </span>
+                                    </div>
+                                </div>
+                                <p style="font-size: 0.85rem; margin-top: 0.5rem; color: rgba(255,255,255,0.8);">
+                                    <i class="fas fa-info-circle"></i> Instant verification via webhook
+                                </p>
+                            </div>
+                        </div>
+                        
                         <div class="bank-accounts-grid">
                             ${bankAccounts.map(account => `
                                 <div class="bank-account-card">
@@ -368,6 +460,7 @@ function createAddFundsModal(bankAccounts) {
                                 <li>Use your bank's mobile app or visit a branch</li>
                                 <li>Copy the account number for easy transfer</li>
                                 <li>Upload proof of payment for faster verification</li>
+                                <li><strong>Note:</strong> Flutterwave virtual account transfers are verified automatically</li>
                             </ol>
                         </div>
                     </div>

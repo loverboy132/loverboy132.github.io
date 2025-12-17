@@ -523,6 +523,73 @@ export async function notifyEscrowFundsRefunded(
     });
 }
 
+// Flutterwave Payment Notifications
+export async function notifyFlutterwaveWalletFunding(userId, amount, txRef) {
+    const title = "Wallet Funded Successfully";
+    const message = `Your wallet has been credited with ${formatCurrency(
+        amount
+    )} via Flutterwave. Transaction Reference: ${txRef}.`;
+
+    return createNotification({
+        userId,
+        type: "wallet_funded",
+        title,
+        message,
+        metadata: { amount, txRef, source: "flutterwave", status: "completed" },
+        emailOptions: {
+            subject: title,
+            html: buildEmailTemplate({
+                heading: title,
+                body: message,
+            }),
+        },
+    });
+}
+
+export async function notifyFlutterwaveSubscription(userId, planName, amount, txRef) {
+    const title = "Subscription Activated";
+    const message = `Your ${planName} subscription has been activated successfully! Payment: ${formatCurrency(
+        amount
+    )}. Transaction Reference: ${txRef}.`;
+
+    return createNotification({
+        userId,
+        type: "subscription_activated",
+        title,
+        message,
+        metadata: { planName, amount, txRef, source: "flutterwave", status: "active" },
+        emailOptions: {
+            subject: title,
+            html: buildEmailTemplate({
+                heading: title,
+                body: message,
+            }),
+        },
+    });
+}
+
+export async function notifyFlutterwaveJobFunding(userId, jobTitle, amount, txRef) {
+    const title = "Job Funded Successfully";
+    const message = `Your job "${jobTitle}" has been funded with ${formatCurrency(
+        amount
+    )} via Flutterwave. The job is now active and open for applications. Transaction Reference: ${txRef}.`;
+
+    return createNotification({
+        userId,
+        type: "job_funded",
+        title,
+        message,
+        metadata: { jobTitle, amount, txRef, source: "flutterwave", status: "funded" },
+        emailOptions: {
+            subject: title,
+            html: buildEmailTemplate({
+                heading: title,
+                body: message,
+            }),
+        },
+    });
+}
+
 // ==============================================
 // JOB & ALERT NOTIFICATIONS
 // ==============================================
