@@ -242,11 +242,14 @@ export async function getUserReferralStats(userId) {
 
 // --- Authentication Functions ---
 export async function handleLogin(email, password) {
+    console.log('🔄 Starting login...');
     try {
         const { data, error } = await supabase.auth.signInWithPassword({
             email,
             password,
         });
+
+        console.log('📦 Login response:', { data: data ? { user: data.user?.email } : null, error: error ? error.message : null });
 
         if (error) {
             const normalizedMessage = error.message?.toLowerCase() || "";
@@ -284,6 +287,9 @@ export async function handleLogin(email, password) {
             throw new Error("Session not established");
         }
 
+        console.log('✅ User logged in:', user.email);
+        console.log('🔄 Checking user role for redirect...');
+
         // Check user's role to determine redirect destination
         const { data: profile, error: loginProfileError } = await supabase
             .from('profiles')
@@ -291,22 +297,24 @@ export async function handleLogin(email, password) {
             .eq('id', session.user.id)
             .single();
 
+        // Use absolute URL for GitHub Pages
+        const baseUrl = 'https://loverboy132.github.io';
+
         if (loginProfileError) {
             console.warn("Could not fetch user profile, defaulting to regular dashboard");
-            window.location.href = "dashboard-supabase.html";
+            console.log('🔄 Redirecting to dashboard...');
+            window.location.href = `${baseUrl}/dashboard-supabase.html`;
             return;
         }
 
         // Redirect based on user role
-        // Use absolute paths to avoid issues on GitHub Pages
-        const basePath = window.location.pathname.split('/').filter(p => p && p !== 'index.html' && !p.endsWith('.html'))[0];
-        const baseUrl = basePath ? `/${basePath}` : '';
-        
         if (profile.role === 'admin') {
             console.log("Admin user detected, redirecting to admin dashboard");
+            console.log('🔄 Redirecting to admin dashboard...');
             window.location.href = `${baseUrl}/admin-dashboard-simplified.html`;
         } else {
             console.log("Regular user detected, redirecting to dashboard");
+            console.log('🔄 Redirecting to dashboard...');
             window.location.href = `${baseUrl}/dashboard-supabase.html`;
         }
     } catch (error) {
