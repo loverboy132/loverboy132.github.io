@@ -5689,180 +5689,487 @@ async function showUserProfileModal(userId, userName) {
 
 // --- Event Listeners for Modals ---
 console.log('📋 Dashboard script: Setting up DOMContentLoaded handlers...');
-document.addEventListener("DOMContentLoaded", () => {
-    console.log('✅ Dashboard: DOMContentLoaded fired');
-    // Close modals when clicking outside
-    window.addEventListener("click", (e) => {
-        if (e.target.classList.contains("modal")) {
-            e.target.classList.remove("active");
-        }
-    });
+console.log('📊 Document ready state:', document.readyState);
 
-    // User Profile Modal Event Handlers
-    const userProfileModal = document.getElementById("user-profile-modal");
-    if (userProfileModal) {
-        const closeBtn = userProfileModal.querySelector(
-            "#close-user-profile-modal"
-        );
-        if (closeBtn) {
-            closeBtn.addEventListener("click", () => {
-                userProfileModal.classList.remove("active");
-            });
-        }
+// Function to initialize dashboard
+async function initializeDashboardOnReady() {
+  console.log('🚀 DOMContentLoaded fired (or document already ready)');
+  
+  // Set up event listeners first (non-blocking)
+  // Close modals when clicking outside
+  window.addEventListener("click", (e) => {
+      if (e.target.classList.contains("modal")) {
+          e.target.classList.remove("active");
+      }
+  });
 
-        // Connect button handler
-        const connectBtn = userProfileModal.querySelector("#modal-connect-btn");
-        if (connectBtn) {
-            connectBtn.addEventListener("click", async () => {
-                const userId = connectBtn.dataset.userId;
-                const userName = connectBtn.dataset.userName;
+  // User Profile Modal Event Handlers
+  const userProfileModal = document.getElementById("user-profile-modal");
+  if (userProfileModal) {
+      const closeBtn = userProfileModal.querySelector(
+          "#close-user-profile-modal"
+      );
+      if (closeBtn) {
+          closeBtn.addEventListener("click", () => {
+              userProfileModal.classList.remove("active");
+          });
+      }
 
-                // Get current user
-                const {
-                    data: { user },
-                } = await supabase.auth.getUser();
-                if (!user) {
-                    showNotification(
-                        "Please log in to connect with users",
-                        "error"
-                    );
-                    return;
-                }
+      // Connect button handler
+      const connectBtn = userProfileModal.querySelector("#modal-connect-btn");
+      if (connectBtn) {
+          connectBtn.addEventListener("click", async () => {
+              const userId = connectBtn.dataset.userId;
+              const userName = connectBtn.dataset.userName;
 
-                if (user.id === userId) {
-                    showNotification(
-                        "You cannot connect with yourself",
-                        "error"
-                    );
-                    return;
-                }
+              // Get current user
+              const {
+                  data: { user },
+              } = await supabase.auth.getUser();
+              if (!user) {
+                  showNotification(
+                      "Please log in to connect with users",
+                      "error"
+                  );
+                  return;
+              }
 
-                try {
-                    connectBtn.disabled = true;
-                    connectBtn.textContent = "Connecting...";
+              if (user.id === userId) {
+                  showNotification(
+                      "You cannot connect with yourself",
+                      "error"
+                  );
+                  return;
+              }
 
-                    const success = await followUser(user.id, userId);
+              try {
+                  connectBtn.disabled = true;
+                  connectBtn.textContent = "Connecting...";
 
-                    if (success) {
-                        connectBtn.textContent = "Connected!";
-                        connectBtn.classList.remove(
-                            "bg-blue-600",
-                            "hover:bg-blue-700"
-                        );
-                        connectBtn.classList.add(
-                            "bg-green-600",
-                            "cursor-not-allowed"
-                        );
-                        connectBtn.disabled = true;
+                  const success = await followUser(user.id, userId);
 
-                        // Update the original follow button if it exists
-                        const originalBtn = document.querySelector(
-                            `[data-user-id="${userId}"].follow-btn`
-                        );
-                        if (originalBtn) {
-                            originalBtn.textContent = "Following";
-                            originalBtn.classList.remove(
-                                "bg-blue-600",
-                                "hover:bg-blue-700"
-                            );
-                            originalBtn.classList.add(
-                                "bg-gray-400",
-                                "cursor-not-allowed"
-                            );
-                            originalBtn.disabled = true;
-                        }
+                  if (success) {
+                      connectBtn.textContent = "Connected!";
+                      connectBtn.classList.remove(
+                          "bg-blue-600",
+                          "hover:bg-blue-700"
+                      );
+                      connectBtn.classList.add(
+                          "bg-green-600",
+                          "cursor-not-allowed"
+                      );
+                      connectBtn.disabled = true;
 
-                        // Update follower count in UI
-                        updateFollowerCountInUI(userId);
+                      // Update the original follow button if it exists
+                      const originalBtn = document.querySelector(
+                          `[data-user-id="${userId}"].follow-btn`
+                      );
+                      if (originalBtn) {
+                          originalBtn.textContent = "Following";
+                          originalBtn.classList.remove(
+                              "bg-blue-600",
+                              "hover:bg-blue-700"
+                          );
+                          originalBtn.classList.add(
+                              "bg-gray-400",
+                              "cursor-not-allowed"
+                          );
+                          originalBtn.disabled = true;
+                      }
 
-                        showNotification(
-                            `Successfully connected with ${userName}!`,
-                            "success"
-                        );
+                      // Update follower count in UI
+                      updateFollowerCountInUI(userId);
 
-                        // Close modal after 2 seconds
-                        setTimeout(() => {
-                            userProfileModal.classList.remove("active");
-                        }, 2000);
-                    } else {
-                        throw new Error("Failed to connect");
-                    }
-                } catch (error) {
-                    console.error("Error connecting with user:", error);
-                    connectBtn.disabled = false;
-                    connectBtn.textContent = "Connect";
-                    showNotification(
-                        "Error connecting with user. Please try again.",
-                        "error"
-                    );
-                }
-            });
-        }
+                      showNotification(
+                          `Successfully connected with ${userName}!`,
+                          "success"
+                      );
 
-        // View Gallery button handler
-        const galleryBtn = userProfileModal.querySelector(
-            "#modal-view-gallery-btn"
-        );
-        if (galleryBtn) {
-            galleryBtn.addEventListener("click", () => {
-                const userId = galleryBtn.dataset.userId;
-                const userName = galleryBtn.dataset.userName;
+                      // Close modal after 2 seconds
+                      setTimeout(() => {
+                          userProfileModal.classList.remove("active");
+                      }, 2000);
+                  } else {
+                      throw new Error("Failed to connect");
+                  }
+              } catch (error) {
+                  console.error("Error connecting with user:", error);
+                  connectBtn.disabled = false;
+                  connectBtn.textContent = "Connect";
+                  showNotification(
+                      "Error connecting with user. Please try again.",
+                      "error"
+                  );
+              }
+          });
+      }
 
-                // Close user profile modal
-                userProfileModal.classList.remove("active");
+      // View Gallery button handler
+      const galleryBtn = userProfileModal.querySelector(
+          "#modal-view-gallery-btn"
+      );
+      if (galleryBtn) {
+          galleryBtn.addEventListener("click", () => {
+              const userId = galleryBtn.dataset.userId;
+              const userName = galleryBtn.dataset.userName;
 
-                // Show gallery modal
-                handleGalleryView(userId, userName);
-            });
-        }
+              // Close user profile modal
+              userProfileModal.classList.remove("active");
+
+              // Show gallery modal
+              handleGalleryView(userId, userName);
+          });
+      }
+  }
+
+  // Close modals with Escape key
+  document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+          document.querySelectorAll(".modal.active").forEach((modal) => {
+              modal.classList.remove("active");
+          });
+      }
+  });
+
+  // Add global error handler for images to prevent timeouts from blocking the page
+  document.addEventListener('error', (e) => {
+      if (e.target.tagName === 'IMG' && e.target.src && e.target.src.includes('placehold.co')) {
+          console.warn('Placeholder image timed out:', e.target.src);
+          // Extract text from URL if possible, or use 'U' as default
+          const match = e.target.src.match(/text=([^&]+)/);
+          const text = match ? decodeURIComponent(match[1]) : 'U';
+          const sizeMatch = e.target.src.match(/(\d+)x\d+/);
+          const size = sizeMatch ? parseInt(sizeMatch[1]) : 100;
+          
+          // Only set fallback if not already set (prevent infinite loop)
+          if (!e.target.src.startsWith('data:')) {
+              e.target.src = generateFallbackAvatar(text, size);
+          }
+      }
+  }, true); // Use capture phase to catch errors early
+
+  // Set up auto-acknowledgment (non-blocking)
+  console.log('✅ Dashboard: Setting up auto-acknowledgment...');
+  setupAutoAcknowledgment();
+  
+  // Safety timeout: force-hide spinner after 10 seconds
+  const timeoutId = setTimeout(() => {
+    console.warn('⚠️ TIMEOUT: Dashboard took too long to load');
+    const spinner = document.querySelector('#loading-screen, .spinner, .loading, [class*="spinner"], [class*="loading"]');
+    if (spinner) {
+      spinner.style.display = 'none';
+      spinner.classList.add('hidden');
+      console.log('🛑 Force-hiding spinner due to timeout');
     }
-
-    // Close modals with Escape key
-    document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") {
-            document.querySelectorAll(".modal.active").forEach((modal) => {
-                modal.classList.remove("active");
-            });
-        }
-    });
-
-    // Add global error handler for images to prevent timeouts from blocking the page
-    document.addEventListener('error', (e) => {
-        if (e.target.tagName === 'IMG' && e.target.src && e.target.src.includes('placehold.co')) {
-            console.warn('Placeholder image timed out:', e.target.src);
-            // Extract text from URL if possible, or use 'U' as default
-            const match = e.target.src.match(/text=([^&]+)/);
-            const text = match ? decodeURIComponent(match[1]) : 'U';
-            const sizeMatch = e.target.src.match(/(\d+)x\d+/);
-            const size = sizeMatch ? parseInt(sizeMatch[1]) : 100;
-            
-            // Only set fallback if not already set (prevent infinite loop)
-            if (!e.target.src.startsWith('data:')) {
-                e.target.src = generateFallbackAvatar(text, size);
-            }
-        }
-    }, true); // Use capture phase to catch errors early
-
-    // Initialize dashboard
-    console.log('🚀 Dashboard: About to call initializeDashboard()...');
-    initializeDashboard().catch(error => {
-        console.error('❌ Dashboard: initializeDashboard() failed:', error);
-        // Force show dashboard even on error
-        if (loadingScreen) {
-            loadingScreen.style.display = 'none';
-            loadingScreen.classList.add('hidden');
-        }
-        if (dashboardLayout) {
-            dashboardLayout.classList.remove('hidden');
-            dashboardLayout.style.display = '';
-        }
-    });
     
-    // Set up auto-acknowledgment
-    console.log('✅ Dashboard: Setting up auto-acknowledgment...');
-    setupAutoAcknowledgment();
-    console.log('✅ Dashboard: All initialization started');
-});
+    if (dashboardLayout) {
+      dashboardLayout.classList.remove('hidden');
+      dashboardLayout.style.display = '';
+    }
+    
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = 'padding: 20px; background: #fee; color: #c00; text-align: center; margin: 20px;';
+    errorDiv.textContent = 'Dashboard loading timed out. Please refresh the page or contact support.';
+    if (mainContent) {
+      mainContent.prepend(errorDiv);
+    } else {
+      document.body.prepend(errorDiv);
+    }
+  }, 10000);
+  
+  try {
+    // Step 1: Check authentication
+    console.log('🔐 Step 1: Checking authentication...');
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    console.log('📦 Session data:', session ? { userId: session.user?.id, email: session.user?.email } : null);
+    console.log('❌ Session error:', sessionError);
+    
+    if (sessionError) {
+      console.error('❌ Session error occurred:', sessionError);
+      clearTimeout(timeoutId);
+      throw new Error('Session error: ' + sessionError.message);
+    }
+    
+    if (!session || !session.user) {
+      console.log('❌ No session found, redirecting to login');
+      clearTimeout(timeoutId);
+      window.location.href = './login-supabase.html';
+      return;
+    }
+    
+    console.log('✅ Session found for user:', session.user.email);
+    console.log('👤 User ID:', session.user.id);
+    
+    // Step 2: Get user profile/data
+    console.log('👤 Step 2: Fetching user profile...');
+    let userProfile;
+    let profileError;
+    try {
+      userProfile = await getUserProfile(session.user.id);
+      console.log('📦 User profile:', userProfile);
+    } catch (error) {
+      profileError = error;
+      console.log('❌ Profile error:', profileError);
+      console.warn('⚠️ Could not fetch user profile:', profileError.message);
+      // Continue anyway - profile might be optional or we'll create it
+    }
+    
+    // Also try querying users table directly for comparison
+    console.log('🔄 Step 2b: Also checking users table...');
+    try {
+      const { data: userFromUsersTable, error: usersTableError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+      
+      console.log('📦 Users table data:', userFromUsersTable);
+      if (usersTableError) {
+        console.log('❌ Users table error:', usersTableError.message);
+      }
+    } catch (err) {
+      console.warn('⚠️ Could not query users table:', err.message);
+    }
+    
+    // Step 3: Check user role/type
+    console.log('🎭 Step 3: Checking user role...');
+    const userRole = userProfile?.role || userProfile?.user_type || session.user.user_metadata?.role || 'user';
+    console.log('👤 User role:', userRole);
+    
+    // Step 4: Check if profile is completed
+    console.log('✅ Step 4: Checking profile completion...');
+    let profileCompleted = false;
+    try {
+      profileCompleted = await isProfileCompleted(session.user.id);
+      console.log('📋 Profile completed:', profileCompleted);
+    } catch (error) {
+      console.warn('⚠️ Error checking profile completion:', error.message);
+      profileCompleted = true; // Assume completed to avoid blocking
+    }
+    
+    // Step 5: Hide loading spinner
+    console.log('⏳ Step 5: Hiding loading spinner...');
+    const possibleSpinnerSelectors = [
+      '#loading-screen',
+      '.spinner',
+      '.loading',
+      '[class*="spinner"]',
+      '[class*="loading"]',
+      '.loader'
+    ];
+    
+    let spinnerFound = false;
+    for (const selector of possibleSpinnerSelectors) {
+      const spinner = document.querySelector(selector);
+      if (spinner && window.getComputedStyle(spinner).display !== 'none') {
+        console.log(`✅ Found spinner with selector: ${selector}`);
+        spinner.style.display = 'none';
+        spinner.classList.add('hidden');
+        spinner.style.visibility = 'hidden';
+        spinner.style.opacity = '0';
+        spinner.style.zIndex = '-1';
+        spinnerFound = true;
+        break;
+      }
+    }
+    
+    if (!spinnerFound) {
+      console.warn('⚠️ No visible spinner element found with common selectors');
+      // Try the known loadingScreen element
+      if (loadingScreen) {
+        console.log('✅ Using loadingScreen element directly');
+        loadingScreen.style.display = 'none';
+        loadingScreen.classList.add('hidden');
+        loadingScreen.style.visibility = 'hidden';
+        loadingScreen.style.opacity = '0';
+        loadingScreen.style.zIndex = '-1';
+        spinnerFound = true;
+      }
+    }
+    
+    if (!spinnerFound) {
+      console.warn('⚠️ No spinner element found at all');
+      console.log('Available elements:', document.body.innerHTML.substring(0, 500));
+    }
+    
+    // Step 6: Show dashboard content
+    console.log('📄 Step 6: Showing dashboard content...');
+    if (dashboardLayout) {
+      console.log('✅ Found dashboardLayout element');
+      dashboardLayout.classList.remove('hidden');
+      dashboardLayout.style.display = '';
+      dashboardLayout.style.visibility = '';
+      dashboardLayout.style.opacity = '';
+    } else {
+      console.warn('⚠️ dashboardLayout element not found');
+    }
+    
+    // Step 7: Render dashboard
+    console.log('🎨 Step 7: Rendering dashboard...');
+    
+    if (!userProfile) {
+      console.warn('⚠️ No user profile available, cannot render dashboard');
+      if (mainContent) {
+        mainContent.innerHTML = `
+          <div class="text-center py-12">
+            <p class="text-red-500 mb-4">Error: User profile not found</p>
+            <button onclick="location.reload()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+              Retry
+            </button>
+          </div>
+        `;
+      }
+      clearTimeout(timeoutId);
+      return;
+    }
+    
+    // Check if profile needs completion
+    if (!profileCompleted) {
+      console.log('📝 Profile not completed, showing setup modal...');
+      try {
+        if (typeof showProfileSetupModal === 'function') {
+          showProfileSetupModal(userProfile);
+          console.log('✅ Profile setup modal shown');
+        } else {
+          console.warn('⚠️ showProfileSetupModal function not found');
+        }
+      } catch (error) {
+        console.error('❌ Error showing profile setup modal:', error);
+      }
+    }
+    
+    // Render the dashboard
+    try {
+      console.log('🔄 Calling renderDashboard...');
+      if (typeof renderDashboard === 'function') {
+        await renderDashboard(session.user, userProfile);
+        console.log('✅ Dashboard rendered successfully');
+      } else {
+        console.error('❌ renderDashboard function not found!');
+        throw new Error('renderDashboard function not available');
+      }
+    } catch (error) {
+      console.error('❌ Error rendering dashboard:', error);
+      throw error;
+    }
+    
+    // Step 8: Load additional data
+    console.log('📊 Step 8: Loading additional dashboard components...');
+    
+    // Jobs
+    try {
+      console.log('🔄 Fetching jobs...');
+      const { data: jobs, error: jobsError } = await supabase
+        .from('jobs')
+        .select('*')
+        .eq('user_id', session.user.id);
+      
+      console.log('📦 Jobs data:', jobs ? `${jobs.length} jobs found` : 'null');
+      if (jobsError) console.warn('⚠️ Jobs error:', jobsError.message);
+    } catch (err) {
+      console.warn('⚠️ Could not fetch jobs:', err.message);
+    }
+    
+    // Wallet
+    try {
+      console.log('🔄 Fetching wallet...');
+      const { data: wallet, error: walletError } = await supabase
+        .from('wallet')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .single();
+      
+      console.log('📦 Wallet data:', wallet ? 'Found' : 'null');
+      if (walletError) console.warn('⚠️ Wallet error:', walletError.message);
+    } catch (err) {
+      console.warn('⚠️ Could not fetch wallet:', err.message);
+    }
+    
+    // Transactions
+    try {
+      console.log('🔄 Fetching transactions...');
+      const { data: transactions, error: txError } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      console.log('📦 Transactions data:', transactions ? `${transactions.length} transactions found` : 'null');
+      if (txError) console.warn('⚠️ Transactions error:', txError.message);
+    } catch (err) {
+      console.warn('⚠️ Could not fetch transactions:', err.message);
+    }
+    
+    // Start real-time updates for apprentices
+    if (userProfile.role === "apprentice") {
+      console.log('🔄 Starting real-time updates for apprentice...');
+      try {
+        if (typeof startRealTimeUpdates === "function") {
+          startRealTimeUpdates(userProfile);
+          console.log('✅ Real-time updates started');
+        }
+        if (typeof updateApprenticeStats === "function") {
+          await updateApprenticeStats(userProfile);
+          console.log('✅ Apprentice stats updated');
+        }
+      } catch (err) {
+        console.warn('⚠️ Error starting real-time updates:', err.message);
+      }
+    }
+    
+    console.log('🎉 Dashboard initialization complete!');
+    clearTimeout(timeoutId);
+    
+  } catch (error) {
+    console.error('💥 FATAL ERROR in dashboard initialization:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    clearTimeout(timeoutId);
+    
+    // Hide spinner even on error
+    if (loadingScreen) {
+      loadingScreen.style.display = 'none';
+      loadingScreen.classList.add('hidden');
+      console.log('🛑 Spinner hidden after error');
+    }
+    
+    if (dashboardLayout) {
+      dashboardLayout.classList.remove('hidden');
+      dashboardLayout.style.display = '';
+    }
+    
+    // Show error message
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = 'padding: 20px; background: #fee; color: #c00; text-align: center; margin: 20px; border-radius: 8px;';
+    errorDiv.innerHTML = `
+      <h3>Dashboard Failed to Load</h3>
+      <p><strong>Error:</strong> ${error.message}</p>
+      <p>Please refresh the page or contact support if the issue persists.</p>
+      <button onclick="location.reload()" style="padding: 10px 20px; margin-top: 10px; cursor: pointer;">
+        Refresh Page
+      </button>
+    `;
+    if (mainContent) {
+      mainContent.prepend(errorDiv);
+    } else {
+      document.body.prepend(errorDiv);
+    }
+  }
+}
+
+// Check if DOMContentLoaded has already fired
+if (document.readyState === 'loading') {
+  // DOMContentLoaded hasn't fired yet, wait for it
+  console.log('⏳ Document still loading, waiting for DOMContentLoaded...');
+  document.addEventListener("DOMContentLoaded", initializeDashboardOnReady);
+} else {
+  // DOMContentLoaded has already fired, run immediately
+  console.log('✅ Document already loaded, running initialization immediately...');
+  initializeDashboardOnReady();
+}
 
 // --- Gallery Delete Button Setup ---
 function setupGalleryDeleteButtons(userData) {
