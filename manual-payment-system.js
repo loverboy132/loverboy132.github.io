@@ -323,14 +323,32 @@ export async function createWithdrawalRequest(amountPoints, bankDetails) {
             throw new Error("Unable to retrieve your wallet. Please try again.");
         }
 
-        // Calculate total deduction including fees
-        const withdrawalFeePoints = 2;
+        // Get user's role to determine fee
+        const { data: userProfile, error: profileError } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+        if (profileError) {
+            console.warn('Could not fetch user profile for role check:', profileError);
+        }
+
+        // Calculate fee: 10% for apprentices, 0% for members
+        const userRole = userProfile?.role || 'member';
+        const withdrawalFeePercentage = userRole === 'apprentice' ? 0.10 : 0;
+        const withdrawalFeePoints = userRole === 'apprentice' 
+            ? Math.round(amountPoints * withdrawalFeePercentage * 100) / 100  // Round to 2 decimal places
+            : 0;
         const totalDeductionPoints = amountPoints + withdrawalFeePoints;
         
         const availablePoints = wallet.balance_points ?? 0;
         if (availablePoints < totalDeductionPoints) {
+            const feeMessage = withdrawalFeePoints > 0 
+                ? `with the ${withdrawalFeePoints.toFixed(2)} point fee (10%)` 
+                : `with no fee`;
             throw new Error(
-                `Insufficient points balance. You requested ${amountPoints} points, but with the ${withdrawalFeePoints} point fee, you need ${totalDeductionPoints} points total. You have ${availablePoints.toFixed(2)} pts available.`
+                `Insufficient points balance. You requested ${amountPoints} points, but ${feeMessage}, you need ${totalDeductionPoints.toFixed(2)} points total. You have ${availablePoints.toFixed(2)} pts available.`
             );
         }
 
@@ -1138,8 +1156,24 @@ export async function approveWithdrawalRequest(requestId, bankTransactionId = nu
             throw new Error(`Withdrawal request is already ${withdrawalRequest.status}`);
         }
 
-        // Calculate total deduction including fees (needed for validation and notification)
-        const feePoints = withdrawalRequest.withdrawal_fee_points ?? 2; // Default fee is 2 points
+        // Get user's role to determine fee (in case fee wasn't stored in request)
+        const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', withdrawalRequest.user_id)
+            .single();
+        
+        const userRole = userProfile?.role || 'member';
+        
+        // Calculate fee: 10% for apprentices, 0% for members
+        // If fee wasn't stored, recalculate it based on user role
+        let feePoints = withdrawalRequest.withdrawal_fee_points;
+        if (feePoints === null || feePoints === undefined) {
+            feePoints = userRole === 'apprentice' 
+                ? Math.round(withdrawalRequest.amount_points * 0.10 * 100) / 100 
+                : 0;
+        }
+        
         const feeNgn = withdrawalRequest.withdrawal_fee_ngn ?? pointsToNgn(feePoints);
         const pointsToDeduct = withdrawalRequest.total_deduction_points ?? (withdrawalRequest.amount_points + feePoints);
         const ngnToDeduct = withdrawalRequest.total_deduction_ngn ?? (withdrawalRequest.amount_ngn + feeNgn);

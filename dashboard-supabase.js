@@ -4621,15 +4621,15 @@ function renderNavigation(tabs, planKey = "free") {
                 userPlan.unlocks.includes(tab.id) ||
                 tab.access === "free";
             return `
-            <button class="nav-link flex items-center px-4 py-2 text-sm font-medium text-gray-600 border-b-2 border-transparent hover:text-gray-800 ${
+            <button class="nav-link flex items-center text-sm font-medium text-gray-600 border-b-2 border-transparent hover:text-gray-800 ${
                 !isUnlocked ? "opacity-50 cursor-not-allowed" : ""
             }" 
                     data-tab="${tab.id}" ${!isUnlocked ? "disabled" : ""}>
-                <i data-feather="${tab.icon}" class="w-4 h-4 mr-2"></i>
-                ${tab.name}
+                <i data-feather="${tab.icon}" class="w-4 h-4 mr-2 flex-shrink-0"></i>
+                <span class="whitespace-nowrap">${tab.name}</span>
                 ${
                     !isUnlocked
-                        ? '<i data-feather="lock" class="w-3 h-3 ml-1"></i>'
+                        ? '<i data-feather="lock" class="w-3 h-3 ml-1 flex-shrink-0"></i>'
                         : ""
                 }
             </button>

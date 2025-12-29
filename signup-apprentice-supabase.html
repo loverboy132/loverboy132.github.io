@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>Become an Apprentice - Craftnet</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="dark-mode.css">
+    <link rel="stylesheet" href="mobile-responsive.css">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -14,13 +15,13 @@
         }
     </style>
 </head>
-<body class="min-h-screen flex flex-col items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div class="max-w-xl w-full space-y-8">
+<body class="min-h-screen flex flex-col items-center justify-center py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
+    <div class="max-w-xl w-full space-y-6 sm:space-y-8">
         <div>
             <a href="index.html" class="flex justify-center items-center">
-                <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+                    <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
                     width="96" height="96" viewBox="0 0 300.000000 300.000000"
-                    preserveAspectRatio="xMidYMid meet" class="h-24 w-auto"
+                    preserveAspectRatio="xMidYMid meet" class="h-16 sm:h-20 md:h-24 w-auto"
                     fill="currentColor"
                     style="color: #1d4ed8;"
                 >
@@ -90,45 +91,45 @@
                     </g>
                 </svg>
             </a>
-            <h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+            <h2 class="mt-4 sm:mt-6 text-center text-2xl sm:text-3xl font-extrabold text-gray-900">
                 Become an Apprentice
             </h2>
-            <p class="mt-2 text-center text-sm text-gray-600">
+            <p class="mt-2 text-center text-sm sm:text-base text-gray-600">
                 Showcase your skills and get hired. 
-                <p class="mt-2 text-center text-sm text-gray-600">Already have an account? <a href="login-supabase.html" class="font-medium text-blue-600 hover:text-blue-500">Sign in</a></p>
             </p>
+            <p class="mt-2 text-center text-sm sm:text-base text-gray-600">Already have an account? <a href="login-supabase.html" class="font-medium text-blue-600 hover:text-blue-500">Sign in</a></p>
         </div>
-        <form id="signup-apprentice-form" class="mt-8 space-y-6">
-            <div class="rounded-md shadow-sm -space-y-px grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form id="signup-apprentice-form" class="mt-6 sm:mt-8 space-y-4 sm:space-y-6">
+            <div class="rounded-md shadow-sm grid grid-cols-1 gap-4">
                 <div>
-                    <label for="apprentice-name" class="block text-sm font-medium text-gray-700">Full Name</label>
-                    <input type="text" id="apprentice-name" required placeholder="John Doe" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <label for="apprentice-name" class="block text-base font-medium text-gray-700 mb-2">Full Name</label>
+                    <input type="text" id="apprentice-name" required placeholder="John Doe" class="block w-full px-4 py-3 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 min-h-[48px]">
                 </div>
                 <div>
-                    <label for="apprentice-skill" class="block text-sm font-medium text-gray-700">Skill</label>
-                    <input type="text" id="apprentice-skill" required placeholder="e.g., Web Development" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <label for="apprentice-skill" class="block text-base font-medium text-gray-700 mb-2">Skill</label>
+                    <input type="text" id="apprentice-skill" required placeholder="e.g., Web Development" class="block w-full px-4 py-3 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 min-h-[48px]">
                 </div>
                 <div>
-                    <label for="apprentice-location" class="block text-sm font-medium text-gray-700">Location</label>
-                    <input type="text" id="apprentice-location" required placeholder="City, Country" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <label for="apprentice-location" class="block text-base font-medium text-gray-700 mb-2">Location</label>
+                    <input type="text" id="apprentice-location" required placeholder="City, Country" class="block w-full px-4 py-3 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 min-h-[48px]">
                 </div>
                 <div>
-                    <label for="apprentice-email" class="block text-sm font-medium text-gray-700">Email Address</label>
-                    <input type="email" id="apprentice-email" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <label for="apprentice-email" class="block text-base font-medium text-gray-700 mb-2">Email Address</label>
+                    <input type="email" id="apprentice-email" required class="block w-full px-4 py-3 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 min-h-[48px]">
                 </div>
                 <div>
-                    <label for="apprentice-password" class="block text-sm font-medium text-gray-700">Password</label>
-                    <input type="password" id="apprentice-password" required class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <label for="apprentice-password" class="block text-base font-medium text-gray-700 mb-2">Password</label>
+                    <input type="password" id="apprentice-password" required class="block w-full px-4 py-3 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 min-h-[48px]">
                 </div>
                 <div>
-                    <label for="referral-code" class="block text-sm font-medium text-gray-700">Referral Code (Optional)</label>
-                    <input type="text" id="referral-code" placeholder="Enter referral code" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                    <label for="referral-code" class="block text-base font-medium text-gray-700 mb-2">Referral Code (Optional)</label>
+                    <input type="text" id="referral-code" placeholder="Enter referral code" class="block w-full px-4 py-3 text-base border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 min-h-[48px]">
                 </div>
             </div>
             <p id="signup-apprentice-error" class="text-red-500 text-sm hidden"></p>
             <p id="signup-apprentice-success" class="text-green-600 text-sm hidden"></p>
             <div>
-                <button type="submit" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">Sign Up</button>
+                <button type="submit" class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 min-h-[48px]">Sign Up</button>
             </div>
         </form>
     </div>

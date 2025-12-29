@@ -2,10 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>Craftnet Admin Dashboard - Simplified</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="dark-mode.css">
+    <link rel="stylesheet" href="mobile-responsive.css">
     <style>
         * {
             margin: 0;
@@ -514,22 +515,22 @@
                 <h2 style="margin-top: 10px; text-align: center; font-size: 1rem;"><i class="fas fa-shield-alt"></i> Admin</h2>
             </div>
             <div class="sidebar-nav">
-                <a href="#" class="nav-item active" data-section="dashboard">
+                <a href="javascript:void(0)" class="nav-item active" data-section="dashboard" onclick="navigateToSection('dashboard'); return false;">
                     <i class="fas fa-tachometer-alt"></i> Dashboard
                 </a>
-                <a href="#" class="nav-item" data-section="payments">
+                <a href="javascript:void(0)" class="nav-item" data-section="payments" onclick="navigateToSection('payments'); return false;">
                     <i class="fas fa-credit-card"></i> Payment Management
                 </a>
-                <a href="#" class="nav-item" data-section="users">
+                <a href="javascript:void(0)" class="nav-item" data-section="users" onclick="navigateToSection('users'); return false;">
                     <i class="fas fa-users"></i> Users & Apprentices
                 </a>
-                <a href="#" class="nav-item" data-section="jobs">
+                <a href="javascript:void(0)" class="nav-item" data-section="jobs" onclick="navigateToSection('jobs'); return false;">
                     <i class="fas fa-briefcase"></i> Jobs Overview
                 </a>
-                <a href="#" class="nav-item" data-section="disputes">
+                <a href="javascript:void(0)" class="nav-item" data-section="disputes" onclick="navigateToSection('disputes'); return false;">
                     <i class="fas fa-gavel"></i> Disputes & Refunds
                 </a>
-                <a href="#" class="nav-item" data-section="settings">
+                <a href="javascript:void(0)" class="nav-item" data-section="settings" onclick="navigateToSection('settings'); return false;">
                     <i class="fas fa-cog"></i> Settings
                 </a>
             </div>

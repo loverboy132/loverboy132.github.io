@@ -2,17 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
     <title>Payment Processing - Craftnet</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="dark-mode.css">
+    <link rel="stylesheet" href="mobile-responsive.css">
     <style>
         body { font-family: 'Inter', sans-serif; }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
-    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+<body class="bg-gray-100 min-h-screen flex items-center justify-center py-8 px-4">
+    <div class="bg-white p-6 sm:p-8 rounded-lg shadow-lg w-full max-w-md">
         <div class="text-center">
             <!-- Logo -->
             <div class="flex justify-center mb-6">
@@ -115,13 +116,13 @@
 
             <!-- Action Buttons -->
             <div id="action-buttons" class="space-y-3">
-                <button id="go-to-dashboard-btn" class="hidden w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold">
+                <button id="go-to-dashboard-btn" class="hidden w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold min-h-[48px] text-base">
                     Go to Dashboard
                 </button>
-                <button id="retry-btn" class="hidden w-full bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors font-semibold">
+                <button id="retry-btn" class="hidden w-full bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 transition-colors font-semibold min-h-[48px] text-base">
                     Try Again
                 </button>
-                <a href="dashboard-supabase.html" class="block w-full text-center text-blue-600 hover:text-blue-800 font-semibold">
+                <a href="dashboard-supabase.html" class="block w-full text-center text-blue-600 hover:text-blue-800 font-semibold py-3 min-h-[48px] flex items-center justify-center text-base">
                     Back to Dashboard
                 </a>
             </div>

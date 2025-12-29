@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
         <title>Sign Up as a Member - Craftnet</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link
@@ -10,6 +10,7 @@
             rel="stylesheet"
         />
         <link rel="stylesheet" href="dark-mode.css">
+        <link rel="stylesheet" href="mobile-responsive.css">
         <style>
             body {
                 font-family: "Inter", sans-serif;
@@ -21,9 +22,9 @@
         </style>
     </head>
     <body
-        class="min-h-screen flex flex-col items-center justify-center py-12 px-4"
+        class="min-h-screen flex flex-col items-center justify-center py-8 sm:py-12 px-4"
     >
-        <div class="max-w-md w-full space-y-8">
+        <div class="max-w-md w-full space-y-6 sm:space-y-8">
             <div>
                 <a
                     href="index.html"
@@ -31,7 +32,7 @@
                 >
                     <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
                         width="96" height="96" viewBox="0 0 300.000000 300.000000"
-                        preserveAspectRatio="xMidYMid meet" class="h-24 w-auto"
+                        preserveAspectRatio="xMidYMid meet" class="h-16 sm:h-20 md:h-24 w-auto"
                         fill="currentColor"
                         style="color: #1d4ed8;"
                     >
@@ -102,11 +103,11 @@
                     </svg>
                 </a>
                 <h2
-                    class="mt-6 text-center text-3xl font-extrabold text-gray-900"
+                    class="mt-4 sm:mt-6 text-center text-2xl sm:text-3xl font-extrabold text-gray-900"
                 >
                     Create your Member account
                 </h2>
-                <p class="mt-2 text-center text-sm text-gray-600">
+                <p class="mt-2 text-center text-sm sm:text-base text-gray-600">
                     Already have an account?
                     <a
                         href="login-supabase.html"
@@ -115,50 +116,60 @@
                     >
                 </p>
             </div>
-            <form id="signup-member-form" class="mt-8 space-y-6">
-                <div class="rounded-md shadow-sm -space-y-px">
-                    <input
-                        id="member-name"
-                        type="text"
-                        required
-                        placeholder="Full Name"
-                        class="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <input
-                        id="member-email"
-                        type="email"
-                        required
-                        placeholder="Email address"
-                        class="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <input
-                        id="member-password"
-                        type="password"
-                        required
-                        placeholder="Password"
-                        class="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    <select
-                        id="creative-type"
-                        required
-                        class="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 bg-white text-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    >
-                        <option value="" disabled selected>
-                            Select your Creative Type
-                        </option>
-                        <option>Photographer</option>
-                        <option>Designer</option>
-                        <option>Artisan</option>
-                        <option>Student</option>
-                        <option>Programmer</option>
-                        <option>Other</option>
-                    </select>
-                    <input
-                        id="referral-code"
-                        type="text"
-                        placeholder="Referral Code (Optional)"
-                        class="appearance-none rounded-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    />
+            <form id="signup-member-form" class="mt-6 sm:mt-8 space-y-4 sm:space-y-6">
+                <div class="rounded-md shadow-sm space-y-4">
+                    <div>
+                        <input
+                            id="member-name"
+                            type="text"
+                            required
+                            placeholder="Full Name"
+                            class="appearance-none relative block w-full px-4 py-3 text-base border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 min-h-[48px]"
+                        />
+                    </div>
+                    <div>
+                        <input
+                            id="member-email"
+                            type="email"
+                            required
+                            placeholder="Email address"
+                            class="appearance-none relative block w-full px-4 py-3 text-base border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 min-h-[48px]"
+                        />
+                    </div>
+                    <div>
+                        <input
+                            id="member-password"
+                            type="password"
+                            required
+                            placeholder="Password"
+                            class="appearance-none relative block w-full px-4 py-3 text-base border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 min-h-[48px]"
+                        />
+                    </div>
+                    <div>
+                        <select
+                            id="creative-type"
+                            required
+                            class="appearance-none relative block w-full px-4 py-3 text-base border border-gray-300 bg-white text-gray-700 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 min-h-[48px]"
+                        >
+                            <option value="" disabled selected>
+                                Select your Creative Type
+                            </option>
+                            <option>Photographer</option>
+                            <option>Designer</option>
+                            <option>Artisan</option>
+                            <option>Student</option>
+                            <option>Programmer</option>
+                            <option>Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <input
+                            id="referral-code"
+                            type="text"
+                            placeholder="Referral Code (Optional)"
+                            class="appearance-none relative block w-full px-4 py-3 text-base border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 min-h-[48px]"
+                        />
+                    </div>
                 </div>
                 <p
                     id="signup-member-error"
@@ -171,7 +182,7 @@
                 <div>
                     <button
                         type="submit"
-                        class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        class="group relative w-full flex justify-center py-3 px-4 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 min-h-[48px]"
                     >
                         Sign Up
                     </button>

@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
         <title>Craftnet - Discover, Earn, and Showcase Your Work</title>
         <script src="https://cdn.tailwindcss.com"></script>
         <link
@@ -11,6 +11,7 @@
         />
         <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
         <link rel="stylesheet" href="dark-mode.css">
+        <link rel="stylesheet" href="mobile-responsive.css">
         <style>
             body {
                 font-family: "Inter", sans-serif;
@@ -35,12 +36,12 @@
             class="bg-white/80 backdrop-blur-md fixed top-0 left-0 right-0 z-50 border-b border-gray-200"
         >
             <div
-                class="container mx-auto px-6 py-4 flex justify-between items-center"
+                class="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center"
             >
                 <a href="index.html" class="flex items-center">
                     <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
                         width="96" height="96" viewBox="0 0 300.000000 300.000000"
-                        preserveAspectRatio="xMidYMid meet" class="h-24 w-auto"
+                        preserveAspectRatio="xMidYMid meet" class="h-12 sm:h-16 md:h-24 w-auto"
                         fill="currentColor"
                         style="color: #1d4ed8;"
                     >
@@ -110,7 +111,7 @@
                         </g>
                     </svg>
                 </a>
-                <nav class="hidden md:flex items-center space-x-6">
+                <nav class="hidden md:flex items-center space-x-6 desktop-nav">
                     <a
                         href="#features"
                         class="text-gray-600 hover:text-gray-900"
@@ -120,7 +121,7 @@
                         >FAQ</a
                     >
                 </nav>
-                <div class="flex items-center space-x-4">
+                <div class="hidden md:flex items-center space-x-4">
                     <a
                         href="login-supabase.html"
                         class="text-gray-600 hover:text-gray-900 font-medium"
@@ -133,38 +134,64 @@
                         >Sign Up</a
                     >
                 </div>
+                <button id="mobile-menu-toggle" class="md:hidden mobile-menu-toggle" aria-label="Toggle menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
             </div>
         </header>
+        
+        <!-- Mobile Menu Overlay -->
+        <div id="mobile-nav-overlay" class="mobile-nav-overlay"></div>
+        
+        <!-- Mobile Menu Drawer -->
+        <div id="mobile-nav-drawer" class="mobile-nav-drawer">
+            <div class="mobile-nav-header">
+                <span class="font-bold text-lg">Menu</span>
+                <button id="mobile-nav-close" class="mobile-nav-close" aria-label="Close menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <nav class="mobile-nav-menu">
+                <a href="#features" class="mobile-nav-item">Features</a>
+                <a href="#faq" class="mobile-nav-item">FAQ</a>
+                <a href="login-supabase.html" class="mobile-nav-item">Log In</a>
+                <a href="signup-member-supabase.html" id="mobile-signup-link" class="mobile-nav-item">Sign Up</a>
+            </nav>
+        </div>
 
         <!-- Hero Section -->
-        <main class="hero-bg pt-32 pb-20">
-            <div class="container mx-auto px-6 text-center">
+        <main class="hero-bg pt-24 sm:pt-32 pb-16 sm:pb-20">
+            <div class="container mx-auto px-4 sm:px-6 text-center">
                 <div class="max-w-4xl mx-auto">
                     <h1
-                        class="text-4xl md:text-6xl font-extrabold text-gray-900 leading-tight mb-6"
+                        class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 leading-tight mb-4 sm:mb-6 px-2"
                     >
                         We help Africa's young workforce get discovered, earn
                         money, and showcase their work.
                     </h1>
-                    <p class="text-lg md:text-xl text-gray-600 mb-10">
+                    <p class="text-base sm:text-lg md:text-xl text-gray-600 mb-8 sm:mb-10 px-2">
                         For photographers, designers, artisans, students, video
                         editors, and recent grads. A simple platform to earn,
                         grow, and get seen — all in one place.
                     </p>
                     <div
-                        class="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-6"
+                        class="flex flex-col sm:flex-row justify-center items-stretch sm:items-center space-y-4 sm:space-y-0 sm:space-x-6 px-4"
                     >
                         <a
                             href="signup-member-supabase.html"
                             id="hero-member-link"
-                            class="w-full sm:w-auto bg-blue-600 text-white px-8 py-4 rounded-lg font-bold text-lg shadow-lg hover:bg-blue-700 btn"
+                            class="w-full sm:w-auto bg-blue-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg shadow-lg hover:bg-blue-700 btn min-h-[48px] flex items-center justify-center"
                         >
                             Sign Up as Member
                         </a>
                         <a
                             href="signup-apprentice-supabase.html"
                             id="hero-apprentice-link"
-                            class="w-full sm:w-auto bg-white text-blue-600 border border-blue-600 px-8 py-4 rounded-lg font-bold text-lg shadow-lg hover:bg-blue-50 btn"
+                            class="w-full sm:w-auto bg-white text-blue-600 border-2 border-blue-600 px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg shadow-lg hover:bg-blue-50 btn min-h-[48px] flex items-center justify-center"
                         >
                             Sign Up as Apprentice
                         </a>
@@ -174,12 +201,12 @@
         </main>
 
         <!-- Features Section -->
-        <section id="features" class="py-20 bg-gray-50">
-            <div class="container mx-auto px-6">
-                <h2 class="text-3xl font-bold text-center text-gray-900 mb-12">
+        <section id="features" class="py-12 sm:py-16 md:py-20 bg-gray-50">
+            <div class="container mx-auto px-4 sm:px-6">
+                <h2 class="text-2xl sm:text-3xl font-bold text-center text-gray-900 mb-8 sm:mb-12">
                     One Platform, Endless Opportunities
                 </h2>
-                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-10">
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 md:gap-10">
                     <div class="bg-white p-8 rounded-xl shadow-md">
                         <h3 class="text-2xl font-bold mb-3">
                             Showcase Your Work
@@ -212,9 +239,9 @@
         </section>
 
         <!-- FAQ Section -->
-        <section id="faq" class="py-20 bg-white">
-            <div class="container mx-auto px-6 max-w-4xl">
-                <h2 class="text-3xl font-bold text-center text-gray-900 mb-12">
+        <section id="faq" class="py-12 sm:py-16 md:py-20 bg-white">
+            <div class="container mx-auto px-4 sm:px-6 max-w-4xl">
+                <h2 class="text-2xl sm:text-3xl font-bold text-center text-gray-900 mb-8 sm:mb-12">
                     Frequently Asked Questions
                 </h2>
                 <div class="space-y-6">
@@ -289,8 +316,8 @@
 
         <!-- Footer -->
         <footer class="bg-gray-900 text-gray-400">
-            <div class="container mx-auto px-6 py-12">
-                <div class="grid md:grid-cols-4 gap-8">
+            <div class="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
                     <div>
                         <h3 class="text-white font-semibold mb-4">Craftiva</h3>
                         <p class="text-sm">
@@ -393,6 +420,42 @@
 
             // Update links when page loads
             document.addEventListener("DOMContentLoaded", updateSignupLinks);
+            
+            // Mobile menu toggle
+            const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+            const mobileNavDrawer = document.getElementById('mobile-nav-drawer');
+            const mobileNavOverlay = document.getElementById('mobile-nav-overlay');
+            const mobileNavClose = document.getElementById('mobile-nav-close');
+            
+            function openMobileMenu() {
+                mobileNavDrawer.classList.add('active');
+                mobileNavOverlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+            
+            function closeMobileMenu() {
+                mobileNavDrawer.classList.remove('active');
+                mobileNavOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+            
+            if (mobileMenuToggle) {
+                mobileMenuToggle.addEventListener('click', openMobileMenu);
+            }
+            
+            if (mobileNavClose) {
+                mobileNavClose.addEventListener('click', closeMobileMenu);
+            }
+            
+            if (mobileNavOverlay) {
+                mobileNavOverlay.addEventListener('click', closeMobileMenu);
+            }
+            
+            // Close mobile menu when clicking a link
+            const mobileNavItems = document.querySelectorAll('.mobile-nav-item');
+            mobileNavItems.forEach(item => {
+                item.addEventListener('click', closeMobileMenu);
+            });
         </script>
         <script src="dark-mode.js"></script>
     </body>

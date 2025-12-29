@@ -3556,20 +3556,38 @@ export async function createWithdrawalRequest(userId, pointsRequested, payoutMet
             throw new Error("Unable to create withdrawal request: missing user information.");
         }
 
-        // Calculate total deduction including fees
-        const withdrawalFeePoints = 2;
-        const totalDeductionPoints = pointsRequested + withdrawalFeePoints;
-
         // Check if user has sufficient balance BEFORE creating the request
         const wallet = await getUserWallet(userId);
         if (!wallet) {
             throw new Error("Unable to retrieve your wallet. Please try again.");
         }
 
+        // Get user's role to determine fee
+        const { data: userProfile, error: profileError } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', userId)
+            .single();
+
+        if (profileError) {
+            console.warn('Could not fetch user profile for role check:', profileError);
+        }
+
+        // Calculate fee: 10% for apprentices, 0% for members
+        const userRole = userProfile?.role || 'member';
+        const withdrawalFeePercentage = userRole === 'apprentice' ? 0.10 : 0;
+        const withdrawalFeePoints = userRole === 'apprentice' 
+            ? Math.round(pointsRequested * withdrawalFeePercentage * 100) / 100  // Round to 2 decimal places
+            : 0;
+        const totalDeductionPoints = pointsRequested + withdrawalFeePoints;
+
         const availablePoints = wallet.balance_points ?? 0;
         if (availablePoints < totalDeductionPoints) {
+            const feeMessage = withdrawalFeePoints > 0 
+                ? `with the ${withdrawalFeePoints.toFixed(2)} point fee (10%)` 
+                : `with no fee`;
             throw new Error(
-                `Insufficient points balance. You requested ${pointsRequested} points, but with the ${withdrawalFeePoints} point fee, you need ${totalDeductionPoints} points total. You have ${availablePoints.toFixed(2)} pts available.`
+                `Insufficient points balance. You requested ${pointsRequested} points, but ${feeMessage}, you need ${totalDeductionPoints.toFixed(2)} points total. You have ${availablePoints.toFixed(2)} pts available.`
             );
         }
 

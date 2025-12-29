@@ -61,10 +61,23 @@ const notificationState = {
 
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', async () => {
-    await initializeAuth();
-    await loadDashboardData();
-    setupEventListeners();
-    updateStats();
+    try {
+        await initializeAuth();
+        await loadDashboardData();
+
+        // Preload key admin sections so their tabs feel responsive
+        // (errors are already handled inside these functions)
+        await Promise.allSettled([
+            loadDisputes(),
+            loadUsers(),
+        ]);
+
+        setupEventListeners();
+        updateStats();
+    } catch (error) {
+        console.error('Error initializing admin dashboard:', error);
+        showNotification('Failed to initialize admin dashboard. Please refresh the page.', 'error');
+    }
 });
 
 // Initialize authentication
@@ -368,6 +381,13 @@ function formatTimeAgo(dateString) {
 
 // Navigate to section
 function navigateToSection(sectionId) {
+    console.log('navigateToSection called with:', sectionId);
+    
+    if (!sectionId) {
+        console.error('navigateToSection: sectionId is missing');
+        return;
+    }
+
     // Update active nav item
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
@@ -376,6 +396,9 @@ function navigateToSection(sectionId) {
     const navItem = document.querySelector(`[data-section="${sectionId}"]`);
     if (navItem) {
         navItem.classList.add('active');
+        console.log('Nav item activated:', sectionId);
+    } else {
+        console.error('Nav item not found for section:', sectionId);
     }
 
     // Show section
@@ -386,6 +409,7 @@ function navigateToSection(sectionId) {
     const targetSection = document.getElementById(sectionId);
     if (targetSection) {
         targetSection.classList.add('active');
+        console.log('Section activated:', sectionId);
         
         // Load section-specific data
         if (sectionId === 'disputes') {
@@ -393,14 +417,19 @@ function navigateToSection(sectionId) {
         } else if (sectionId === 'users') {
             loadUsers();
         }
+    } else {
+        console.error('Target section not found:', sectionId);
     }
 
     // Close mobile sidebar if open
     const sidebar = document.getElementById('sidebar');
-    if (sidebar.classList.contains('open')) {
+    if (sidebar && sidebar.classList.contains('open')) {
         sidebar.classList.remove('open');
     }
 }
+
+// Make navigateToSection available globally immediately
+window.navigateToSection = navigateToSection;
 
 // Toggle sidebar
 function toggleSidebar() {
@@ -442,12 +471,26 @@ function showNotification(message, type = 'info') {
 
 // Setup event listeners
 function setupEventListeners() {
+    console.log('Setting up event listeners...');
+    
     // Navigation
-    document.querySelectorAll('.nav-item').forEach(item => {
+    const navItems = document.querySelectorAll('.nav-item');
+    console.log('Found nav items:', navItems.length);
+    
+    navItems.forEach((item, index) => {
+        const sectionId = item.dataset.section;
+        console.log(`Setting up listener for nav item ${index}:`, sectionId);
+        
         item.addEventListener('click', (e) => {
             e.preventDefault();
-            const sectionId = item.dataset.section;
-            navigateToSection(sectionId);
+            e.stopPropagation();
+            console.log('Nav item clicked:', sectionId);
+            const clickedSectionId = item.dataset.section;
+            if (clickedSectionId) {
+                navigateToSection(clickedSectionId);
+            } else {
+                console.error('No data-section attribute found on clicked item');
+            }
         });
     });
 
@@ -1636,8 +1679,7 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
-// Make functions globally available
-window.navigateToSection = navigateToSection;
+// Make remaining functions globally available (navigateToSection already assigned above)
 window.toggleSidebar = toggleSidebar;
 window.refreshAllData = refreshAllData;
 window.logout = logout;

@@ -1,0 +1,157 @@
+
+
+Craftnet Development 
+Fix List
+(Final Instructions – Priority Based)
+1. Notifications (CRITICAL)
+Fix notification bell and email notifications for all activities.
+Notifications must trigger on:
+Job application submitted
+Job accepted / rejected
+Payment success / failure
+Funds released to apprentice
+Dispute opened / dispute resolved
+Admin replies
+Withdrawal request status (referral withdrawals only)
+Notification UI Rules
+Notification icon must show red unread indicator
+Notifications should open in full screen on mobile
+Every notification must include a clickable “Contact Us” link
+Text: “For any issues, contact us”
+Link must lead directly to the Contact Form page
+2. Wallet, Payments & Escrow Logic (CRITICAL)
+Fix wallet, escrow, and payment flow completely.
+Ensure correct money dispatch to apprentice after job completion.
+Apply 10% commission only when funds are released to the apprentice.
+REMOVE “Withdraw” from Members completely
+REMOVE “Add Funds” from Apprentices completely
+Members’ wallet is only for:
+Job funding
+Subscription
+Refund balance (usable only inside platform)
+3. Job Pricing Logic (CRITICAL)
+Jobs must use FIXED PRICE only
+Fixed price must fall within Craftnet default range
+Minimum: ₦3,000
+Maximum: ₦50,000
+Any job below ₦3,000 or above ₦50,000 must not be fundable
+Member pays full fixed price before job goes live
+4. Job Availability Rules (CRITICAL)
+Once:
+An apprentice accepts a job AND
+The member confirms/accepts that apprentice
+➡️ The job becomes UNAVAILABLE to all other apprentices
+Job must automatically lock and stop receiving applications
+Allow job delete/update only before acceptance
+5. Platform Cleanup & Error Fixes
+Remove follower logic for hiring completely
+Remove “test storage error”
+Fix “undefined error” on apprentice dashboard
+Remove leaderboard and gallery from Members’ dashboard only
+6. Automated Payment Status
+After any payment: Show message:
+“Payment processing… funds will be issued within 24 hours.”
+7. Disputes, Ratings & Reviews
+Fully fix and complete:
+Dispute opening flow
+Admin dispute resolution
+Job rating system
+Job review flow (after completion only)
+8. Apprentice Profile & Explore Tab
+Apprentice setup profile information must reflect on:
+Their public profile
+Explore tab
+Must show:
+Profile picture
+Skills
+Bio
+Experience
+Links
+9. Referral System
+Complete referral tracking
+Correct reward calculation
+Display referral earnings clearly
+Referral withdrawals are MANUAL ONLY (admin-approved)
+10. Payments Integration
+Integrate Flutterwave using:
+Manual payment links
+Virtual account (for funding wallet/subscription)
+Use same integration for:
+Subscription
+Wallet funding
+Job funding
+11. Profiles & CV
+Add advanced profile setup:
+Skills
+Experience
+Bio
+Portfolio links
+Create individual profile pages when clicking any user:
+From Explore tab
+From job applications
+Add “Upload CV” field to job applications
+Auto-generate Craftnet ID Card / CV from apprentice profile info (downloadable)
+12. UI / UX Fixes
+Fix all UI/UX issues including:
+Blurry fonts
+Mobile responsiveness
+Payment layout
+Leaderboard UI
+Help center layout
+Contact form UI
+Auto-scroll for top navigation icons
+13. Pages Redesign
+Redesign Visitors (Landing) Page – more detailed & professional
+Redesign Login Page – clearer onboarding and messaging
+14. Admin Dashboard
+Upgrade admin dashboard to include:
+Full analytics
+User management
+Job tracking
+Dispute handling
+Manual payout approval
+Platform controls
+15. Account Settings
+Add Change Password inside settings
+Add Delete Account with full data removal
+16. Subscription Plan
+Keep ONE subscription plan only:
+Creative – ₦1,500
+Unlocks all premium features
+17. Help Center & Contact Form
+Improve help center
+Add problem categories
+Auto-response message:
+“We will review your request within 72 hours.”
+18. Testing & Relaunch
+Run full system testing after fixes:
+Payments
+Wallet
+Jobs
+Disputes
+Profiles
+Notifications
+Member → Apprentice flow
+Admin features
+Fix any additional issues found during testing
+Delete all initial user accounts and data
+Relaunch with a clean database
+Contact Form (FINAL)
+Contact Form Fields
+Full Name
+Email Address
+Phone Number (optional)
+Issue Category (dropdown):
+Payment Issue
+Job Issue
+Dispute
+Account Issue
+Refund Request
+Other
+Subject
+Message (textarea)
+Optional Attachment (image/pdf)
+Auto-Response Message (System)
+Thank you for contacting Craftnet.
+We have received your request and will review it within 72 hours.
+You will be notified once there is an update.
