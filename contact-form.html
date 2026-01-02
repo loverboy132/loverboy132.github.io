@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+        <title>Contact Us - Craftnet</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+            rel="stylesheet"
+        />
+        <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+        <link rel="stylesheet" href="dark-mode.css">
+        <link rel="stylesheet" href="mobile-responsive.css">
+        <style>
+            body {
+                font-family: "Inter", sans-serif;
+            }
+            .form-error {
+                color: #dc2626;
+                font-size: 0.875rem;
+                margin-top: 0.25rem;
+            }
+            .form-success {
+                color: #16a34a;
+                font-size: 0.875rem;
+                margin-top: 0.25rem;
+            }
+            .file-preview {
+                max-width: 200px;
+                max-height: 200px;
+                border-radius: 8px;
+                margin-top: 8px;
+            }
+            .loading-spinner {
+                display: inline-block;
+                width: 16px;
+                height: 16px;
+                border: 2px solid #ffffff;
+                border-radius: 50%;
+                border-top-color: transparent;
+                animation: spin 0.6s linear infinite;
+            }
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+        </style>
+    </head>
+    <body class="bg-white text-gray-800">
+        <!-- Header -->
+        <header
+            class="bg-white/80 backdrop-blur-md fixed top-0 left-0 right-0 z-50 border-b border-gray-200"
+        >
+            <div
+                class="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center"
+            >
+                <a href="index.html" class="flex items-center">
+                    <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+                        width="96" height="96" viewBox="0 0 300.000000 300.000000"
+                        preserveAspectRatio="xMidYMid meet" class="h-12 sm:h-16 md:h-24 w-auto"
+                        fill="currentColor"
+                        style="color: #1d4ed8;"
+                    >
+                        <g transform="translate(0.000000,300.000000) scale(0.100000,-0.100000)"
+                        fill="currentColor" stroke="none">
+                        <path d="M539 1931 c-153 -50 -269 -212 -269 -375 0 -67 24 -156 55 -211 36
+                        -60 116 -132 183 -163 50 -24 69 -27 162 -27 99 0 110 2 171 32 196 97 281
+                        340 189 537 -35 74 -112 151 -187 188 -57 28 -78 33 -157 35 -68 2 -105 -2
+                        -147 -16z m241 -57 c142 -46 241 -199 227 -352 -12 -124 -83 -229 -193 -283
+                        -55 -28 -76 -32 -137 -32 -136 1 -250 71 -313 193 -26 49 -29 65 -29 150 0 89
+                        2 99 34 158 84 155 244 220 411 166z"/>
+                        <path d="M627 1822 c-22 -24 -21 -57 3 -109 33 -73 75 -47 97 58 11 54 -64 91
+                        -100 51z m63 -27 c12 -15 6 -49 -13 -73 -8 -11 -13 -9 -23 10 -17 30 -17 65
+                        -1 71 20 9 24 8 37 -8z"/>
+                        <path d="M449 1726 c-14 -29 -2 -51 34 -62 12 -3 34 -18 49 -32 23 -21 30 -23
+                        43 -12 14 12 13 16 -14 44 -16 17 -31 42 -33 56 -2 20 -9 26 -35 28 -27 3 -35
+                        -1 -44 -22z"/>
+                        <path d="M812 1738 c-6 -6 -12 -19 -12 -28 0 -9 -11 -27 -25 -40 -14 -13 -25
+                        -29 -25 -36 0 -25 22 -26 46 -3 14 13 39 28 57 34 28 9 32 14 32 45 0 32 -3
+                        35 -30 38 -17 2 -36 -3 -43 -10z"/>
+                        <path d="M618 1616 c-24 -18 -39 -63 -32 -92 8 -33 50 -64 86 -64 69 0 106
+                        100 55 148 -26 25 -82 29 -109 8z m80 -38 c21 -21 14 -57 -14 -70 -23 -11 -29
+                        -10 -45 10 -15 19 -16 28 -7 48 12 26 46 32 66 12z"/>
+                        <path d="M388 1565 c-9 -21 -8 -28 7 -45 21 -24 48 -26 65 -5 7 9 29 15 51 15
+                        32 0 39 3 39 20 0 17 -7 20 -44 20 -25 0 -48 5 -51 10 -13 20 -55 11 -67 -15z"/>
+                        <path d="M875 1581 c-6 -5 -28 -11 -50 -13 -57 -4 -55 -32 2 -36 23 -2 47 -10
+                        53 -18 31 -36 93 12 70 55 -11 22 -58 29 -75 12z"/>
+                        <path d="M536 1451 c-16 -17 -40 -31 -55 -33 -21 -2 -27 -9 -29 -35 -3 -27 1
+                        -35 22 -45 22 -9 29 -8 46 7 11 10 20 25 20 34 0 8 12 27 26 42 16 17 24 34
+                        21 43 -9 23 -20 20 -51 -13z"/>
+                        <path d="M753 1464 c-3 -9 5 -26 21 -43 14 -15 26 -37 26 -49 0 -14 9 -27 25
+                        -34 21 -9 28 -8 45 7 32 29 20 75 -20 75 -9 0 -29 14 -45 30 -32 34 -43 37
+                        -52 14z"/>
+                        <path d="M650 1392 c0 -23 -6 -45 -15 -52 -24 -20 -19 -59 11 -72 45 -21 79
+                        19 55 66 -6 11 -12 37 -13 56 -2 24 -9 36 -20 38 -15 3 -18 -4 -18 -36z"/>
+                        <path d="M1840 1728 c-29 -11 -40 -25 -40 -55 0 -14 -6 -23 -15 -23 -9 0 -15
+                        -10 -15 -26 0 -19 4 -25 15 -20 13 4 15 -9 15 -84 l0 -90 30 0 30 0 0 90 0 90
+                        25 -6 c22 -5 25 -3 25 20 0 21 -5 26 -25 26 -19 0 -25 5 -25 21 0 16 5 20 28
+                        17 22 -2 28 1 30 20 2 13 -2 22 -10 23 -7 0 -20 2 -28 3 -8 2 -26 -1 -40 -6z"/>
+                        <path d="M1223 1715 c-48 -21 -73 -68 -73 -140 0 -102 63 -166 147 -150 40 7
+                        99 56 89 73 -11 19 -50 14 -69 -8 -22 -26 -50 -25 -81 3 -39 34 -39 124 -1
+                        162 31 31 49 31 81 0 20 -20 29 -23 49 -15 14 5 25 13 25 18 0 14 -43 50 -73
+                        61 -37 14 -55 13 -94 -4z"/>
+                        <path d="M1954 1695 c-4 -8 -4 -21 -1 -29 3 -8 -2 -16 -15 -19 -23 -6 -22 -42
+                        2 -42 11 0 13 -13 11 -55 -3 -68 11 -107 43 -121 36 -17 76 -4 76 24 0 18 -5
+                        23 -27 22 -28 0 -28 1 -31 67 l-3 68 31 -6 c27 -6 30 -4 30 20 0 22 -4 26 -30
+                        26 -27 0 -30 3 -30 30 0 25 -4 30 -25 30 -14 0 -28 -7 -31 -15z"/>
+                        <path d="M2590 1681 c0 -21 -5 -31 -15 -31 -9 0 -15 -10 -15 -26 0 -19 4 -25
+                        15 -20 13 4 15 -8 15 -74 0 -70 2 -81 22 -94 28 -20 62 -20 82 -1 21 22 11 41
+                        -22 40 -26 0 -27 1 -30 67 l-3 68 31 -6 c27 -6 30 -4 30 20 0 22 -4 26 -31 26
+                        -27 0 -30 3 -27 28 3 23 -1 27 -24 30 -25 3 -28 0 -28 -27z m36 -67 c-5 -13
+                        -10 -14 -18 -6 -6 6 -8 18 -4 28 5 13 10 14 18 6 6 -6 8 -18 4 -28z"/>
+                        <path d="M1420 1540 l0 -110 31 0 32 0 -6 48 c-9 74 1 102 39 118 23 9 34 21
+                        34 34 0 28 -44 27 -64 -2 l-16 -22 0 22 c0 17 -6 22 -25 22 l-25 0 0 -110z"/>
+                        <path d="M1592 1634 c-12 -8 -22 -21 -22 -28 0 -22 31 -28 51 -10 26 23 69 11
+                        69 -19 0 -19 -6 -22 -47 -25 -53 -3 -83 -24 -83 -59 0 -60 57 -90 107 -57 19
+                        12 28 13 31 6 2 -7 15 -12 28 -12 24 0 24 2 24 85 0 78 -2 88 -25 110 -29 30
+                        -97 34 -133 9z m82 -161 c-27 -20 -49 -12 -49 17 0 20 6 26 30 30 24 4 31 2
+                        33 -14 2 -11 -4 -26 -14 -33z"/>
+                        <path d="M2110 1540 l0 -110 25 0 c24 0 25 2 25 66 0 80 11 104 49 104 36 0
+                        41 -13 41 -101 0 -67 1 -69 25 -69 25 0 25 1 25 90 0 77 -3 93 -20 110 -24 24
+                        -82 27 -104 4 -15 -14 -16 -14 -16 0 0 10 -9 16 -25 16 l-25 0 0 -110z"/>
+                        <path d="M2366 1624 c-22 -23 -26 -36 -26 -83 0 -33 6 -65 15 -77 33 -48 122
+                        -55 160 -14 28 31 6 48 -36 27 -35 -16 -57 -13 -76 11 -29 35 -16 43 59 41 47
+                        -2 73 2 76 9 7 21 -19 82 -41 97 -36 25 -100 19 -131 -11z m112 -41 c3 -21 -1
+                        -23 -42 -23 -50 0 -51 1 -35 31 15 29 73 23 77 -8z"/>
+                        </g>
+                    </svg>
+                </a>
+                <nav class="hidden md:flex items-center space-x-6 desktop-nav">
+                    <a href="index.html" class="text-gray-600 hover:text-gray-900">Home</a>
+                    <a href="help-center.html" class="text-gray-600 hover:text-gray-900">Help Center</a>
+                    <a href="contact-form.html" class="text-gray-600 hover:text-gray-900 font-semibold">Contact Us</a>
+                </nav>
+                <div class="hidden md:flex items-center space-x-4">
+                    <a
+                        href="login-supabase.html"
+                        class="text-gray-600 hover:text-gray-900 font-medium"
+                        >Log In</a
+                    >
+                    <a
+                        href="signup-member-supabase.html"
+                        class="bg-gray-900 text-white px-5 py-2 rounded-lg font-semibold text-sm shadow-md hover:bg-gray-800 btn"
+                        >Sign Up</a
+                    >
+                </div>
+                <button id="mobile-menu-toggle" class="md:hidden mobile-menu-toggle" aria-label="Toggle menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+        
+        <!-- Mobile Menu Overlay -->
+        <div id="mobile-nav-overlay" class="mobile-nav-overlay"></div>
+        
+        <!-- Mobile Menu Drawer -->
+        <div id="mobile-nav-drawer" class="mobile-nav-drawer">
+            <div class="mobile-nav-header">
+                <span class="font-bold text-lg">Menu</span>
+                <button id="mobile-nav-close" class="mobile-nav-close" aria-label="Close menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <nav class="mobile-nav-menu">
+                <a href="index.html" class="mobile-nav-item">Home</a>
+                <a href="help-center.html" class="mobile-nav-item">Help Center</a>
+                <a href="contact-form.html" class="mobile-nav-item">Contact Us</a>
+                <a href="login-supabase.html" class="mobile-nav-item">Log In</a>
+                <a href="signup-member-supabase.html" class="mobile-nav-item">Sign Up</a>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <main class="pt-24 sm:pt-32 pb-16 sm:pb-20 bg-gray-50 min-h-screen">
+            <div class="container mx-auto px-4 sm:px-6">
+                <div class="max-w-2xl mx-auto">
+                    <!-- Page Header -->
+                    <div class="text-center mb-8">
+                        <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">
+                            Contact Us
+                        </h1>
+                        <p class="text-lg text-gray-600">
+                            Have a question or need assistance? Fill out the form below and we'll get back to you within 72 hours.
+                        </p>
+                    </div>
+
+                    <!-- Auto-Response Message (Hidden Initially) -->
+                    <div id="auto-response" class="hidden bg-green-50 border-l-4 border-green-500 p-6 rounded-lg mb-8">
+                        <div class="flex items-start">
+                            <i data-feather="check-circle" class="w-6 h-6 text-green-500 mr-3 flex-shrink-0"></i>
+                            <div>
+                                <h3 class="font-semibold text-green-800 mb-2">Thank you for contacting Craftnet.</h3>
+                                <p class="text-green-700">
+                                    We have received your request and will review it within 72 hours.<br>
+                                    You will be notified once there is an update.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contact Form -->
+                    <form id="contact-form" class="bg-white rounded-lg shadow-lg p-6 sm:p-8">
+                        <!-- Full Name -->
+                        <div class="mb-6">
+                            <label for="full-name" class="block text-sm font-medium text-gray-700 mb-2">
+                                Full Name <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                id="full-name"
+                                name="full-name"
+                                required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                                placeholder="Enter your full name"
+                            />
+                            <div id="full-name-error" class="form-error hidden"></div>
+                        </div>
+
+                        <!-- Email Address -->
+                        <div class="mb-6">
+                            <label for="email" class="block text-sm font-medium text-gray-700 mb-2">
+                                Email Address <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="email"
+                                id="email"
+                                name="email"
+                                required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                                placeholder="your.email@example.com"
+                            />
+                            <div id="email-error" class="form-error hidden"></div>
+                        </div>
+
+                        <!-- Phone Number (Optional) -->
+                        <div class="mb-6">
+                            <label for="phone" class="block text-sm font-medium text-gray-700 mb-2">
+                                Phone Number <span class="text-gray-500 text-xs">(Optional)</span>
+                            </label>
+                            <input
+                                type="tel"
+                                id="phone"
+                                name="phone"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                                placeholder="+234 800 000 0000"
+                            />
+                            <div id="phone-error" class="form-error hidden"></div>
+                        </div>
+
+                        <!-- Issue Category -->
+                        <div class="mb-6">
+                            <label for="issue-category" class="block text-sm font-medium text-gray-700 mb-2">
+                                Issue Category <span class="text-red-500">*</span>
+                            </label>
+                            <select
+                                id="issue-category"
+                                name="issue-category"
+                                required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                            >
+                                <option value="">Select a category</option>
+                                <option value="Payment Issue">Payment Issue</option>
+                                <option value="Job Issue">Job Issue</option>
+                                <option value="Dispute">Dispute</option>
+                                <option value="Account Issue">Account Issue</option>
+                                <option value="Refund Request">Refund Request</option>
+                                <option value="Other">Other</option>
+                            </select>
+                            <div id="issue-category-error" class="form-error hidden"></div>
+                        </div>
+
+                        <!-- Subject -->
+                        <div class="mb-6">
+                            <label for="subject" class="block text-sm font-medium text-gray-700 mb-2">
+                                Subject <span class="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                id="subject"
+                                name="subject"
+                                required
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                                placeholder="Brief description of your issue"
+                            />
+                            <div id="subject-error" class="form-error hidden"></div>
+                        </div>
+
+                        <!-- Message -->
+                        <div class="mb-6">
+                            <label for="message" class="block text-sm font-medium text-gray-700 mb-2">
+                                Message <span class="text-red-500">*</span>
+                            </label>
+                            <textarea
+                                id="message"
+                                name="message"
+                                required
+                                rows="6"
+                                minlength="10"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base resize-y"
+                                placeholder="Please provide details about your issue (minimum 10 characters)"
+                            ></textarea>
+                            <div id="message-error" class="form-error hidden"></div>
+                            <div class="text-sm text-gray-500 mt-1">
+                                <span id="message-count">0</span> / 10 minimum characters
+                            </div>
+                        </div>
+
+                        <!-- Attachment -->
+                        <div class="mb-6">
+                            <label for="attachment" class="block text-sm font-medium text-gray-700 mb-2">
+                                Attachment <span class="text-gray-500 text-xs">(Optional)</span>
+                            </label>
+                            <input
+                                type="file"
+                                id="attachment"
+                                name="attachment"
+                                accept="image/*,.pdf"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                            />
+                            <div id="attachment-error" class="form-error hidden"></div>
+                            <div id="file-preview" class="mt-2"></div>
+                            <div class="text-sm text-gray-500 mt-1">
+                                Accepted: Images (JPG, PNG, GIF) and PDF files. Max size: 5MB
+                            </div>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button
+                            type="submit"
+                            id="submit-btn"
+                            class="w-full bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold text-base shadow-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] flex items-center justify-center"
+                        >
+                            <span id="submit-text">Submit Request</span>
+                            <span id="submit-spinner" class="loading-spinner hidden ml-2"></span>
+                        </button>
+
+                        <!-- Error Message -->
+                        <div id="form-error" class="hidden mt-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+                            <div class="flex items-start">
+                                <i data-feather="alert-circle" class="w-5 h-5 text-red-500 mr-3 flex-shrink-0"></i>
+                                <p id="form-error-text" class="text-red-700 text-sm"></p>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-gray-900 text-gray-400">
+            <div class="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+                    <div>
+                        <h3 class="text-white font-semibold mb-4">Craftiva</h3>
+                        <p class="text-sm">
+                            Connecting Africa's creative talent with
+                            opportunities to earn, grow, and showcase their
+                            work.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-white font-semibold mb-4">Platform</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li>
+                                <a href="index.html#features" class="hover:text-white"
+                                    >Features</a
+                                >
+                            </li>
+                            <li>
+                                <a href="index.html#faq" class="hover:text-white">FAQ</a>
+                            </li>
+                            <li>
+                                <a href="help-center.html" class="hover:text-white">Help Center</a>
+                            </li>
+                            <li>
+                                <a href="contact-form.html" class="hover:text-white">Contact Us</a>
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-white font-semibold mb-4">Legal</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li>
+                                <a
+                                    href="terms-of-service.html"
+                                    class="hover:text-white"
+                                    >Terms of Service</a
+                                >
+                            </li>
+                            <li>
+                                <a
+                                    href="privacy-policy.html"
+                                    class="hover:text-white"
+                                    >Privacy Policy</a
+                                >
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-white font-semibold mb-4">Contact</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li>support@craftiva.com</li>
+                            <li>+234 (0) 800 000 0000</li>
+                            <li>Lagos, Nigeria</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="border-t border-gray-800 mt-8 pt-8 text-center">
+                    <p>&copy; 2025 Craftiva. All Rights Reserved.</p>
+                </div>
+            </div>
+        </footer>
+
+        <script type="module" src="contact-form.js"></script>
+        <script>
+            feather.replace();
+
+            // Mobile menu toggle
+            const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+            const mobileNavDrawer = document.getElementById('mobile-nav-drawer');
+            const mobileNavOverlay = document.getElementById('mobile-nav-overlay');
+            const mobileNavClose = document.getElementById('mobile-nav-close');
+            
+            function openMobileMenu() {
+                mobileNavDrawer.classList.add('active');
+                mobileNavOverlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+            
+            function closeMobileMenu() {
+                mobileNavDrawer.classList.remove('active');
+                mobileNavOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+            
+            if (mobileMenuToggle) {
+                mobileMenuToggle.addEventListener('click', openMobileMenu);
+            }
+            
+            if (mobileNavClose) {
+                mobileNavClose.addEventListener('click', closeMobileMenu);
+            }
+            
+            if (mobileNavOverlay) {
+                mobileNavOverlay.addEventListener('click', closeMobileMenu);
+            }
+            
+            const mobileNavItems = document.querySelectorAll('.mobile-nav-item');
+            mobileNavItems.forEach(item => {
+                item.addEventListener('click', closeMobileMenu);
+            });
+
+            // Message character counter
+            const messageInput = document.getElementById('message');
+            const messageCount = document.getElementById('message-count');
+            if (messageInput && messageCount) {
+                messageInput.addEventListener('input', () => {
+                    messageCount.textContent = messageInput.value.length;
+                });
+            }
+        </script>
+        <script src="dark-mode.js"></script>
+    </body>
+</html>
+

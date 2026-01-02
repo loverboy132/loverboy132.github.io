@@ -874,7 +874,14 @@ function showNotification(message, type = 'info') {
     // Create a simple notification
     const notification = document.createElement('div');
     notification.className = `notification notification-${type}`;
-    notification.textContent = messageText;
+    
+    // Set content with Contact Us link
+    notification.innerHTML = `
+        <div style="margin-bottom: 8px;">${messageText}</div>
+        <a href="contact-form.html" style="font-size: 12px; text-decoration: underline; opacity: 0.9;">
+            For any issues, contact us
+        </a>
+    `;
     
     // Add styling for better visibility
     notification.style.cssText = `

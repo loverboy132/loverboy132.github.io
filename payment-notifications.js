@@ -851,6 +851,9 @@ function createNotificationElement(notification) {
             <div class="notification-time">${new Date(
                 notification.created_at
             ).toLocaleString()}</div>
+            <a href="contact-form.html" class="notification-contact-link" style="display: block; margin-top: 8px; font-size: 12px; color: #3b82f6; text-decoration: underline;">
+                For any issues, contact us
+            </a>
         </div>
         <button class="notification-close" onclick="this.parentElement.remove()">&times;</button>
     `;

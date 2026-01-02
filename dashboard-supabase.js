@@ -96,6 +96,7 @@ import {
     unsubscribeFromNotifications,
     injectNotificationStyles,
     displayNotification,
+    createNotification,
 } from "./payment-notifications.js";
 
 // --- DOM Elements ---
@@ -235,6 +236,7 @@ const memberTabs = [
         access: "locked",
     },
     { id: "profile", name: "Profile", icon: "user", access: "free" },
+    { id: "contact", name: "Contact Us", icon: "mail", access: "free" },
 ];
 
 const apprenticeTabs = [
@@ -245,6 +247,7 @@ const apprenticeTabs = [
     { id: "earnings", name: "Earnings & Progress", icon: "dollar-sign" },
     { id: "extras", name: "Extras", icon: "gift" },
     { id: "settings", name: "Settings & Info", icon: "settings" },
+    { id: "contact", name: "Contact Us", icon: "mail" },
 ];
 
 let currentActiveTab = "home";
@@ -1099,6 +1102,185 @@ const apprenticeContentTemplates = {
                      </div>
                 </div>
              </div>
+        </div>
+    `,
+    contact: (userData) => `
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Contact Us</h1>
+            <p class="text-gray-600">Have a question or need assistance? Fill out the form below and we'll get back to you within 72 hours.</p>
+        </div>
+        
+        <!-- Auto-Response Message (Hidden Initially) -->
+        <div id="contact-auto-response" class="hidden bg-green-50 border-l-4 border-green-500 p-6 rounded-lg mb-8">
+            <div class="flex items-start">
+                <i data-feather="check-circle" class="w-6 h-6 text-green-500 mr-3 flex-shrink-0"></i>
+                <div>
+                    <h3 class="font-semibold text-green-800 mb-2">Thank you for contacting Craftnet.</h3>
+                    <p class="text-green-700">
+                        We have received your request and will review it within 72 hours.<br>
+                        You will be notified once there is an update.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Form -->
+        <div class="bg-white rounded-lg shadow-lg p-6 sm:p-8 max-w-2xl">
+            <form id="dashboard-contact-form">
+                <!-- Full Name -->
+                <div class="mb-6">
+                    <label for="dashboard-full-name" class="block text-sm font-medium text-gray-700 mb-2">
+                        Full Name <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="dashboard-full-name"
+                        name="full-name"
+                        required
+                        value="${userData.name || ''}"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                        placeholder="Enter your full name"
+                    />
+                    <div id="dashboard-full-name-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                </div>
+
+                <!-- Email Address -->
+                <div class="mb-6">
+                    <label for="dashboard-email" class="block text-sm font-medium text-gray-700 mb-2">
+                        Email Address <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="email"
+                        id="dashboard-email"
+                        name="email"
+                        required
+                        value="${userData.email || ''}"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                        placeholder="your.email@example.com"
+                    />
+                    <div id="dashboard-email-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                </div>
+
+                <!-- Phone Number (Optional) -->
+                <div class="mb-6">
+                    <label for="dashboard-phone" class="block text-sm font-medium text-gray-700 mb-2">
+                        Phone Number <span class="text-gray-500 text-xs">(Optional)</span>
+                    </label>
+                    <input
+                        type="tel"
+                        id="dashboard-phone"
+                        name="phone"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                        placeholder="+234 800 000 0000"
+                    />
+                    <div id="dashboard-phone-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                </div>
+
+                <!-- Issue Category -->
+                <div class="mb-6">
+                    <label for="dashboard-issue-category" class="block text-sm font-medium text-gray-700 mb-2">
+                        Issue Category <span class="text-red-500">*</span>
+                    </label>
+                    <select
+                        id="dashboard-issue-category"
+                        name="issue-category"
+                        required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                    >
+                        <option value="">Select a category</option>
+                        <option value="Payment Issue">Payment Issue</option>
+                        <option value="Job Issue">Job Issue</option>
+                        <option value="Dispute">Dispute</option>
+                        <option value="Account Issue">Account Issue</option>
+                        <option value="Refund Request">Refund Request</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <div id="dashboard-issue-category-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                </div>
+
+                <!-- Subject -->
+                <div class="mb-6">
+                    <label for="dashboard-subject" class="block text-sm font-medium text-gray-700 mb-2">
+                        Subject <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="dashboard-subject"
+                        name="subject"
+                        required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                        placeholder="Brief description of your issue"
+                    />
+                    <div id="dashboard-subject-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                </div>
+
+                <!-- Message -->
+                <div class="mb-6">
+                    <label for="dashboard-message" class="block text-sm font-medium text-gray-700 mb-2">
+                        Message <span class="text-red-500">*</span>
+                    </label>
+                    <textarea
+                        id="dashboard-message"
+                        name="message"
+                        required
+                        rows="6"
+                        minlength="10"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base resize-y"
+                        placeholder="Please provide details about your issue (minimum 10 characters)"
+                    ></textarea>
+                    <div id="dashboard-message-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                    <div class="text-sm text-gray-500 mt-1">
+                        <span id="dashboard-message-count">0</span> / 10 minimum characters
+                    </div>
+                </div>
+
+                <!-- Attachment -->
+                <div class="mb-6">
+                    <label for="dashboard-attachment" class="block text-sm font-medium text-gray-700 mb-2">
+                        Attachment <span class="text-gray-500 text-xs">(Optional)</span>
+                    </label>
+                    <input
+                        type="file"
+                        id="dashboard-attachment"
+                        name="attachment"
+                        accept="image/*,.pdf"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    />
+                    <div id="dashboard-attachment-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                    <div class="text-sm text-gray-500 mt-1">
+                        Accepted: Images (JPG, PNG, GIF) and PDF files. Max size: 5MB
+                    </div>
+                    <div id="dashboard-file-preview" class="mt-2"></div>
+                </div>
+
+                <!-- Submit Button -->
+                <button
+                    type="submit"
+                    id="dashboard-submit-btn"
+                    class="w-full bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold text-base shadow-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] flex items-center justify-center"
+                >
+                    <span id="dashboard-submit-text">Submit Request</span>
+                    <span id="dashboard-submit-spinner" class="hidden ml-2">
+                        <i data-feather="loader" class="w-5 h-5 animate-spin"></i>
+                    </span>
+                </button>
+
+                <!-- Error Message -->
+                <div id="dashboard-form-error" class="hidden mt-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+                    <div class="flex items-start">
+                        <i data-feather="alert-circle" class="w-5 h-5 text-red-500 mr-3 flex-shrink-0"></i>
+                        <p id="dashboard-form-error-text" class="text-red-700 text-sm"></p>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Help Center Link -->
+        <div class="mt-8 text-center">
+            <p class="text-gray-600 mb-4">Looking for quick answers?</p>
+            <a href="help-center.html" class="text-blue-600 hover:text-blue-800 underline">
+                Visit our Help Center
+            </a>
         </div>
     `,
 };
@@ -2452,6 +2634,185 @@ const memberContentTemplates = {
             </div>
         </div>
     `,
+    contact: (userData) => `
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-900 mb-2">Contact Us</h1>
+            <p class="text-gray-600">Have a question or need assistance? Fill out the form below and we'll get back to you within 72 hours.</p>
+        </div>
+        
+        <!-- Auto-Response Message (Hidden Initially) -->
+        <div id="contact-auto-response" class="hidden bg-green-50 border-l-4 border-green-500 p-6 rounded-lg mb-8">
+            <div class="flex items-start">
+                <i data-feather="check-circle" class="w-6 h-6 text-green-500 mr-3 flex-shrink-0"></i>
+                <div>
+                    <h3 class="font-semibold text-green-800 mb-2">Thank you for contacting Craftnet.</h3>
+                    <p class="text-green-700">
+                        We have received your request and will review it within 72 hours.<br>
+                        You will be notified once there is an update.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Form -->
+        <div class="bg-white rounded-lg shadow-lg p-6 sm:p-8 max-w-2xl">
+            <form id="dashboard-contact-form">
+                <!-- Full Name -->
+                <div class="mb-6">
+                    <label for="dashboard-full-name" class="block text-sm font-medium text-gray-700 mb-2">
+                        Full Name <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="dashboard-full-name"
+                        name="full-name"
+                        required
+                        value="${userData.name || ''}"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                        placeholder="Enter your full name"
+                    />
+                    <div id="dashboard-full-name-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                </div>
+
+                <!-- Email Address -->
+                <div class="mb-6">
+                    <label for="dashboard-email" class="block text-sm font-medium text-gray-700 mb-2">
+                        Email Address <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="email"
+                        id="dashboard-email"
+                        name="email"
+                        required
+                        value="${userData.email || ''}"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                        placeholder="your.email@example.com"
+                    />
+                    <div id="dashboard-email-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                </div>
+
+                <!-- Phone Number (Optional) -->
+                <div class="mb-6">
+                    <label for="dashboard-phone" class="block text-sm font-medium text-gray-700 mb-2">
+                        Phone Number <span class="text-gray-500 text-xs">(Optional)</span>
+                    </label>
+                    <input
+                        type="tel"
+                        id="dashboard-phone"
+                        name="phone"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                        placeholder="+234 800 000 0000"
+                    />
+                    <div id="dashboard-phone-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                </div>
+
+                <!-- Issue Category -->
+                <div class="mb-6">
+                    <label for="dashboard-issue-category" class="block text-sm font-medium text-gray-700 mb-2">
+                        Issue Category <span class="text-red-500">*</span>
+                    </label>
+                    <select
+                        id="dashboard-issue-category"
+                        name="issue-category"
+                        required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                    >
+                        <option value="">Select a category</option>
+                        <option value="Payment Issue">Payment Issue</option>
+                        <option value="Job Issue">Job Issue</option>
+                        <option value="Dispute">Dispute</option>
+                        <option value="Account Issue">Account Issue</option>
+                        <option value="Refund Request">Refund Request</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <div id="dashboard-issue-category-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                </div>
+
+                <!-- Subject -->
+                <div class="mb-6">
+                    <label for="dashboard-subject" class="block text-sm font-medium text-gray-700 mb-2">
+                        Subject <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                        type="text"
+                        id="dashboard-subject"
+                        name="subject"
+                        required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                        placeholder="Brief description of your issue"
+                    />
+                    <div id="dashboard-subject-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                </div>
+
+                <!-- Message -->
+                <div class="mb-6">
+                    <label for="dashboard-message" class="block text-sm font-medium text-gray-700 mb-2">
+                        Message <span class="text-red-500">*</span>
+                    </label>
+                    <textarea
+                        id="dashboard-message"
+                        name="message"
+                        required
+                        rows="6"
+                        minlength="10"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base resize-y"
+                        placeholder="Please provide details about your issue (minimum 10 characters)"
+                    ></textarea>
+                    <div id="dashboard-message-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                    <div class="text-sm text-gray-500 mt-1">
+                        <span id="dashboard-message-count">0</span> / 10 minimum characters
+                    </div>
+                </div>
+
+                <!-- Attachment -->
+                <div class="mb-6">
+                    <label for="dashboard-attachment" class="block text-sm font-medium text-gray-700 mb-2">
+                        Attachment <span class="text-gray-500 text-xs">(Optional)</span>
+                    </label>
+                    <input
+                        type="file"
+                        id="dashboard-attachment"
+                        name="attachment"
+                        accept="image/*,.pdf"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    />
+                    <div id="dashboard-attachment-error" class="form-error hidden text-red-600 text-sm mt-1"></div>
+                    <div class="text-sm text-gray-500 mt-1">
+                        Accepted: Images (JPG, PNG, GIF) and PDF files. Max size: 5MB
+                    </div>
+                    <div id="dashboard-file-preview" class="mt-2"></div>
+                </div>
+
+                <!-- Submit Button -->
+                <button
+                    type="submit"
+                    id="dashboard-submit-btn"
+                    class="w-full bg-blue-600 text-white px-6 py-4 rounded-lg font-semibold text-base shadow-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] flex items-center justify-center"
+                >
+                    <span id="dashboard-submit-text">Submit Request</span>
+                    <span id="dashboard-submit-spinner" class="hidden ml-2">
+                        <i data-feather="loader" class="w-5 h-5 animate-spin"></i>
+                    </span>
+                </button>
+
+                <!-- Error Message -->
+                <div id="dashboard-form-error" class="hidden mt-4 bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+                    <div class="flex items-start">
+                        <i data-feather="alert-circle" class="w-5 h-5 text-red-500 mr-3 flex-shrink-0"></i>
+                        <p id="dashboard-form-error-text" class="text-red-700 text-sm"></p>
+                    </div>
+                </div>
+            </form>
+        </div>
+        
+        <!-- Help Center Link -->
+        <div class="mt-8 text-center">
+            <p class="text-gray-600 mb-4">Looking for quick answers?</p>
+            <a href="help-center.html" class="text-blue-600 hover:text-blue-800 underline">
+                Visit our Help Center
+            </a>
+        </div>
+    `,
 };
 
 // --- Explore Tab Functions ---
@@ -2795,6 +3156,239 @@ function attachDynamicEventListeners(tabId, userData) {
                 feather.replace();
             });
         }
+    }
+
+    // Contact form handler
+    if (tabId === "contact") {
+        const contactForm = document.getElementById("dashboard-contact-form");
+        const messageInput = document.getElementById("dashboard-message");
+        const messageCount = document.getElementById("dashboard-message-count");
+        const attachmentInput = document.getElementById("dashboard-attachment");
+        const filePreview = document.getElementById("dashboard-file-preview");
+
+        // Message character counter
+        if (messageInput && messageCount) {
+            messageInput.addEventListener("input", () => {
+                messageCount.textContent = messageInput.value.length;
+            });
+        }
+
+        // File preview handler
+        if (attachmentInput && filePreview) {
+            attachmentInput.addEventListener("change", (e) => {
+                const file = e.target.files[0];
+                if (!file) {
+                    filePreview.innerHTML = "";
+                    return;
+                }
+
+                // Validate file
+                const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+                const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+                
+                if (file.size > MAX_FILE_SIZE) {
+                    showNotification(`File size exceeds 5MB limit. Your file is ${(file.size / 1024 / 1024).toFixed(2)}MB`, "error");
+                    e.target.value = "";
+                    filePreview.innerHTML = "";
+                    return;
+                }
+                
+                if (!ALLOWED_TYPES.includes(file.type)) {
+                    showNotification("File type not allowed. Please upload an image (JPG, PNG, GIF) or PDF file.", "error");
+                    e.target.value = "";
+                    filePreview.innerHTML = "";
+                    return;
+                }
+
+                // Show preview
+                if (file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        filePreview.innerHTML = `<img src="${e.target.result}" class="max-w-[200px] max-h-[200px] rounded-lg mt-2" alt="Preview">`;
+                    };
+                    reader.readAsDataURL(file);
+                } else if (file.type === 'application/pdf') {
+                    filePreview.innerHTML = `
+                        <div class="bg-gray-100 p-3 rounded-lg mt-2 flex items-center">
+                            <i data-feather="file" class="w-8 h-8 text-red-500 mr-3"></i>
+                            <div>
+                                <p class="font-medium text-sm">${file.name}</p>
+                                <p class="text-xs text-gray-500">${(file.size / 1024).toFixed(2)} KB</p>
+                            </div>
+                        </div>
+                    `;
+                    if (typeof feather !== 'undefined') feather.replace();
+                }
+            });
+        }
+
+        // Form submission handler
+        if (contactForm) {
+            contactForm.addEventListener("submit", async (e) => {
+                e.preventDefault();
+                
+                const submitBtn = document.getElementById("dashboard-submit-btn");
+                const submitText = document.getElementById("dashboard-submit-text");
+                const submitSpinner = document.getElementById("dashboard-submit-spinner");
+                const autoResponse = document.getElementById("contact-auto-response");
+                const formError = document.getElementById("dashboard-form-error");
+                const formErrorText = document.getElementById("dashboard-form-error-text");
+
+                // Clear previous errors
+                document.querySelectorAll('[id^="dashboard-"][id$="-error"]').forEach(el => {
+                    el.classList.add('hidden');
+                    el.textContent = '';
+                });
+                if (formError) formError.classList.add('hidden');
+
+                // Get form data
+                const formData = {
+                    fullName: document.getElementById("dashboard-full-name").value.trim(),
+                    email: document.getElementById("dashboard-email").value.trim(),
+                    phone: document.getElementById("dashboard-phone").value.trim() || null,
+                    issueCategory: document.getElementById("dashboard-issue-category").value,
+                    subject: document.getElementById("dashboard-subject").value.trim(),
+                    message: document.getElementById("dashboard-message").value.trim(),
+                    attachment: attachmentInput?.files[0] || null
+                };
+
+                // Basic validation
+                if (!formData.fullName || !formData.email || !formData.issueCategory || !formData.subject || !formData.message) {
+                    showNotification("Please fill in all required fields", "error");
+                    return;
+                }
+
+                if (formData.message.length < 10) {
+                    showNotification("Message must be at least 10 characters", "error");
+                    return;
+                }
+
+                // Set loading state
+                submitBtn.disabled = true;
+                submitText.textContent = "Submitting...";
+                submitSpinner.classList.remove("hidden");
+
+                try {
+                    // Get current user
+                    const { data: { user } } = await supabase.auth.getUser();
+                    const userId = user?.id || null;
+
+                    // Upload attachment if provided
+                    let attachmentUrl = null;
+                    if (formData.attachment) {
+                        const fileExt = formData.attachment.name.split('.').pop();
+                        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+                        const filePath = userId ? `${userId}/${fileName}` : `anonymous/${fileName}`;
+                        
+                        const { data: uploadData, error: uploadError } = await supabase.storage
+                            .from('contact-attachments')
+                            .upload(filePath, formData.attachment, {
+                                cacheControl: '3600',
+                                upsert: false
+                            });
+                        
+                        if (uploadError) throw uploadError;
+                        
+                        const { data: urlData } = supabase.storage
+                            .from('contact-attachments')
+                            .getPublicUrl(uploadData.path);
+                        
+                        attachmentUrl = urlData.publicUrl;
+                    }
+
+                    // Submit contact request
+                    const { data, error } = await supabase
+                        .from('contact_requests')
+                        .insert([{
+                            user_id: userId,
+                            full_name: formData.fullName,
+                            email: formData.email,
+                            phone: formData.phone,
+                            issue_category: formData.issueCategory,
+                            subject: formData.subject,
+                            message: formData.message,
+                            attachment_url: attachmentUrl,
+                            status: 'pending'
+                        }])
+                        .select()
+                        .single();
+
+                    if (error) throw error;
+
+                    // Notify all admins about the new contact request
+                    await notifyAdminsOfContactRequest(data);
+
+                    // Success
+                    if (autoResponse) {
+                        autoResponse.classList.remove("hidden");
+                        autoResponse.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                    
+                    contactForm.reset();
+                    if (filePreview) filePreview.innerHTML = "";
+                    if (messageCount) messageCount.textContent = "0";
+                    
+                    showNotification("Contact request submitted successfully!", "success");
+                    
+                    if (typeof feather !== 'undefined') feather.replace();
+
+                } catch (error) {
+                    console.error("Error submitting contact request:", error);
+                    if (formError && formErrorText) {
+                        formErrorText.textContent = error.message || "Failed to submit your request. Please try again.";
+                        formError.classList.remove("hidden");
+                    } else {
+                        showNotification(error.message || "Failed to submit your request. Please try again.", "error");
+                    }
+                } finally {
+                    submitBtn.disabled = false;
+                    submitText.textContent = "Submit Request";
+                    submitSpinner.classList.add("hidden");
+                }
+            });
+        }
+    }
+}
+
+/**
+ * Notify all admins about a new contact request
+ */
+async function notifyAdminsOfContactRequest(contactRequest) {
+    try {
+        // Get all admin users
+        const admins = await getUsersByRole('admin', 50);
+        
+        if (!admins || admins.length === 0) {
+            console.warn('⚠️ No admin users found to notify');
+            return;
+        }
+
+        // Create notification for each admin
+        const notificationPromises = admins.map(admin => 
+            createNotification({
+                userId: admin.id,
+                type: 'contact_request',
+                title: 'New Contact Request',
+                message: `New contact request from ${contactRequest.full_name} (${contactRequest.issue_category})`,
+                metadata: {
+                    contact_request_id: contactRequest.id,
+                    issue_category: contactRequest.issue_category,
+                    subject: contactRequest.subject,
+                    from_name: contactRequest.full_name,
+                    from_email: contactRequest.email
+                },
+                channels: ['in_app']
+            }).catch(error => {
+                console.error(`Failed to notify admin ${admin.id}:`, error);
+                return null;
+            })
+        );
+
+        await Promise.allSettled(notificationPromises);
+        console.log(`✅ Notified ${admins.length} admin(s) about new contact request`);
+    } catch (error) {
+        console.error('❌ Error notifying admins:', error);
+        // Don't throw - we don't want to fail the form submission if notification fails
     }
 }
 
@@ -4147,10 +4741,13 @@ function showNotification(message, type = "info") {
         iconColors[type] || iconColors.info
     }"></i>
             </div>
-            <div class="ml-3">
+            <div class="ml-3 flex-1">
                 <p class="text-sm font-medium ${
                     textColors[type] || textColors.info
                 }">${message}</p>
+                <a href="contact-form.html" class="text-xs text-blue-600 hover:text-blue-800 underline mt-1 block">
+                    For any issues, contact us
+                </a>
             </div>
             <div class="ml-auto pl-3">
                 <button class="text-gray-400 hover:text-gray-600" onclick="this.parentElement.parentElement.parentElement.remove()">

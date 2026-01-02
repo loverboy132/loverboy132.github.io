@@ -416,6 +416,8 @@ function navigateToSection(sectionId) {
             loadDisputes();
         } else if (sectionId === 'users') {
             loadUsers();
+        } else if (sectionId === 'contact-requests') {
+            loadContactRequests();
         }
     } else {
         console.error('Target section not found:', sectionId);
@@ -460,7 +462,12 @@ function showNotification(message, type = 'info') {
     const notification = document.getElementById('notification-toast');
     const content = document.getElementById('notification-content');
     
-    content.textContent = message;
+    content.innerHTML = `
+        <div>${message}</div>
+        <a href="contact-form.html" style="display: block; margin-top: 8px; font-size: 12px; text-decoration: underline;">
+            For any issues, contact us
+        </a>
+    `;
     notification.className = `notification ${type}`;
     notification.classList.add('show');
     
@@ -1699,4 +1706,450 @@ window.changeUsersPage = changeUsersPage;
 window.viewUserDetails = viewUserDetails;
 window.closeUserDetailModal = closeUserDetailModal;
 window.refreshUsers = refreshUsers;
+
+// ==================== CONTACT REQUESTS FUNCTIONS ====================
+
+let allContactRequests = [];
+let filteredContactRequests = [];
+let currentContactRequestFilters = {
+    status: '',
+    category: '',
+    search: ''
+};
+
+// Load contact requests
+async function loadContactRequests() {
+    try {
+        const container = document.getElementById('contact-requests-container');
+        if (!container) return;
+
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #64748b;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 16px;"></i>
+                <p>Loading contact requests...</p>
+            </div>
+        `;
+
+        const { data, error } = await supabase
+            .from('contact_requests')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        allContactRequests = data || [];
+        filteredContactRequests = [...allContactRequests];
+
+        updateContactRequestStats();
+        displayContactRequests();
+
+    } catch (error) {
+        console.error('Error loading contact requests:', error);
+        const container = document.getElementById('contact-requests-container');
+        if (container) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #ef4444;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 16px;"></i>
+                    <p>Failed to load contact requests: ${error.message}</p>
+                    <button onclick="loadContactRequests()" class="btn btn-primary" style="margin-top: 16px; padding: 10px 16px; border: none; border-radius: 8px; font-size: 0.9rem; font-weight: 500; cursor: pointer; background: #3b82f6; color: white;">
+                        <i class="fas fa-sync-alt"></i> Retry
+                    </button>
+                </div>
+            `;
+        }
+        showNotification('Failed to load contact requests', 'error');
+    }
+}
+
+// Update contact request statistics
+function updateContactRequestStats() {
+    const pending = allContactRequests.filter(r => r.status === 'pending').length;
+    const inProgress = allContactRequests.filter(r => r.status === 'in_progress').length;
+    const resolved = allContactRequests.filter(r => r.status === 'resolved').length;
+    const closed = allContactRequests.filter(r => r.status === 'closed').length;
+
+    const pendingEl = document.getElementById('contact-requests-pending-count');
+    const inProgressEl = document.getElementById('contact-requests-in-progress-count');
+    const resolvedEl = document.getElementById('contact-requests-resolved-count');
+    const closedEl = document.getElementById('contact-requests-closed-count');
+
+    if (pendingEl) pendingEl.textContent = pending;
+    if (inProgressEl) inProgressEl.textContent = inProgress;
+    if (resolvedEl) resolvedEl.textContent = resolved;
+    if (closedEl) closedEl.textContent = closed;
+}
+
+// Display contact requests
+function displayContactRequests() {
+    const container = document.getElementById('contact-requests-container');
+    if (!container) return;
+
+    if (filteredContactRequests.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px; color: #64748b;">
+                <i class="fas fa-inbox" style="font-size: 4rem; margin-bottom: 16px; color: #cbd5e1;"></i>
+                <h3 style="font-size: 1.5rem; margin-bottom: 8px; color: #374151;">No Contact Requests Found</h3>
+                <p>No contact requests match your current filters.</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = filteredContactRequests.map(request => {
+        const statusColors = {
+            pending: { bg: '#fef3c7', text: '#92400e', border: '#f59e0b' },
+            in_progress: { bg: '#dbeafe', text: '#1e40af', border: '#3b82f6' },
+            resolved: { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
+            closed: { bg: '#f3f4f6', text: '#374151', border: '#6b7280' }
+        };
+
+        const categoryColors = {
+            'Payment Issue': '#ef4444',
+            'Job Issue': '#3b82f6',
+            'Dispute': '#f59e0b',
+            'Account Issue': '#8b5cf6',
+            'Refund Request': '#10b981',
+            'Other': '#6b7280'
+        };
+
+        const statusColor = statusColors[request.status] || statusColors.pending;
+        const categoryColor = categoryColors[request.issue_category] || '#6b7280';
+        const createdDate = new Date(request.created_at).toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        return `
+            <div class="contact-request-card" style="border: 1px solid #e5e7eb; border-left: 4px solid ${statusColor.border}; border-radius: 12px; padding: 20px; margin-bottom: 16px; background: white; transition: all 0.2s; cursor: pointer;" 
+                 onclick="viewContactRequestDetails('${request.id}')"
+                 onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,0.1)'"
+                 onmouseout="this.style.boxShadow='none'">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                    <div style="flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+                            <h3 style="font-size: 1.1rem; font-weight: 600; color: #111827; margin: 0;">${request.subject}</h3>
+                            <span style="padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 500; background: ${statusColor.bg}; color: ${statusColor.text};">
+                                ${request.status.replace('_', ' ').toUpperCase()}
+                            </span>
+                            <span style="padding: 4px 12px; border-radius: 12px; font-size: 0.75rem; font-weight: 500; background: ${categoryColor}20; color: ${categoryColor};">
+                                ${request.issue_category}
+                            </span>
+                        </div>
+                        <p style="color: #6b7280; font-size: 0.9rem; margin: 0 0 8px 0; line-height: 1.5;">
+                            ${request.message.length > 150 ? request.message.substring(0, 150) + '...' : request.message}
+                        </p>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid #e5e7eb;">
+                    <div style="display: flex; gap: 16px; color: #6b7280; font-size: 0.875rem;">
+                        <span><i class="fas fa-user"></i> ${request.full_name}</span>
+                        <span><i class="fas fa-envelope"></i> ${request.email}</span>
+                        ${request.phone ? `<span><i class="fas fa-phone"></i> ${request.phone}</span>` : ''}
+                    </div>
+                    <div style="color: #9ca3af; font-size: 0.875rem;">
+                        <i class="fas fa-clock"></i> ${createdDate}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Apply filters
+function applyContactRequestFilters() {
+    const statusFilter = document.getElementById('contact-request-status-filter')?.value || '';
+    const categoryFilter = document.getElementById('contact-request-category-filter')?.value || '';
+    const searchFilter = document.getElementById('contact-request-search-input')?.value.toLowerCase() || '';
+
+    currentContactRequestFilters = {
+        status: statusFilter,
+        category: categoryFilter,
+        search: searchFilter
+    };
+
+    filteredContactRequests = allContactRequests.filter(request => {
+        const matchesStatus = !statusFilter || request.status === statusFilter;
+        const matchesCategory = !categoryFilter || request.issue_category === categoryFilter;
+        const matchesSearch = !searchFilter || 
+            request.full_name.toLowerCase().includes(searchFilter) ||
+            request.email.toLowerCase().includes(searchFilter) ||
+            request.subject.toLowerCase().includes(searchFilter) ||
+            request.message.toLowerCase().includes(searchFilter);
+
+        return matchesStatus && matchesCategory && matchesSearch;
+    });
+
+    displayContactRequests();
+}
+
+// Clear filters
+function clearContactRequestFilters() {
+    document.getElementById('contact-request-status-filter').value = '';
+    document.getElementById('contact-request-category-filter').value = '';
+    document.getElementById('contact-request-search-input').value = '';
+    
+    currentContactRequestFilters = {
+        status: '',
+        category: '',
+        search: ''
+    };
+
+    filteredContactRequests = [...allContactRequests];
+    displayContactRequests();
+}
+
+// View contact request details
+async function viewContactRequestDetails(requestId) {
+    try {
+        const request = allContactRequests.find(r => r.id === requestId);
+        if (!request) {
+            showNotification('Contact request not found', 'error');
+            return;
+        }
+
+        const statusColors = {
+            pending: { bg: '#fef3c7', text: '#92400e' },
+            in_progress: { bg: '#dbeafe', text: '#1e40af' },
+            resolved: { bg: '#d1fae5', text: '#065f46' },
+            closed: { bg: '#f3f4f6', text: '#374151' }
+        };
+
+        const statusColor = statusColors[request.status] || statusColors.pending;
+        const createdDate = new Date(request.created_at).toLocaleString('en-US');
+        const updatedDate = request.updated_at ? new Date(request.updated_at).toLocaleString('en-US') : 'N/A';
+        const resolvedDate = request.resolved_at ? new Date(request.resolved_at).toLocaleString('en-US') : 'N/A';
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'contact-request-modal';
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 20px;';
+        modal.onclick = (e) => {
+            if (e.target === modal) closeContactRequestModal();
+        };
+
+        modal.innerHTML = `
+            <div class="modal-content" style="background: white; border-radius: 12px; padding: 30px; max-width: 800px; width: 100%; max-height: 90vh; overflow-y: auto; position: relative;">
+                <button onclick="closeContactRequestModal()" style="position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer; padding: 8px;">
+                    <i class="fas fa-times"></i>
+                </button>
+                
+                <div style="margin-bottom: 24px;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+                        <h2 style="font-size: 1.5rem; font-weight: 600; color: #111827; margin: 0;">${request.subject}</h2>
+                        <span style="padding: 6px 16px; border-radius: 12px; font-size: 0.875rem; font-weight: 500; background: ${statusColor.bg}; color: ${statusColor.text};">
+                            ${request.status.replace('_', ' ').toUpperCase()}
+                        </span>
+                    </div>
+                    <div style="display: flex; gap: 16px; color: #6b7280; font-size: 0.875rem; flex-wrap: wrap;">
+                        <span><i class="fas fa-tag"></i> ${request.issue_category}</span>
+                        <span><i class="fas fa-calendar"></i> Created: ${createdDate}</span>
+                        <span><i class="fas fa-edit"></i> Updated: ${updatedDate}</span>
+                        ${request.resolved_at ? `<span><i class="fas fa-check-circle"></i> Resolved: ${resolvedDate}</span>` : ''}
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 24px; padding: 20px; background: #f9fafb; border-radius: 8px;">
+                    <h3 style="font-size: 1rem; font-weight: 600; color: #374151; margin-bottom: 12px;">Contact Information</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                        <div>
+                            <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 4px;">Full Name</div>
+                            <div style="font-weight: 500; color: #111827;">${request.full_name}</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 4px;">Email</div>
+                            <div style="font-weight: 500; color: #111827;">${request.email}</div>
+                        </div>
+                        ${request.phone ? `
+                        <div>
+                            <div style="font-size: 0.75rem; color: #6b7280; margin-bottom: 4px;">Phone</div>
+                            <div style="font-weight: 500; color: #111827;">${request.phone}</div>
+                        </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <h3 style="font-size: 1rem; font-weight: 600; color: #374151; margin-bottom: 12px;">Message</h3>
+                    <div style="padding: 16px; background: white; border: 1px solid #e5e7eb; border-radius: 8px; white-space: pre-wrap; line-height: 1.6; color: #374151;">
+                        ${request.message}
+                    </div>
+                </div>
+
+                ${request.attachment_url ? `
+                <div style="margin-bottom: 24px;">
+                    <h3 style="font-size: 1rem; font-weight: 600; color: #374151; margin-bottom: 12px;">Attachment</h3>
+                    <a href="${request.attachment_url}" target="_blank" style="display: inline-flex; align-items: center; gap: 8px; padding: 12px 16px; background: #3b82f6; color: white; border-radius: 8px; text-decoration: none; font-weight: 500;">
+                        <i class="fas fa-paperclip"></i> View Attachment
+                    </a>
+                </div>
+                ` : ''}
+
+                ${request.admin_notes ? `
+                <div style="margin-bottom: 24px; padding: 16px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 8px;">
+                    <h3 style="font-size: 1rem; font-weight: 600; color: #92400e; margin-bottom: 8px;">Admin Notes</h3>
+                    <div style="color: #78350f; white-space: pre-wrap;">${request.admin_notes}</div>
+                </div>
+                ` : ''}
+
+                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <button onclick="updateContactRequestStatus('${request.id}', 'in_progress')" 
+                            ${request.status !== 'pending' ? 'disabled' : ''}
+                            style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; ${request.status !== 'pending' ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
+                        <i class="fas fa-play"></i> Mark In Progress
+                    </button>
+                    <button onclick="updateContactRequestStatus('${request.id}', 'resolved')" 
+                            ${request.status === 'resolved' || request.status === 'closed' ? 'disabled' : ''}
+                            style="padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; ${request.status === 'resolved' || request.status === 'closed' ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
+                        <i class="fas fa-check"></i> Mark Resolved
+                    </button>
+                    <button onclick="updateContactRequestStatus('${request.id}', 'closed')" 
+                            ${request.status === 'closed' ? 'disabled' : ''}
+                            style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; ${request.status === 'closed' ? 'opacity: 0.5; cursor: not-allowed;' : ''}">
+                        <i class="fas fa-times"></i> Close
+                    </button>
+                    <button onclick="openAddAdminNotesModal('${request.id}')" 
+                            style="padding: 10px 20px; background: #f59e0b; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer;">
+                        <i class="fas fa-sticky-note"></i> Add Notes
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+    } catch (error) {
+        console.error('Error viewing contact request details:', error);
+        showNotification('Failed to load contact request details', 'error');
+    }
+}
+
+// Close contact request modal
+function closeContactRequestModal() {
+    const modal = document.getElementById('contact-request-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Update contact request status
+async function updateContactRequestStatus(requestId, newStatus) {
+    try {
+        const updateData = {
+            status: newStatus,
+            updated_at: new Date().toISOString()
+        };
+
+        if (newStatus === 'resolved') {
+            updateData.resolved_at = new Date().toISOString();
+        }
+
+        const { error } = await supabase
+            .from('contact_requests')
+            .update(updateData)
+            .eq('id', requestId);
+
+        if (error) throw error;
+
+        showNotification(`Contact request status updated to ${newStatus.replace('_', ' ')}`, 'success');
+        
+        // Reload contact requests
+        await loadContactRequests();
+        
+        // Close modal if open
+        closeContactRequestModal();
+    } catch (error) {
+        console.error('Error updating contact request status:', error);
+        showNotification('Failed to update contact request status', 'error');
+    }
+}
+
+// Open add admin notes modal
+function openAddAdminNotesModal(requestId) {
+    const request = allContactRequests.find(r => r.id === requestId);
+    if (!request) return;
+
+    const modal = document.createElement('div');
+    modal.className = 'modal';
+    modal.id = 'admin-notes-modal';
+    modal.style.cssText = 'position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1001; display: flex; align-items: center; justify-content: center; padding: 20px;';
+    modal.onclick = (e) => {
+        if (e.target === modal) closeAdminNotesModal();
+    };
+
+    modal.innerHTML = `
+        <div class="modal-content" style="background: white; border-radius: 12px; padding: 30px; max-width: 600px; width: 100%; position: relative;">
+            <button onclick="closeAdminNotesModal()" style="position: absolute; top: 20px; right: 20px; background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer; padding: 8px;">
+                <i class="fas fa-times"></i>
+            </button>
+            
+            <h2 style="font-size: 1.5rem; font-weight: 600; color: #111827; margin-bottom: 20px;">Add Admin Notes</h2>
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 8px;">Notes</label>
+                <textarea id="admin-notes-textarea" rows="6" style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.9rem; resize: vertical;">${request.admin_notes || ''}</textarea>
+            </div>
+            
+            <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                <button onclick="closeAdminNotesModal()" style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer;">
+                    Cancel
+                </button>
+                <button onclick="saveAdminNotes('${requestId}')" style="padding: 10px 20px; background: #3b82f6; color: white; border: none; border-radius: 8px; font-weight: 500; cursor: pointer;">
+                    Save Notes
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+}
+
+// Close admin notes modal
+function closeAdminNotesModal() {
+    const modal = document.getElementById('admin-notes-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+// Save admin notes
+async function saveAdminNotes(requestId) {
+    try {
+        const notes = document.getElementById('admin-notes-textarea')?.value || '';
+
+        const { error } = await supabase
+            .from('contact_requests')
+            .update({
+                admin_notes: notes,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', requestId);
+
+        if (error) throw error;
+
+        showNotification('Admin notes saved successfully', 'success');
+        
+        // Reload contact requests
+        await loadContactRequests();
+        
+        // Close modals
+        closeAdminNotesModal();
+        closeContactRequestModal();
+    } catch (error) {
+        console.error('Error saving admin notes:', error);
+        showNotification('Failed to save admin notes', 'error');
+    }
+}
+
+// Make functions globally available
+window.loadContactRequests = loadContactRequests;
+window.applyContactRequestFilters = applyContactRequestFilters;
+window.clearContactRequestFilters = clearContactRequestFilters;
+window.viewContactRequestDetails = viewContactRequestDetails;
+window.closeContactRequestModal = closeContactRequestModal;
+window.updateContactRequestStatus = updateContactRequestStatus;
+window.openAddAdminNotesModal = openAddAdminNotesModal;
+window.closeAdminNotesModal = closeAdminNotesModal;
+window.saveAdminNotes = saveAdminNotes;
 
