@@ -1,5 +1,6 @@
 // supabase-client.js - shared Supabase client instance
-import { createClient } from "https://cdn.skypack.dev/@supabase/supabase-js@2.39.3";
+// Use a stable ESM CDN for the browser (Skypack is returning 500 errors)
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm";
 
 // Load environment config with fallback chain:
 // 1. Try env.js (local development, not committed)

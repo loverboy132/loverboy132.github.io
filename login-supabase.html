@@ -91,7 +91,7 @@
             </a>
         </div>
         <h2 class="text-2xl sm:text-3xl font-bold text-center text-gray-900 mb-6">Sign in to your account</h2>
-        <form id="login-form" onsubmit="return false;">
+        <form id="login-form">
             <div class="mb-4">
                 <label for="email" class="block text-gray-700 font-semibold mb-2 text-base">Email Address</label>
                 <input type="email" id="login-email" name="email" class="w-full px-4 py-3 text-base border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 min-h-[48px]" placeholder="yourname@example.com" required>
@@ -113,154 +113,115 @@
         </p>
     </div>
     <script type="module">
+        // Static import at the top level
+        import { handleLogin, showError } from './supabase-auth.js';
+        
         console.log('🚀 Login page script starting...');
+        
+        // Verify imports are available
+        if (typeof handleLogin !== 'function' || typeof showError !== 'function') {
+            console.error('❌ Auth functions not available');
+            throw new Error('Auth module not loaded');
+        }
         
         // Remove credentials from URL if present (security issue)
         if (window.location.search.includes('email=') || window.location.search.includes('password=')) {
             console.warn('⚠️ Credentials detected in URL - removing for security');
-            const cleanUrl = window.location.pathname;
-            window.history.replaceState({}, document.title, cleanUrl);
+            window.history.replaceState({}, document.title, window.location.pathname);
         }
-
-        // Add error handling for module imports
-        let handleLogin, showError;
         
-        try {
-            console.log('📦 Importing auth module...');
-            const authModule = await import('./supabase-auth.js');
-            handleLogin = authModule.handleLogin;
-            showError = authModule.showError;
-            console.log('✅ Auth module loaded successfully');
-        } catch (importError) {
-            console.error('❌ Failed to load auth module:', importError);
-            console.error('Import error details:', {
-                message: importError?.message,
-                stack: importError?.stack,
-                name: importError?.name
-            });
-            const errorEl = document.getElementById('login-error');
-            if (errorEl) {
-                errorEl.textContent = 'Failed to load authentication module. Please refresh the page.';
-                errorEl.classList.remove('hidden-view', 'hidden');
+        console.log('✅ Auth module imported successfully');
+
+        // Login handler function
+        async function performLogin() {
+            console.log('📝 Login initiated');
+            
+            const emailEl = document.getElementById('login-email');
+            const passwordEl = document.getElementById('login-password');
+            const loginBtn = document.getElementById('login-button');
+            const btnText = document.getElementById('login-button-text');
+            const spinEl = document.getElementById('login-spinner');
+            
+            if (!emailEl || !passwordEl) {
+                console.error('❌ Form fields missing');
+                showError('login-error', 'Form fields are missing. Please refresh the page.');
+                return;
             }
-            throw importError;
+            
+            const email = emailEl.value.trim();
+            const password = passwordEl.value;
+            
+            if (!email || !password) {
+                showError('login-error', 'Please enter both email and password.');
+                return;
+            }
+            
+            // Update UI
+            btnText.textContent = 'Signing in...';
+            spinEl.classList.remove('hidden');
+            loginBtn.disabled = true;
+            
+            try {
+                console.log("🔐 Attempting login for:", email);
+                await handleLogin(email, password);
+                console.log("✅ Login successful, redirect should happen now");
+            } catch (error) {
+                console.error("❌ Login failed:", error);
+                
+                // Reset button state
+                btnText.textContent = 'Sign in';
+                spinEl.classList.add('hidden');
+                loginBtn.disabled = false;
+                
+                // Show error if not already shown
+                if (error?.message && !error.message.includes('EMAIL_NOT_VERIFIED')) {
+                    showError('login-error', error.message || 'Login failed. Please try again.');
+                }
+            }
         }
 
-        // Setup form handler - don't wait for DOMContentLoaded
+        // Setup form handler when DOM is ready
         function setupLoginForm() {
-            console.log('✅ Setting up login form handler');
-            
             const loginForm = document.getElementById('login-form');
+            const loginButton = document.getElementById('login-button');
 
-            if (!loginForm) {
-                console.error('❌ Login form not found');
-                // Retry after a short delay if DOM isn't ready
-                setTimeout(setupLoginForm, 100);
+            if (!loginForm || !loginButton) {
+                console.error('❌ Form or button not found');
                 return;
             }
 
             // Check if handler already attached
             if (loginForm.hasAttribute('data-handler-attached')) {
-                console.log('⚠️ Form handler already attached, skipping');
                 return;
             }
             
             // Mark as attached
             loginForm.setAttribute('data-handler-attached', 'true');
             
-            // Attach event listener directly (no need to clone)
+            // Handle form submission (works for both button click and Enter key)
             loginForm.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                console.log('📝 Form submit event triggered');
                 
-                console.log('📝 Login form submitted');
-                
-                // Re-get elements in case DOM changed
-                const emailEl = document.getElementById('login-email');
-                const passwordEl = document.getElementById('login-password');
-                const loginBtn = document.getElementById('login-button');
-                const btnText = document.getElementById('login-button-text');
-                const spinEl = document.getElementById('login-spinner');
-                
-                btnText.textContent = 'Signing in...';
-                spinEl.classList.remove('hidden');
-                loginBtn.disabled = true;
-                
-                if (!emailEl || !passwordEl) {
-                    console.error('❌ Form fields missing');
-                    showError('login-error', 'Form fields are missing. Please refresh the page.');
-                    btnText.textContent = 'Sign in';
-                    spinEl.classList.add('hidden');
-                    loginBtn.disabled = false;
+                // Validate form
+                if (!loginForm.checkValidity()) {
+                    loginForm.reportValidity();
                     return;
                 }
                 
-                const email = emailEl.value.trim();
-                const password = passwordEl.value;
-                
-                if (!email || !password) {
-                    showError('login-error', 'Please enter both email and password.');
-                    btnText.textContent = 'Sign in';
-                    spinEl.classList.add('hidden');
-                    loginBtn.disabled = false;
-                    return;
-                }
-                
-                try {
-                    console.log("🔐 Attempting login for:", email);
-                    console.log("📍 Current URL:", window.location.href);
-                    
-                    await handleLogin(email, password);
-                    
-                    console.log("✅ Login successful, redirect should happen now");
-                    // Don't reset button - redirect should happen
-                } catch (error) {
-                    console.error("❌ Login failed:", error);
-                    console.error("Error details:", {
-                        message: error?.message,
-                        code: error?.code,
-                        stack: error?.stack
-                    });
-                    
-                    // The error is already handled in handleLogin, but we need to reset the button state
-                    const btnText = document.getElementById('login-button-text');
-                    const spinEl = document.getElementById('login-spinner');
-                    const loginBtn = document.getElementById('login-button');
-                    btnText.textContent = 'Sign in';
-                    spinEl.classList.add('hidden');
-                    loginBtn.disabled = false;
-                    
-                    // Show error if not already shown
-                    if (error?.message && !error.message.includes('EMAIL_NOT_VERIFIED')) {
-                        showError('login-error', error.message || 'Login failed. Please try again.');
-                    }
-                }
+                await performLogin();
             });
             
             console.log('✅ Login form handler attached');
         }
 
-        // Try to setup immediately, or wait for DOM
-        console.log('📋 Document ready state:', document.readyState);
+        // Initialize when DOM is ready
         if (document.readyState === 'loading') {
-            console.log('⏳ Waiting for DOMContentLoaded...');
-            document.addEventListener('DOMContentLoaded', () => {
-                console.log('✅ DOMContentLoaded fired');
-                setupLoginForm();
-            });
+            document.addEventListener('DOMContentLoaded', setupLoginForm);
         } else {
-            console.log('✅ DOM already ready, setting up form immediately');
             setupLoginForm();
         }
-        
-        // Also try after a short delay as backup
-        setTimeout(() => {
-            const form = document.getElementById('login-form');
-            if (form && !form.hasAttribute('data-handler-attached')) {
-                console.log('⚠️ Form handler not attached yet, retrying...');
-                setupLoginForm();
-            }
-        }, 500);
     </script>
     <script src="dark-mode.js"></script>
 </body>
