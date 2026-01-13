@@ -1268,8 +1268,16 @@ export async function createJobRequest(userId, jobData) {
             throw new Error("Wallet not found. Please contact support.");
         }
 
-        // Calculate escrow amount (use budget_max as the escrow amount)
-        const escrowAmount = jobData.budgetMax;
+        // Calculate escrow amount (use fixed_price as the escrow amount)
+        const escrowAmount = jobData.fixedPrice;
+        
+        // Validate fixed price range
+        if (escrowAmount < 3000) {
+            throw new Error("Fixed price must be at least ₦3,000");
+        }
+        if (escrowAmount > 50000) {
+            throw new Error("Fixed price cannot exceed ₦50,000");
+        }
         const currentBalance = wallet.balance_ngn || 0;
 
         // Check if wallet has sufficient funds
@@ -1322,8 +1330,9 @@ export async function createJobRequest(userId, jobData) {
                 client_id: userId,
                 title: jobData.title,
                 description: jobData.description,
-                budget_min: jobData.budgetMin,
-                budget_max: jobData.budgetMax,
+                fixed_price: escrowAmount,
+                budget_min: escrowAmount, // Set to fixed_price for backwards compatibility
+                budget_max: escrowAmount, // Set to fixed_price for backwards compatibility
                 escrow_amount: escrowAmount,
                 skills_required: jobData.skillsRequired,
                 location: jobData.location,
@@ -1488,11 +1497,12 @@ export async function getAllJobRequests(filters = {}) {
         if (filters.location) {
             query = query.ilike("location", `%${filters.location}%`);
         }
+        // Filter by fixed price range (for backward compatibility, also check budget_max)
         if (filters.budgetMin) {
-            query = query.gte("budget_max", filters.budgetMin);
+            query = query.or(`fixed_price.gte.${filters.budgetMin},budget_max.gte.${filters.budgetMin}`);
         }
         if (filters.budgetMax) {
-            query = query.lte("budget_min", filters.budgetMax);
+            query = query.or(`fixed_price.lte.${filters.budgetMax},budget_max.lte.${filters.budgetMax}`);
         }
 
         const { data, error } = await query;
@@ -1565,6 +1575,7 @@ export async function getApprenticeJobApplications(apprenticeId) {
                     id,
                     title,
                     description,
+                    fixed_price,
                     budget_min,
                     budget_max,
                     deadline,
@@ -1786,7 +1797,7 @@ export async function completeJob(jobRequestId, apprenticeId) {
         // Verify the apprentice is assigned to this job
         const { data: job, error: fetchError } = await supabase
             .from("job_requests")
-            .select("assigned_apprentice_id, budget_min, budget_max")
+            .select("assigned_apprentice_id, fixed_price, budget_min, budget_max")
             .eq("id", jobRequestId)
             .eq("assigned_apprentice_id", apprenticeId)
             .single();
@@ -1893,7 +1904,7 @@ export async function getClientStats(clientId) {
                 .filter((job) => job.status === "completed")
                 .reduce(
                     (sum, job) =>
-                        sum + Math.round((job.budget_min + job.budget_max) / 2),
+                        sum + (job.fixed_price || job.budget_max || (job.budget_min && job.budget_max ? Math.round((job.budget_min + job.budget_max) / 2) : 0)),
                     0
                 ),
         };
@@ -1988,7 +1999,7 @@ export async function reviewJob(jobRequestId, approved, reviewNotes, clientId) {
         // Verify the client owns the job request and get escrow amount
         const { data: job, error: fetchError } = await supabase
             .from("job_requests")
-            .select("assigned_apprentice_id, budget_min, budget_max, client_id, escrow_amount, title")
+            .select("assigned_apprentice_id, fixed_price, budget_min, budget_max, client_id, escrow_amount, title")
             .eq("id", jobRequestId)
             .eq("client_id", clientId)
             .eq("status", "pending_review")
@@ -1998,8 +2009,8 @@ export async function reviewJob(jobRequestId, approved, reviewNotes, clientId) {
             throw new Error("Job not found or unauthorized");
         }
 
-        // Get escrow amount (use escrow_amount if available, otherwise calculate from budget)
-        const escrowAmount = job.escrow_amount || job.budget_max || Math.round((job.budget_min + job.budget_max) / 2);
+        // Get escrow amount (use escrow_amount if available, otherwise use fixed_price or budget_max)
+        const escrowAmount = job.escrow_amount || job.fixed_price || job.budget_max || (job.budget_min && job.budget_max ? Math.round((job.budget_min + job.budget_max) / 2) : 0);
 
         const updateData = {
             review_approved: approved,
@@ -3319,7 +3330,7 @@ export async function deleteJobRequest(jobRequestId, clientId) {
         // First, check if the job request belongs to the client and get escrow amount
         const { data: jobRequest, error: fetchError } = await supabase
             .from('job_requests')
-            .select('id, client_id, status, escrow_amount, title')
+            .select('id, client_id, status, escrow_amount, title, assigned_apprentice_id')
             .eq('id', jobRequestId)
             .single();
 
@@ -3330,6 +3341,11 @@ export async function deleteJobRequest(jobRequestId, clientId) {
 
         if (jobRequest.client_id !== clientId) {
             throw new Error("You can only delete your own job requests");
+        }
+
+        // Check if an apprentice has accepted the job
+        if (jobRequest.assigned_apprentice_id) {
+            throw new Error("Cannot delete job: An apprentice has already been assigned to this job");
         }
 
         // Check if job is in a state that allows deletion
@@ -3382,15 +3398,20 @@ export async function deleteJobRequest(jobRequestId, clientId) {
         }
 
         // Delete the job request (cascade will handle related records)
-        const { error: deleteError } = await supabase
+        const { data: deletedRows, error: deleteError } = await supabase
             .from('job_requests')
             .delete()
             .eq('id', jobRequestId)
-            .eq('client_id', clientId);
+            .eq('client_id', clientId)
+            .select('id');
 
         if (deleteError) {
             console.error("Error deleting job request:", deleteError);
             throw new Error("Failed to delete job request");
+        }
+
+        if (!deletedRows || deletedRows.length === 0) {
+            throw new Error("Job request not found or already deleted");
         }
 
         console.log("Job request deleted successfully");

@@ -86,7 +86,7 @@ import {
     saveMemberProfile,
     fetchProfileCardStats,
 } from "./supabase-auth.js";
-import { uploadCV, getCVSignedUrl } from "./manual-payment-system.js";
+import { uploadCV, getCVSignedUrl, getUserWallet, createFundingRequest, getCraftnetBankAccounts, uploadProofOfPayment } from "./manual-payment-system.js";
 import {
     getUserNotifications,
     markNotificationAsRead,
@@ -415,7 +415,7 @@ const apprenticeContentTemplates = {
                 ${
                     availableJobs.length > 0
                         ? `
-                    <div class="space-y-6">
+                    <div class="space-y-6 job-request-list">
                         ${availableJobs
                             .map(
                                 (job) => `
@@ -443,11 +443,9 @@ const apprenticeContentTemplates = {
                                     </div>
                                     <div class="text-right">
                                                         <div class="text-2xl font-bold text-green-600">₦${(
-                                                            job.budget_min
-                                                        ).toLocaleString()}-₦${(
-                                    job.budget_max
-                                ).toLocaleString()}</div>
-                                        <div class="text-sm text-gray-500">Budget</div>
+                                                            job.fixed_price || job.budget_max || (job.budget_min && job.budget_max ? Math.round((job.budget_min + job.budget_max) / 2) : 0)
+                                                        ).toLocaleString()}</div>
+                                        <div class="text-sm text-gray-500">Fixed Price</div>
                                     </div>
                                 </div>
                                 
@@ -514,7 +512,7 @@ const apprenticeContentTemplates = {
                 ${
                     myApplications.length > 0
                         ? `
-                    <div class="space-y-6">
+                    <div class="space-y-6 job-request-list">
                         ${myApplications
                             .map(
                                 (app) => `
@@ -563,14 +561,10 @@ const apprenticeContentTemplates = {
                                 
                                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
                                     <div>
-                                        <span class="text-gray-500">Budget:</span>
+                                        <span class="text-gray-500">Fixed Price:</span>
                                                                 <span class="font-medium">₦${(
-                                                                    app
-                                                                        .job_request
-                                                                        .budget_min
-                                                                ).toLocaleString()}-₦${(
-                                    app.job_request.budget_max
-                                ).toLocaleString()}</span>
+                                                                    app.job_request.fixed_price || app.job_request.budget_max || (app.job_request.budget_min && app.job_request.budget_max ? Math.round((app.job_request.budget_min + app.job_request.budget_max) / 2) : 0)
+                                                                ).toLocaleString()}</span>
                                     </div>
                                     <div>
                                         <span class="text-gray-500">Deadline:</span>
@@ -1030,9 +1024,6 @@ const apprenticeContentTemplates = {
             <div class="wallet-actions flex gap-4 justify-center flex-wrap">
                 <button id="add-funds-btn" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center">
                     <i class="fas fa-plus mr-2"></i> Add Funds (Bank Transfer)
-                </button>
-                <button id="add-funds-flutterwave-btn" class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors flex items-center">
-                    <i class="fas fa-credit-card mr-2"></i> Add Funds (Flutterwave)
                 </button>
                 <button id="withdraw-funds-btn" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center">
                     <i class="fas fa-money-bill-wave mr-2"></i> Withdraw
@@ -2263,20 +2254,13 @@ const memberContentTemplates = {
                             placeholder="Describe the job requirements, deliverables, and any specific details..."></textarea>
                     </div>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label for="job-budget-min" class="block text-sm font-medium text-gray-700 mb-2">Minimum Budget (₦)</label>
-                            <input type="number" id="job-budget-min" name="budgetMin" required min="1500"
+                            <label for="job-fixed-price" class="block text-sm font-medium text-gray-700 mb-2">Fixed Price (₦)</label>
+                            <input type="number" id="job-fixed-price" name="fixedPrice" required min="3000" max="50000"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="150000">
-                            <p class="text-xs text-gray-500 mt-1">Minimum: ₦1,500</p>
-                        </div>
-                        <div>
-                            <label for="job-budget-max" class="block text-sm font-medium text-gray-700 mb-2">Maximum Budget (₦)</label>
-                            <input type="number" id="job-budget-max" name="budgetMax" required min="1500"
-                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                placeholder="750000">
-                            <p class="text-xs text-gray-500 mt-1">Maximum: No limit</p>
+                                placeholder="25000">
+                            <p class="text-xs text-gray-500 mt-1">Range: ₦3,000 - ₦50,000</p>
                         </div>
                         <div>
                             <label for="job-deadline" class="block text-sm font-medium text-gray-700 mb-2">Deadline</label>
@@ -2329,11 +2313,11 @@ const memberContentTemplates = {
                 ${
                     myJobRequests.length > 0
                         ? `
-                    <div class="space-y-6">
+                    <div class="space-y-6 job-request-list">
                         ${myJobRequests
                             .map(
                                 (job) => `
-                            <div class="border border-gray-200 rounded-lg p-6">
+                            <div class="border border-gray-200 rounded-lg p-6 job-request-card" data-job-id="${job.id}">
                                 <div class="flex justify-between items-start mb-4">
                                     <div>
                                         <h4 class="text-xl font-semibold text-gray-900">${
@@ -2367,12 +2351,10 @@ const memberContentTemplates = {
                                 
                                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
                                     <div>
-                                        <span class="text-gray-500">Budget:</span>
+                                        <span class="text-gray-500">Fixed Price:</span>
                                                                 <span class="font-medium">₦${(
-                                                                    job.budget_min
-                                                                ).toLocaleString()}-₦${(
-                                    job.budget_max
-                                ).toLocaleString()}</span>
+                                                                    job.fixed_price || job.budget_max || (job.budget_min && job.budget_max ? Math.round((job.budget_min + job.budget_max) / 2) : 0)
+                                                                ).toLocaleString()}</span>
                                     </div>
                                     <div>
                                         <span class="text-gray-500">Location:</span>
@@ -5489,10 +5471,6 @@ function createSubscriptionPaymentModal() {
                         <i data-feather="credit-card" class="w-5 h-5 mr-2"></i>
                         Pay with Wallet Balance
                     </button>
-                    <button id="pay-flutterwave-btn" class="w-full bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 flex items-center justify-center">
-                        <i data-feather="external-link" class="w-5 h-5 mr-2"></i>
-                        Pay with Flutterwave
-                    </button>
                     <button id="pay-manually-btn" class="w-full bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 flex items-center justify-center">
                         <i data-feather="bank" class="w-5 h-5 mr-2"></i>
                         Manual Bank Transfer
@@ -5511,7 +5489,6 @@ function createSubscriptionPaymentModal() {
     // Add event listeners
     const closeBtn = modal.querySelector('#close-subscription-modal');
     const walletBtn = modal.querySelector('#pay-with-wallet-btn');
-    const flutterwaveBtn = modal.querySelector('#pay-flutterwave-btn');
     const manualBtn = modal.querySelector('#pay-manually-btn');
     
     closeBtn.addEventListener('click', () => {
@@ -5522,12 +5499,6 @@ function createSubscriptionPaymentModal() {
         const planKey = modal.dataset.planKey;
         const planPrice = parseFloat(modal.dataset.planPrice);
         processWalletPayment(planKey, planPrice);
-    });
-    
-    flutterwaveBtn.addEventListener('click', () => {
-        const planKey = modal.dataset.planKey;
-        const planPrice = parseFloat(modal.dataset.planPrice);
-        processFlutterwaveSubscriptionPayment(planKey, planPrice);
     });
     
     manualBtn.addEventListener('click', () => {
@@ -6718,6 +6689,11 @@ async function initializeDashboardOnReady() {
     console.log('🎉 Dashboard initialization complete!');
     clearTimeout(timeoutId);
     
+    // Check for pending job creation after wallet funding
+    setTimeout(() => {
+        checkPendingJobCreation();
+    }, 2000); // Wait 2 seconds for wallet balance to update after payment
+    
   } catch (error) {
     console.error('💥 FATAL ERROR in dashboard initialization:', error);
     console.error('Error name:', error.name);
@@ -7293,11 +7269,12 @@ async function handleJobCreation() {
         const form = document.getElementById("create-job-form");
         const formData = new FormData(form);
 
+        const fixedPrice = parseInt(formData.get("fixedPrice"));
+        
         const jobData = {
             title: formData.get("title"),
             description: formData.get("description"),
-            budgetMin: parseInt(formData.get("budgetMin")),
-            budgetMax: parseInt(formData.get("budgetMax")),
+            fixedPrice: fixedPrice,
             location: formData.get("location") || "Remote",
             deadline: formData.get("deadline"),
             skillsRequired: Array.from(
@@ -7309,25 +7286,25 @@ async function handleJobCreation() {
         if (
             !jobData.title ||
             !jobData.description ||
-            !jobData.budgetMin ||
-            !jobData.budgetMax ||
+            !jobData.fixedPrice ||
             !jobData.deadline
         ) {
             showNotification("Please fill in all required fields", "error");
             return;
         }
 
-        if (jobData.budgetMin > jobData.budgetMax) {
+        // Validate fixed price range
+        if (jobData.fixedPrice < 3000) {
             showNotification(
-                "Minimum budget cannot be greater than maximum budget",
+                "Fixed price must be at least ₦3,000",
                 "error"
             );
             return;
         }
 
-        if (jobData.budgetMin < 1500) {
+        if (jobData.fixedPrice > 50000) {
             showNotification(
-                "Minimum budget must be at least ₦1,500",
+                "Fixed price cannot exceed ₦50,000",
                 "error"
             );
             return;
@@ -7375,15 +7352,32 @@ async function handleJobCreation() {
 // Show job funding modal when wallet balance is insufficient
 async function showJobFundingModal(jobData, errorMessage) {
     const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto';
     modal.id = 'job-funding-modal';
     
-    const escrowAmount = jobData.budgetMax;
+    const escrowAmount = jobData.fixedPrice;
+    
+    // Get current wallet balance
+    const { data: { user } } = await supabase.auth.getUser();
+    let currentBalance = 0;
+    if (user) {
+        const wallet = await getUserWallet(user.id);
+        currentBalance = wallet?.balance_ngn || 0;
+    }
+    const shortfall = escrowAmount - currentBalance;
+    
+    // Get bank accounts for manual transfer
+    let bankAccounts = [];
+    try {
+        bankAccounts = await getCraftnetBankAccounts();
+    } catch (error) {
+        console.error('Error loading bank accounts:', error);
+    }
     
     modal.innerHTML = `
-        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 my-8 p-6">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-gray-900">Fund Job via Flutterwave</h3>
+                <h3 class="text-xl font-bold text-gray-900">Insufficient Wallet Balance</h3>
                 <button id="close-job-funding-modal" class="text-gray-400 hover:text-gray-600">
                     <i data-feather="x" class="w-6 h-6"></i>
                 </button>
@@ -7395,21 +7389,82 @@ async function showJobFundingModal(jobData, errorMessage) {
                     <p class="text-sm text-blue-800 mb-2"><strong>Job Details:</strong></p>
                     <p class="text-sm text-blue-900"><strong>Title:</strong> ${jobData.title}</p>
                     <p class="text-sm text-blue-900"><strong>Required Amount:</strong> ₦${escrowAmount.toLocaleString()}</p>
+                    <p class="text-sm text-blue-900"><strong>Current Balance:</strong> ₦${currentBalance.toLocaleString()}</p>
+                    <p class="text-sm text-blue-900"><strong>Shortfall:</strong> ₦${shortfall.toLocaleString()}</p>
                 </div>
-                <p class="text-sm text-gray-600">
-                    You can fund this job directly via Flutterwave. The job will be created and funded once payment is confirmed.
+                <p class="text-sm text-gray-600 mb-4">
+                    Fund your wallet via manual bank transfer to pay for this job. After your payment is verified and credited, you can create the job using your wallet balance.
                 </p>
             </div>
             
-            <div class="space-y-3">
-                <button id="fund-job-flutterwave-btn" class="w-full bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 flex items-center justify-center font-semibold">
-                    <i data-feather="credit-card" class="w-5 h-5 mr-2"></i>
-                    Pay ₦${escrowAmount.toLocaleString()} with Flutterwave
-                </button>
-                <button id="cancel-job-funding-btn" class="w-full bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300 font-semibold">
-                    Cancel
-                </button>
-            </div>
+            <form id="job-funding-form" class="space-y-4">
+                <div>
+                    <label for="funding-amount" class="block text-sm font-medium text-gray-700 mb-2">
+                        Amount to Fund (₦)
+                    </label>
+                    <input type="number" id="funding-amount" name="amount" 
+                           value="${escrowAmount}" min="1000" step="100" required
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <p class="text-xs text-gray-500 mt-1">Minimum: ₦1,000</p>
+                </div>
+                
+                <div>
+                    <label for="account-details" class="block text-sm font-medium text-gray-700 mb-2">
+                        Account Details Used to Pay
+                    </label>
+                    <input type="text" id="account-details" name="accountDetails" required
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                           placeholder="Enter your account name and number">
+                    <p class="text-xs text-gray-500 mt-1">Example: John Doe - 1234567890</p>
+                </div>
+                
+                <div>
+                    <label for="proof-of-payment" class="block text-sm font-medium text-gray-700 mb-2">
+                        Proof of Payment (Optional)
+                    </label>
+                    <input type="file" id="proof-of-payment" name="proofOfPayment" 
+                           accept="image/*,.pdf"
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <p class="text-xs text-gray-500 mt-1">Upload screenshot or receipt for faster verification</p>
+                </div>
+                
+                ${bankAccounts.length > 0 ? `
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h4 class="text-sm font-semibold text-gray-900 mb-3">Transfer to Craftnet Account:</h4>
+                    <div class="space-y-3">
+                        ${bankAccounts.map(account => `
+                            <div class="bg-white border border-gray-200 rounded p-3">
+                                <p class="font-semibold text-gray-900">${account.bank_name}</p>
+                                <p class="text-sm text-gray-600">Account Name: ${account.account_name}</p>
+                                <p class="text-sm text-gray-600">
+                                    Account Number: 
+                                    <span class="font-mono font-semibold cursor-pointer" onclick="navigator.clipboard.writeText('${account.account_number}')">
+                                        ${account.account_number}
+                                        <i data-feather="copy" class="w-3 h-3 inline"></i>
+                                    </span>
+                                </p>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <p class="text-xs text-gray-500 mt-3">
+                        <i data-feather="info" class="w-3 h-3 inline"></i>
+                        Transfer the exact amount to any account above. Verification usually takes 24 hours.
+                    </p>
+                </div>
+                ` : ''}
+                
+                <div class="flex space-x-3 pt-4">
+                    <button type="button" id="cancel-job-funding-btn" 
+                            class="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300 font-semibold">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submit-funding-btn"
+                            class="flex-1 bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 font-semibold flex items-center justify-center">
+                        <i data-feather="send" class="w-4 h-4 mr-2"></i>
+                        Submit Funding Request
+                    </button>
+                </div>
+            </form>
         </div>
     `;
     
@@ -7418,14 +7473,17 @@ async function showJobFundingModal(jobData, errorMessage) {
     // Add event listeners
     const closeBtn = modal.querySelector('#close-job-funding-modal');
     const cancelBtn = modal.querySelector('#cancel-job-funding-btn');
-    const fundBtn = modal.querySelector('#fund-job-flutterwave-btn');
+    const form = modal.querySelector('#job-funding-form');
     
     closeBtn.addEventListener('click', () => modal.remove());
     cancelBtn.addEventListener('click', () => modal.remove());
     
-    fundBtn.addEventListener('click', async () => {
-        await processJobFundingPayment(jobData, escrowAmount);
-        modal.remove();
+    // Store jobData in sessionStorage for retry after funding
+    modal.dataset.jobData = JSON.stringify(jobData);
+    
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await handleJobFundingRequest(jobData, modal);
     });
     
     // Close on outside click
@@ -7436,82 +7494,138 @@ async function showJobFundingModal(jobData, errorMessage) {
     if (window.feather) window.feather.replace();
 }
 
-// Process job funding payment via Flutterwave
-async function processJobFundingPayment(jobData, amount) {
+// Handle job funding request submission
+async function handleJobFundingRequest(jobData, modal) {
     try {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        if (userError || !user) {
-            showNotification("Please log in to continue", "error");
+        const form = modal.querySelector('#job-funding-form');
+        const formData = new FormData(form);
+        const amount = parseFloat(formData.get('amount'));
+        const accountDetails = formData.get('accountDetails');
+        const proofOfPaymentFile = formData.get('proofOfPayment');
+        
+        const submitBtn = modal.querySelector('#submit-funding-btn');
+        const originalText = submitBtn.innerHTML;
+        
+        // Validate amount
+        if (amount < 1000) {
+            showNotification('Minimum funding amount is ₦1,000', 'error');
             return;
         }
-
-        // First, create the job with pending_funding status
-        const { data: job, error: jobError } = await supabase
-            .from("job_requests")
-            .insert({
-                client_id: user.id,
-                title: jobData.title,
-                description: jobData.description,
-                budget_min: jobData.budgetMin,
-                budget_max: jobData.budgetMax,
-                escrow_amount: amount,
-                skills_required: jobData.skillsRequired,
-                location: jobData.location,
-                deadline: jobData.deadline,
-                status: "pending_funding", // Special status for jobs awaiting payment
-                escrow_status: "pending",
-                locked: false,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
-
-        if (jobError || !job) {
-            throw new Error("Failed to create job: " + (jobError?.message || "Unknown error"));
+        
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i data-feather="loader" class="w-4 h-4 mr-2 animate-spin"></i> Processing...';
+        
+        let proofOfPaymentUrl = null;
+        
+        // Upload proof of payment if provided
+        if (proofOfPaymentFile && proofOfPaymentFile.size > 0) {
+            submitBtn.innerHTML = '<i data-feather="upload" class="w-4 h-4 mr-2 animate-spin"></i> Uploading proof...';
+            proofOfPaymentUrl = await uploadProofOfPayment(proofOfPaymentFile);
         }
-
-        // Now initiate Flutterwave payment with the job_id
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !session) {
-            // Delete the job if payment initiation fails
-            await supabase.from("job_requests").delete().eq("id", job.id);
-            showNotification("Please log in to continue", "error");
-            return;
+        
+        // Create funding request
+        submitBtn.innerHTML = '<i data-feather="send" class="w-4 h-4 mr-2 animate-spin"></i> Submitting...';
+        await createFundingRequest(amount, accountDetails, proofOfPaymentUrl);
+        
+        // Store job data for retry after funding is approved
+        sessionStorage.setItem('pendingJobData', JSON.stringify(jobData));
+        sessionStorage.setItem('pendingJobAction', 'create');
+        
+        showNotification(
+            'Funding request submitted successfully! We will verify your payment and credit your wallet within 24 hours. You can create the job once your wallet is funded.',
+            'success'
+        );
+        
+        modal.remove();
+        
+        // Refresh wallet balance if wallet interface is available
+        if (window.initializeWalletInterface) {
+            try {
+                await window.initializeWalletInterface();
+            } catch (walletError) {
+                console.warn("Failed to refresh wallet balance:", walletError);
+            }
         }
-
-        const flutterwaveUrl = ENV_CONFIG.FLUTTERWAVE_FUNCTION_URL || 
-            `${ENV_CONFIG.SUPABASE_URL.replace('.supabase.co', '.functions.supabase.co')}/flutterwave-init-payment`;
-
-        const response = await fetch(flutterwaveUrl, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-                amount: amount,
-                type: "job_funding",
-                job_id: job.id,
-                description: `Job funding: ${jobData.title}`,
-            }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok || !data.success) {
-            // Delete the job if payment initiation fails
-            await supabase.from("job_requests").delete().eq("id", job.id);
-            throw new Error(data.error || "Failed to start Flutterwave payment");
-        }
-
-        // Redirect to Flutterwave checkout
-        window.location.href = data.payment_url;
+        
     } catch (error) {
-        console.error("Error initializing Flutterwave job funding payment:", error);
-        showNotification(error.message || "Failed to start Flutterwave payment. Please try again.", "error");
+        console.error('Error creating funding request:', error);
+        showNotification(error.message || 'Failed to submit funding request', 'error');
+        const submitBtn = modal.querySelector('#submit-funding-btn');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i data-feather="send" class="w-4 h-4 mr-2"></i> Submit Funding Request';
+        if (window.feather) window.feather.replace();
     }
 }
+
+
+// Check for pending job creation after wallet funding
+async function checkPendingJobCreation() {
+    try {
+        const pendingJobData = sessionStorage.getItem('pendingJobData');
+        const pendingJobAction = sessionStorage.getItem('pendingJobAction');
+        
+        if (pendingJobData && pendingJobAction === 'create') {
+            const jobData = JSON.parse(pendingJobData);
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            if (user) {
+                // Check wallet balance
+                const wallet = await getUserWallet(user.id);
+                const currentBalance = wallet?.balance_ngn || 0;
+                const requiredAmount = jobData.fixedPrice;
+                
+                if (currentBalance >= requiredAmount) {
+                    // Clear pending job data
+                    sessionStorage.removeItem('pendingJobData');
+                    sessionStorage.removeItem('pendingJobAction');
+                    
+                    // Show notification and retry job creation
+                    showNotification("Wallet balance sufficient! Creating job...", "success");
+                    
+                    // Small delay to ensure wallet balance is updated
+                    setTimeout(async () => {
+                        try {
+                            await createJobRequest(user.id, jobData);
+                            showNotification("Job request created successfully!", "success");
+                            
+                            // Refresh wallet balance if wallet interface is available
+                            if (window.initializeWalletInterface) {
+                                try {
+                                    await window.initializeWalletInterface();
+                                } catch (walletError) {
+                                    console.warn("Failed to refresh wallet balance:", walletError);
+                                }
+                            }
+                            
+                            // Refresh the jobs tab
+                            const jobsTab = document.querySelector('[data-tab="jobs"]');
+                            if (jobsTab) {
+                                jobsTab.click();
+                            }
+                        } catch (error) {
+                            console.error("Error creating job after funding:", error);
+                            showNotification(
+                                error.message || "Failed to create job. Please try again.",
+                                "error"
+                            );
+                        }
+                    }, 1000);
+                } else {
+                    // Still insufficient funds - funding request may still be pending approval
+                    const shortfall = requiredAmount - currentBalance;
+                    showNotification(
+                        `Your funding request is pending approval. Current balance: ₦${currentBalance.toLocaleString()}, Required: ₦${requiredAmount.toLocaleString()}. Once your funding is approved, you can create the job.`,
+                        "info"
+                    );
+                }
+            }
+        }
+    } catch (error) {
+        console.error("Error checking pending job creation:", error);
+    }
+}
+
 
 // Handle application action (accept/reject)
 async function handleApplicationAction(appId, action) {
@@ -7656,12 +7770,10 @@ async function handleJobReview(jobId) {
                 
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
-                        <span class="text-gray-500">Budget:</span>
+                        <span class="text-gray-500">Fixed Price:</span>
                         <span class="font-medium">₦${(
-                            job.budget_min
-                        ).toLocaleString()}-₦${(
-            job.budget_max
-        ).toLocaleString()}</span>
+                            job.fixed_price || job.budget_max || (job.budget_min && job.budget_max ? Math.round((job.budget_min + job.budget_max) / 2) : 0)
+                        ).toLocaleString()}</span>
                     </div>
                     <div>
                         <span class="text-gray-500">Location:</span>
@@ -7749,6 +7861,27 @@ async function handleJobDelete(jobId, jobTitle) {
         
         // Show success message
         showNotification("Job deleted successfully!", "success");
+
+        // Optimistically remove the job card from the UI
+        const jobCard = document.querySelector(`[data-job-id="${jobId}"]`);
+        if (jobCard) {
+            const jobList = jobCard.closest(".job-request-list");
+            jobCard.remove();
+
+            // If no jobs remain, show the empty state message
+            if (jobList && jobList.querySelectorAll(".job-request-card").length === 0) {
+                jobList.innerHTML = `
+                    <div class="text-center py-12">
+                        <i data-feather="briefcase" class="w-16 h-16 text-gray-300 mx-auto mb-4"></i>
+                        <h4 class="text-xl font-semibold text-gray-700 mb-2">No Job Requests Yet</h4>
+                        <p class="text-gray-500">Create your first job request to find skilled apprentices!</p>
+                    </div>
+                `;
+                if (window.feather) {
+                    feather.replace();
+                }
+            }
+        }
         
         // Refresh the jobs tab
         const jobsTab = document.querySelector('[data-tab="jobs"]');
@@ -7761,6 +7894,8 @@ async function handleJobDelete(jobId, jobTitle) {
         
         if (error.message.includes("own job requests")) {
             errorMessage = "You can only delete your own job requests.";
+        } else if (error.message.includes("apprentice has already been assigned")) {
+            errorMessage = "Cannot delete job: An apprentice has already been assigned to this job.";
         } else if (error.message.includes("in progress or completed")) {
             errorMessage = "Cannot delete job that is in progress or completed.";
         } else if (error.message.includes("not found")) {
@@ -8568,7 +8703,7 @@ async function openDisputeModal(jobId) {
             jobDetailsEl.innerHTML = `
                 <h3 class="font-semibold text-lg mb-2">${job.title || 'Untitled Job'}</h3>
                 <p class="text-sm text-gray-600 mb-2">Job ID: #${job.id}</p>
-                <p class="text-sm text-gray-600">Budget: ₦${(job.budget || 0).toLocaleString()}</p>
+                <p class="text-sm text-gray-600">Fixed Price: ₦${(job.fixed_price || job.budget_max || (job.budget_min && job.budget_max ? Math.round((job.budget_min + job.budget_max) / 2) : 0)).toLocaleString()}</p>
             `;
         }
 

@@ -303,6 +303,28 @@
             checkPaymentStatus();
         }
 
+        // Check for pending job creation after wallet funding
+        async function checkPendingJobAfterFunding() {
+            if (type === 'wallet_funding') {
+                try {
+                    // Check if there's pending job data
+                    const pendingJobData = sessionStorage.getItem('pendingJobData');
+                    const pendingJobAction = sessionStorage.getItem('pendingJobAction');
+                    
+                    if (pendingJobData && pendingJobAction === 'create') {
+                        // Wait a bit for wallet balance to update
+                        setTimeout(() => {
+                            // Redirect to dashboard where checkPendingJobCreation will run
+                            window.location.href = 'dashboard-supabase.html';
+                        }, 2000);
+                        return;
+                    }
+                } catch (error) {
+                    console.error('Error checking pending job:', error);
+                }
+            }
+        }
+
         // Button handlers
         goToDashboardBtn.addEventListener('click', () => {
             window.location.href = 'dashboard-supabase.html';
@@ -311,6 +333,11 @@
         retryBtn.addEventListener('click', () => {
             window.location.href = 'dashboard-supabase.html';
         });
+
+        // Check for pending job after successful wallet funding
+        if (type === 'wallet_funding') {
+            checkPendingJobAfterFunding();
+        }
     </script>
     <script src="dark-mode.js"></script>
 </body>
