@@ -37,37 +37,12 @@
                 gap: 0;
             }
             
-            /* Mobile navigation spacing - optimized to show at least 4 tabs */
+            /* Mobile navigation spacing */
             @media (max-width: 767px) {
-                #main-nav {
-                    padding-left: 4px;
-                    padding-right: 4px;
-                    display: flex !important;
-                    gap: 2px !important;
-                    overflow-x: auto !important;
-                }
-                
                 .nav-link {
-                    padding: 8px 4px !important;
-                    font-size: 11px !important;
-                    margin-right: 0 !important;
-                    /* Calculate: (viewport - padding - gaps) / 4 tabs */
-                    /* padding: 4px left + 4px right = 8px, gaps: 3 gaps × 2px = 6px */
-                    min-width: calc((100vw - 14px) / 4) !important;
-                    max-width: calc((100vw - 14px) / 4) !important;
-                    white-space: nowrap !important;
-                    flex: 0 0 calc((100vw - 14px) / 4) !important;
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    justify-content: center;
-                    text-align: center;
-                }
-                
-                .nav-link span {
-                    overflow: hidden;
-                    text-overflow: ellipsis;
-                    display: inline-block;
-                    max-width: 100%;
+                    padding: 10px 14px !important;
+                    font-size: 13px !important;
+                    margin-right: 12px !important;
                 }
                 
                 .nav-link:last-child {
@@ -75,34 +50,15 @@
                 }
                 
                 .nav-link i {
-                    margin-right: 3px !important;
-                    width: 12px !important;
-                    height: 12px !important;
+                    margin-right: 6px !important;
+                    width: 16px !important;
+                    height: 16px !important;
                     flex-shrink: 0;
                 }
                 
-                /* Make text smaller on very small screens to fit better */
-                @media (max-width: 375px) {
-                    .nav-link {
-                        font-size: 10px !important;
-                        padding: 8px 3px !important;
-                        /* padding: 2px left + 2px right = 4px, gaps: 3 gaps × 1px = 3px */
-                        min-width: calc((100vw - 7px) / 4) !important;
-                        max-width: calc((100vw - 7px) / 4) !important;
-                        flex: 0 0 calc((100vw - 7px) / 4) !important;
-                    }
-                    
-                    .nav-link i {
-                        width: 11px !important;
-                        height: 11px !important;
-                        margin-right: 2px !important;
-                    }
-                    
-                    #main-nav {
-                        padding-left: 2px;
-                        padding-right: 2px;
-                        gap: 1px !important;
-                    }
+                #main-nav {
+                    padding-left: 12px;
+                    padding-right: 12px;
                 }
             }
             
@@ -273,25 +229,6 @@
                 transform: scale(1.05);
             }
 
-            /* Notification panel mobile positioning - centered for better mobile UX */
-            @media (max-width: 767px) {
-                #notification-wrapper {
-                    position: relative;
-                }
-                
-                #notification-panel {
-                    position: fixed !important;
-                    left: 50% !important;
-                    right: auto !important;
-                    top: 110px !important;
-                    transform: translateX(-50%) !important;
-                    width: calc(100vw - 32px) !important;
-                    max-width: calc(100vw - 32px) !important;
-                    margin-top: 0 !important;
-                    z-index: 9999 !important;
-                }
-            }
-
             /* Loading States */
             .image-loading {
                 opacity: 0.5;
@@ -416,6 +353,10 @@
                                     title="Notifications"
                                 >
                                     <i class="fas fa-bell text-xl"></i>
+                                    <div
+                                        id="notification-dot"
+                                        class="notification-dot hidden absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white"
+                                    ></div>
                                     <span
                                         id="notification-badge"
                                         class="hidden absolute -top-0.5 -right-0.5 bg-red-500 text-white text-xs font-semibold rounded-full w-5 h-5 flex items-center justify-center"
@@ -733,7 +674,7 @@
                             id="modal-connect-btn"
                             class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 font-medium"
                         >
-                            Connect
+                             About
                         </button>
                         <button
                             id="modal-view-gallery-btn"

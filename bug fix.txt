@@ -1,0 +1,46 @@
+Craftnet – Bug Fix List (ONLY BUGS)
+1. Payments & Withdrawals
+Fix money dispatch to apprentice after job completion.
+Remove points-based withdrawal logic completely (causing errors).
+Fix incorrect 10% charge applied during “Add Funds”.
+Remove Withdraw button from Member dashboard (bug still showing).
+Ensure only referral earnings are withdrawable and only from referral page.
+Fix withdrawal errors showing “insufficient points”.
+2. Jobs
+Fix bug where jobs still receive applications after acceptance.
+Fix job delete/update restriction after acceptance.
+Fix fixed-price validation not enforcing limits.
+
+Fix job review flow after completion.
+3. Ratings & Reviews
+Fix ratings not saving correctly.
+Fix reviews appearing before job completion.
+Fix incorrect rating calculation/display.
+4. Disputes
+Fix dispute opening flow.
+Fix dispute status not updating after admin action.
+Fix dispute notifications not triggering correctly.
+
+5. Notifications
+Fix notification red unread indicator not updating.
+Fix missing notifications for admin replies.
+Fix notifications not triggering for:
+Contact form replies
+Job issues
+Payment issues
+Referral/withdrawal updates
+6. Mobile Issues
+Fix broken layouts on mobile screens.
+Fix dashboard UI issues on small devices.
+Fix payment and job pages not rendering properly on mobile.
+7. UI / Design Bugs
+Fix logo display issues (size/placement).
+Fix blurry fonts and alignment issues.
+Fix inconsistent spacing and layout breaks.
+8. Admin Panel
+Fix admin replies not syncing with user notifications.
+Fix inconsistencies in job and dispute management.
+
+9. Miscellaneous
+Fix any remaining system errors affecting normal platform flow.
+

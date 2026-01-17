@@ -97,6 +97,7 @@ import {
     injectNotificationStyles,
     displayNotification,
     createNotification,
+    normalizeNotificationReadStatus,
 } from "./payment-notifications.js";
 
 // --- DOM Elements ---
@@ -1022,9 +1023,6 @@ const apprenticeContentTemplates = {
             </div>
             
             <div class="wallet-actions flex gap-4 justify-center flex-wrap">
-                <button id="add-funds-btn" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center">
-                    <i class="fas fa-plus mr-2"></i> Add Funds (Bank Transfer)
-                </button>
                 <button id="withdraw-funds-btn" class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-colors flex items-center">
                     <i class="fas fa-money-bill-wave mr-2"></i> Withdraw
                 </button>
@@ -3727,8 +3725,24 @@ document.addEventListener("click", async (e) => {
     // Delete job handler (for members)
     if (e.target.classList.contains("delete-job-btn")) {
         e.preventDefault();
+        e.stopPropagation();
+        
+        // Prevent double-clicks - check if button is already disabled
+        if (e.target.disabled) {
+            console.log("Delete already in progress, ignoring click");
+            return;
+        }
+        
         const jobId = e.target.dataset.jobId;
         const jobTitle = e.target.dataset.jobTitle;
+        
+        // Strict validation of jobId
+        if (!jobId || jobId === 'undefined' || jobId === 'null' || jobId.trim() === '') {
+            console.error("Invalid job ID from button:", jobId);
+            showNotification("Invalid job ID. Please refresh the page and try again.", "error");
+            return;
+        }
+        
         handleJobDelete(jobId, jobTitle);
     }
 
@@ -4451,7 +4465,7 @@ async function initializeNotificationCenter(userData) {
         markAllNotificationsBtn.addEventListener("click", async () => {
             if (!notificationState.userId) return;
             try {
-                await markAllNotificationsAsRead(notificationState.userId);
+                // Optimistically update UI first for better UX
                 notificationState.items = notificationState.items.map(
                     (item) => ({
                         ...item,
@@ -4461,13 +4475,24 @@ async function initializeNotificationCenter(userData) {
                 );
                 notificationState.unreadCount = 0;
                 renderNotificationList();
-                updateNotificationBadge();
+                updateNotificationBadge(); // This will hide the red dot immediately
+
+                // Then update in database
+                await markAllNotificationsAsRead(notificationState.userId);
+                
+                // Refresh from server to ensure sync
+                await refreshNotifications();
             } catch (error) {
                 console.error("Failed to mark all notifications:", error);
-                showNotification(
-                    "Unable to mark notifications as read right now.",
-                    "error"
-                );
+                
+                // Revert optimistic update on error
+                await refreshNotifications();
+                
+                // Show user-friendly error message
+                const errorMsg = error?.message?.includes("schema cache") || error?.message?.includes("is_read")
+                    ? "Database schema issue detected. Please check console for details."
+                    : "Unable to mark notifications as read right now.";
+                showNotification(errorMsg, "error");
             }
         });
     }
@@ -4479,25 +4504,43 @@ async function initializeNotificationCenter(userData) {
         if (!notificationId) return;
 
         try {
+            // Optimistically update UI first for better UX
+            const notificationItem = notificationState.items.find(item => item.id === notificationId);
+            if (notificationItem && !notificationItem.is_read) {
+                // Update local state immediately
+                notificationState.items = notificationState.items.map((item) =>
+                    item.id === notificationId
+                        ? {
+                              ...item,
+                              is_read: true,
+                              read_at: item.read_at || new Date().toISOString(),
+                          }
+                        : item
+                );
+                notificationState.unreadCount = Math.max(
+                    notificationState.unreadCount - 1,
+                    0
+                );
+                renderNotificationList();
+                updateNotificationBadge(); // This will hide the red dot if unreadCount becomes 0
+            }
+
+            // Then update in database
             await markNotificationAsRead(notificationId);
-            notificationState.items = notificationState.items.map((item) =>
-                item.id === notificationId
-                    ? {
-                          ...item,
-                          is_read: true,
-                          read_at: item.read_at || new Date().toISOString(),
-                      }
-                    : item
-            );
-            notificationState.unreadCount = Math.max(
-                notificationState.unreadCount - 1,
-                0
-            );
-            renderNotificationList();
-            updateNotificationBadge();
+            
+            // Refresh from server to ensure sync (handles any edge cases)
+            await refreshNotifications();
         } catch (error) {
             console.error("Failed to update notification:", error);
-            showNotification("Could not update notification", "error");
+            
+            // Revert optimistic update on error
+            await refreshNotifications();
+            
+            // Show user-friendly error message
+            const errorMsg = error?.message?.includes("schema cache") || error?.message?.includes("is_read")
+                ? "Database schema issue detected. Please check console for details."
+                : "Could not update notification";
+            showNotification(errorMsg, "error");
         }
     });
 
@@ -4505,6 +4548,11 @@ async function initializeNotificationCenter(userData) {
         notificationState.userId,
         {
             onInsert: handleIncomingNotification,
+            onUpdate: async (newNotification, oldNotification) => {
+                // Refresh notifications when updated (e.g., marked as read)
+                // This ensures the red dot updates in real-time across tabs/devices
+                await refreshNotifications();
+            },
             onError: (err) =>
                 console.error("Notification channel error:", err),
         }
@@ -4544,7 +4592,10 @@ async function refreshNotifications() {
 }
 
 function handleIncomingNotification(notification) {
-    notificationState.items = [notification, ...notificationState.items].slice(
+    // Normalize notification to ensure consistent 'is_read' property
+    const normalizedNotification = normalizeNotificationReadStatus(notification);
+    
+    notificationState.items = [normalizedNotification, ...notificationState.items].slice(
         0,
         50
     );
@@ -4552,7 +4603,7 @@ function handleIncomingNotification(notification) {
     renderNotificationList();
     updateNotificationBadge();
     try {
-        displayNotification(notification);
+        displayNotification(normalizedNotification);
     } catch (error) {
         console.warn("Unable to show toast notification:", error);
     }
@@ -4599,14 +4650,24 @@ function renderNotificationList() {
 
 function updateNotificationBadge() {
     if (!notificationBadge) return;
+    const notificationDot = document.getElementById("notification-dot");
+    
     if (notificationState.unreadCount > 0) {
         notificationBadge.textContent =
             notificationState.unreadCount > 9
                 ? "9+"
                 : notificationState.unreadCount.toString();
         notificationBadge.classList.remove("hidden");
+        // Show red dot when there are unread notifications
+        if (notificationDot) {
+            notificationDot.classList.remove("hidden");
+        }
     } else {
         notificationBadge.classList.add("hidden");
+        // Hide red dot when all notifications are read
+        if (notificationDot) {
+            notificationDot.classList.add("hidden");
+        }
     }
 }
 
@@ -7841,11 +7902,76 @@ async function handleJobReview(jobId) {
 
 // Handle job deletion
 async function handleJobDelete(jobId, jobTitle) {
+    // Strict ID validation
+    if (!jobId || jobId === 'undefined' || jobId === 'null') {
+        console.error("Job ID is missing or invalid:", jobId);
+        showNotification("Invalid job ID. Please try again.", "error");
+        return;
+    }
+
+    // Find and disable the delete button immediately to prevent double-firing
+    const deleteButton = document.querySelector(`.delete-job-btn[data-job-id="${jobId}"]`);
+    const originalButtonText = deleteButton ? deleteButton.innerHTML : '';
+    
+    // Store reference to job card for optimistic UI update and potential restoration
+    const jobCard = document.querySelector(`[data-job-id="${jobId}"]`);
+    const jobList = jobCard ? jobCard.closest(".job-request-list") : null;
+    let jobCardRemoved = false;
+    let jobCardClone = null; // Store clone for potential restoration on error
+
+    if (deleteButton) {
+        deleteButton.disabled = true;
+        deleteButton.style.opacity = '0.6';
+        deleteButton.style.cursor = 'not-allowed';
+        deleteButton.innerHTML = '<i data-feather="loader" class="w-4 h-4 mr-2 animate-spin"></i>Processing...';
+        if (window.feather) {
+            feather.replace();
+        }
+    }
+
     try {
         // Show confirmation dialog
         const confirmed = confirm(`Are you sure you want to delete the job "${jobTitle}"? This action cannot be undone.`);
         if (!confirmed) {
+            // Re-enable button if user cancels
+            if (deleteButton) {
+                deleteButton.disabled = false;
+                deleteButton.style.opacity = '1';
+                deleteButton.style.cursor = 'pointer';
+                deleteButton.innerHTML = originalButtonText;
+                if (window.feather) {
+                    feather.replace();
+                }
+            }
             return;
+        }
+
+        // OPTIMISTIC UI UPDATE: Remove job from UI immediately
+        if (jobCard) {
+            // Clone the card for potential restoration on error (only for actual errors, not "already deleted")
+            jobCardClone = jobCard.cloneNode(true);
+            
+            // Remove the job card from DOM
+            jobCard.remove();
+            jobCardRemoved = true;
+            
+            // Find the job list container
+            if (jobList) {
+                // If no jobs remain, show the empty state message
+                const remainingCards = jobList.querySelectorAll(".job-request-card");
+                if (remainingCards.length === 0) {
+                    jobList.innerHTML = `
+                        <div class="text-center py-12">
+                            <i data-feather="briefcase" class="w-16 h-16 text-gray-300 mx-auto mb-4"></i>
+                            <h4 class="text-xl font-semibold text-gray-700 mb-2">No Job Requests Yet</h4>
+                            <p class="text-gray-500">Create your first job request to find skilled apprentices!</p>
+                        </div>
+                    `;
+                    if (window.feather) {
+                        feather.replace();
+                    }
+                }
+            }
         }
 
         const {
@@ -7853,53 +7979,138 @@ async function handleJobDelete(jobId, jobTitle) {
         } = await supabase.auth.getUser();
         if (!user) {
             showNotification("Please log in to delete jobs", "error");
-            return;
-        }
-
-        // Call the delete function
-        await deleteJobRequest(jobId, user.id);
-        
-        // Show success message
-        showNotification("Job deleted successfully!", "success");
-
-        // Optimistically remove the job card from the UI
-        const jobCard = document.querySelector(`[data-job-id="${jobId}"]`);
-        if (jobCard) {
-            const jobList = jobCard.closest(".job-request-list");
-            jobCard.remove();
-
-            // If no jobs remain, show the empty state message
-            if (jobList && jobList.querySelectorAll(".job-request-card").length === 0) {
-                jobList.innerHTML = `
-                    <div class="text-center py-12">
-                        <i data-feather="briefcase" class="w-16 h-16 text-gray-300 mx-auto mb-4"></i>
-                        <h4 class="text-xl font-semibold text-gray-700 mb-2">No Job Requests Yet</h4>
-                        <p class="text-gray-500">Create your first job request to find skilled apprentices!</p>
-                    </div>
-                `;
+            // Restore UI if user not logged in (actual error)
+            if (jobCardRemoved && jobCardClone && jobList) {
+                // Check if empty state is showing, if so replace it
+                const emptyState = jobList.querySelector('.text-center');
+                if (emptyState) {
+                    jobList.innerHTML = '';
+                }
+                jobList.insertBefore(jobCardClone, jobList.firstChild);
                 if (window.feather) {
                     feather.replace();
                 }
             }
+            // Re-enable button on error
+            if (deleteButton) {
+                deleteButton.disabled = false;
+                deleteButton.style.opacity = '1';
+                deleteButton.style.cursor = 'pointer';
+                deleteButton.innerHTML = originalButtonText;
+                if (window.feather) {
+                    feather.replace();
+                }
+            }
+            return;
+        }
+
+        // Call the delete function with strict ID validation
+        // Ensure jobId is properly formatted (UUIDs should be strings)
+        const jobIdToDelete = String(jobId).trim();
+        console.log(`[DASHBOARD] Calling deleteJobRequest`);
+        console.log(`[DASHBOARD] Job ID to delete: ${jobIdToDelete} (type: ${typeof jobIdToDelete})`);
+        console.log(`[DASHBOARD] User ID: ${user.id} (type: ${typeof user.id})`);
+        console.log(`[DASHBOARD] User object:`, { id: user.id, email: user.email });
+        
+        let result;
+        try {
+            result = await deleteJobRequest(jobIdToDelete, user.id);
+            console.log(`[DASHBOARD] Delete operation result:`, result);
+        } catch (deleteError) {
+            console.error("[DASHBOARD] Delete operation threw an error:", deleteError);
+            console.error("[DASHBOARD] Error message:", deleteError.message);
+            console.error("[DASHBOARD] Error stack:", deleteError.stack);
+            // Re-throw to be caught by outer catch block
+            throw deleteError;
         }
         
-        // Refresh the jobs tab
-        const jobsTab = document.querySelector('[data-tab="jobs"]');
-        if (jobsTab) {
-            jobsTab.click();
+        // Verify the result indicates actual deletion
+        if (!result) {
+            throw new Error("Delete operation returned no result");
         }
+        
+        if (!result.success) {
+            throw new Error("Delete operation did not succeed");
+        }
+        
+        // If deleted is false, it means the job was already deleted
+        // This is acceptable, but log it for debugging
+        if (result.deleted === false) {
+            console.log("[DASHBOARD] Delete returned alreadyDeleted=true - job was already removed");
+            showNotification("Job has already been deleted.", "success");
+        } else if (result.deleted === true) {
+            console.log("[DASHBOARD] ✓ Delete confirmed: Job was successfully deleted from database");
+            showNotification("Job deleted successfully!", "success");
+        } else {
+            // Unexpected result - this shouldn't happen if delete succeeded
+            console.warn("[DASHBOARD] Unexpected delete result:", result);
+            throw new Error("Unexpected deletion result");
+        }
+        
+        // DO NOT refresh the jobs tab - we've already optimistically removed the job from UI
+        // The job is already removed from the DOM, so no refresh is needed
     } catch (error) {
-        console.error("Error deleting job:", error);
-        let errorMessage = "Failed to delete job. Please try again.";
+        console.error("[DASHBOARD] ✗ Error deleting job:", error);
+        console.error("[DASHBOARD] Error message:", error.message);
         
-        if (error.message.includes("own job requests")) {
+        // RESTORE UI ON ERROR - Job deletion failed, so restore the job card
+        if (jobCardRemoved && jobCardClone && jobList) {
+            console.log("[DASHBOARD] Restoring job card in UI due to deletion failure");
+            
+            // Check if empty state is showing, if so replace it
+            const emptyState = jobList.querySelector('.text-center');
+            if (emptyState) {
+                jobList.innerHTML = '';
+            }
+            
+            // Restore the job card at the beginning of the list
+            jobList.insertBefore(jobCardClone, jobList.firstChild);
+            
+            if (window.feather) {
+                feather.replace();
+            }
+            
+            console.log("[DASHBOARD] ✓ Job card restored in UI");
+        }
+
+        // Re-enable button on error
+        if (deleteButton) {
+            deleteButton.disabled = false;
+            deleteButton.style.opacity = '1';
+            deleteButton.style.cursor = 'pointer';
+            deleteButton.innerHTML = originalButtonText;
+            if (window.feather) {
+                feather.replace();
+            }
+        }
+
+        // Handle "already deleted" case gracefully - don't show error
+        const isAlreadyDeleted = error.message && (
+            error.message.includes("already deleted") || 
+            error.message.includes("not found or already deleted") ||
+            error.message.includes("Job request not found")
+        );
+        
+        if (isAlreadyDeleted) {
+            console.log("[DASHBOARD] Job was already deleted, treating as success");
+            showNotification("Job has already been deleted.", "success");
+            // UI already updated optimistically, no need to restore
+            return;
+        }
+
+        // Show user-friendly error message
+        let errorMessage = "Deletion failed. The job was not removed from the database.";
+        
+        if (error.message && error.message.includes("own job requests")) {
             errorMessage = "You can only delete your own job requests.";
-        } else if (error.message.includes("apprentice has already been assigned")) {
+        } else if (error.message && error.message.includes("apprentice has already been assigned")) {
             errorMessage = "Cannot delete job: An apprentice has already been assigned to this job.";
-        } else if (error.message.includes("in progress or completed")) {
+        } else if (error.message && error.message.includes("in progress or completed")) {
             errorMessage = "Cannot delete job that is in progress or completed.";
-        } else if (error.message.includes("not found")) {
-            errorMessage = "Job not found or may have already been deleted.";
+        } else if (error.message && error.message.includes("still exists")) {
+            errorMessage = "Deletion failed - the job still exists in the database. Please try again or contact support.";
+        } else if (error.message && error.message.includes("not found")) {
+            errorMessage = "Job not found. It may have already been deleted.";
         }
         
         showNotification(errorMessage, "error");

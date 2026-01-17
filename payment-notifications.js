@@ -24,6 +24,10 @@ const EMAIL_FUNCTION_NAME =
 const EMAIL_NOTIFICATIONS_ENABLED =
     ENV_CONFIG?.ENABLE_EMAIL_NOTIFICATIONS ?? false;
 
+// Cache for detected read column name to avoid repeated warnings
+let detectedReadColumnName = null;
+let columnDetectionAttempted = false;
+
 // ==============================================
 // CORE NOTIFICATION HELPERS
 // ==============================================
@@ -718,6 +722,24 @@ export async function notifyJobAlert({
 // NOTIFICATION QUERIES & REALTIME
 // ==============================================
 
+/**
+ * Helper function to normalize notification read status.
+ * Handles both 'is_read' and 'read' column names from the database.
+ * Exported for use in dashboard files.
+ */
+export function normalizeNotificationReadStatus(notification) {
+    if (!notification) return notification;
+    
+    // Normalize to always use 'is_read' for consistency
+    if (notification.hasOwnProperty('read') && !notification.hasOwnProperty('is_read')) {
+        notification.is_read = notification.read;
+        // Optionally remove 'read' to avoid confusion
+        // delete notification.read;
+    }
+    
+    return notification;
+}
+
 export async function getUserNotifications(userId, limit = 20, offset = 0) {
     const { data, error } = await supabase
         .from("notifications")
@@ -731,16 +753,140 @@ export async function getUserNotifications(userId, limit = 20, offset = 0) {
         throw error;
     }
 
-    return data || [];
+    // Normalize read status for all notifications
+    const normalizedData = (data || []).map(normalizeNotificationReadStatus);
+    return normalizedData;
 }
 
+/**
+ * Detects which read column name exists in the notifications table.
+ * Caches the result to avoid repeated detection attempts.
+ */
+async function detectReadColumnName() {
+    if (columnDetectionAttempted) {
+        return detectedReadColumnName;
+    }
+    
+    columnDetectionAttempted = true;
+    
+    // Try to fetch a notification to see what columns exist
+    try {
+        const { data, error } = await supabase
+            .from("notifications")
+            .select("*")
+            .limit(1);
+        
+        if (!error && data && data.length > 0) {
+            const columns = Object.keys(data[0]);
+            if (columns.includes("is_read")) {
+                detectedReadColumnName = "is_read";
+            } else if (columns.includes("read")) {
+                detectedReadColumnName = "read";
+            }
+        }
+    } catch (err) {
+        // Detection failed, will fall back to trying both
+    }
+    
+    return detectedReadColumnName;
+}
+
+/**
+ * Marks a single notification as read.
+ * 
+ * SCHEMA REQUIREMENT: The notifications table must have ONE of these columns:
+ * - `is_read` (boolean) - RECOMMENDED column name
+ * - `read` (boolean) - Alternative column name (fallback)
+ * 
+ * NOTE: The `read_at` column is optional. If it doesn't exist, only the read status will be updated.
+ * 
+ * If you get a schema cache error, ensure your notifications table has one of these columns.
+ * Run this in Supabase SQL editor to add the column if missing:
+ *   ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT false;
+ */
 export async function markNotificationAsRead(notificationId) {
-    const { error } = await supabase
+    // Detect which column exists (one-time detection, cached)
+    const detectedColumn = await detectReadColumnName();
+    const useReadColumn = detectedColumn === "read";
+    
+    // Use detected column if available, otherwise try is_read first
+    let updateData = useReadColumn ? { read: true } : { is_read: true };
+    let { error } = await supabase
         .from("notifications")
-        .update({ is_read: true, read_at: new Date().toISOString() })
+        .update(updateData)
         .eq("id", notificationId);
 
-    if (error) {
+    // If error indicates missing column, try the other one
+    if (error && (
+        error.message?.includes("is_read") ||
+        error.message?.includes("read") ||
+        error.message?.includes("schema cache") ||
+        error.code === "PGRST204"
+    )) {
+        // Only show warning on first attempt (not if we already detected)
+        if (!detectedColumn) {
+            console.log(
+                "Using 'read' column (fallback). " +
+                "To use 'is_read' instead, run: ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT false;"
+            );
+        }
+        
+        // Try with the other column name
+        updateData = useReadColumn ? { is_read: true } : { read: true };
+        const retryResult = await supabase
+            .from("notifications")
+            .update(updateData)
+            .eq("id", notificationId);
+        
+        error = retryResult.error;
+        
+        // Cache the working column name
+        if (!error) {
+            detectedReadColumnName = useReadColumn ? "is_read" : "read";
+        }
+        
+        if (error) {
+            // Log detailed error information for debugging
+            console.error("Error marking notification as read (both column names failed):", {
+                error,
+                notificationId,
+                attemptedColumns: ["is_read", "read"],
+                suggestion: "Check your notifications table schema. Required column: 'is_read' (boolean) or 'read' (boolean)"
+            });
+            
+            // Try to get table structure for debugging
+            try {
+                const { data: tableInfo, error: tableError } = await supabase
+                    .from("notifications")
+                    .select("*")
+                    .limit(1);
+                
+                if (!tableError && tableInfo && tableInfo.length > 0) {
+                    console.log("Sample notification structure:", Object.keys(tableInfo[0]));
+                }
+            } catch (debugError) {
+                console.warn("Could not fetch table structure for debugging:", debugError);
+            }
+            
+            throw error;
+        }
+    } else if (error) {
+        // If error is about read_at, try without it
+        if (error.message?.includes("read_at")) {
+            console.log("Column 'read_at' not found, updating without timestamp.");
+            updateData = useReadColumn ? { read: true } : { is_read: true };
+            const retryResult = await supabase
+                .from("notifications")
+                .update(updateData)
+                .eq("id", notificationId);
+            
+            if (retryResult.error) {
+                console.error("Error marking notification as read:", retryResult.error);
+                throw retryResult.error;
+            }
+            return true;
+        }
+        
         console.error("Error marking notification as read:", error);
         throw error;
     }
@@ -748,14 +894,125 @@ export async function markNotificationAsRead(notificationId) {
     return true;
 }
 
+/**
+ * Marks all unread notifications for a user as read.
+ * 
+ * SCHEMA REQUIREMENT: The notifications table must have ONE of these columns:
+ * - `is_read` (boolean) - RECOMMENDED column name
+ * - `read` (boolean) - Alternative column name (fallback)
+ * 
+ * NOTE: The `read_at` column is optional. If it doesn't exist, only the read status will be updated.
+ * 
+ * If you get a schema cache error, ensure your notifications table has one of these columns.
+ * Run this in Supabase SQL editor to add the column if missing:
+ *   ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT false;
+ */
 export async function markAllNotificationsAsRead(userId) {
-    const { error } = await supabase
+    // Detect which column exists (uses cached result if available)
+    const detectedColumn = await detectReadColumnName();
+    const useReadColumn = detectedColumn === "read";
+    
+    // Use detected column if available, otherwise try is_read first
+    let updateData = useReadColumn ? { read: true } : { is_read: true };
+    let query = supabase
         .from("notifications")
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq("user_id", userId)
-        .eq("is_read", false);
+        .update(updateData)
+        .eq("user_id", userId);
+    
+    // Use the appropriate column in the filter
+    if (useReadColumn) {
+        query = query.eq("read", false);
+    } else {
+        query = query.eq("is_read", false);
+    }
+    
+    let { error } = await query;
 
-    if (error) {
+    // If error indicates missing column, try the other one
+    if (error && (
+        error.message?.includes("is_read") ||
+        error.message?.includes("read") ||
+        error.message?.includes("schema cache") ||
+        error.code === "PGRST204"
+    )) {
+        // Only show message on first attempt (not if we already detected)
+        if (!detectedColumn) {
+            console.log(
+                "Using 'read' column (fallback). " +
+                "To use 'is_read' instead, run: ALTER TABLE public.notifications ADD COLUMN IF NOT EXISTS is_read BOOLEAN NOT NULL DEFAULT false;"
+            );
+        }
+        
+        // Try with the other column name
+        updateData = useReadColumn ? { is_read: true } : { read: true };
+        let retryQuery = supabase
+            .from("notifications")
+            .update(updateData)
+            .eq("user_id", userId);
+        
+        if (useReadColumn) {
+            retryQuery = retryQuery.eq("is_read", false);
+        } else {
+            retryQuery = retryQuery.eq("read", false);
+        }
+        
+        const retryResult = await retryQuery;
+        error = retryResult.error;
+        
+        // Cache the working column name
+        if (!error) {
+            detectedReadColumnName = useReadColumn ? "is_read" : "read";
+        }
+        
+        if (error) {
+            // Log detailed error information for debugging
+            console.error("Error marking all notifications as read (both column names failed):", {
+                error,
+                userId,
+                attemptedColumns: ["is_read", "read"],
+                suggestion: "Check your notifications table schema. Required column: 'is_read' (boolean) or 'read' (boolean)"
+            });
+            
+            // Try to get table structure for debugging
+            try {
+                const { data: tableInfo, error: tableError } = await supabase
+                    .from("notifications")
+                    .select("*")
+                    .limit(1);
+                
+                if (!tableError && tableInfo && tableInfo.length > 0) {
+                    console.log("Sample notification structure:", Object.keys(tableInfo[0]));
+                }
+            } catch (debugError) {
+                console.warn("Could not fetch table structure for debugging:", debugError);
+            }
+            
+            throw error;
+        }
+    } else if (error) {
+        // If error is about read_at, try without it
+        if (error.message?.includes("read_at")) {
+            console.log("Column 'read_at' not found, updating without timestamp.");
+            updateData = useReadColumn ? { read: true } : { is_read: true };
+            let retryQuery = supabase
+                .from("notifications")
+                .update(updateData)
+                .eq("user_id", userId);
+            
+            if (useReadColumn) {
+                retryQuery = retryQuery.eq("read", false);
+            } else {
+                retryQuery = retryQuery.eq("is_read", false);
+            }
+            
+            const retryResult = await retryQuery;
+            if (retryResult.error) {
+                console.error("Error marking all notifications as read:", retryResult.error);
+                throw retryResult.error;
+            }
+            return true;
+        }
+        
         console.error("Error marking all notifications as read:", error);
         throw error;
     }
@@ -763,13 +1020,60 @@ export async function markAllNotificationsAsRead(userId) {
     return true;
 }
 
+/**
+ * Gets the count of unread notifications for a user.
+ * 
+ * SCHEMA REQUIREMENT: The notifications table must have ONE of these columns:
+ * - `is_read` (boolean) - RECOMMENDED column name
+ * - `read` (boolean) - Alternative column name (fallback)
+ */
 export async function getUnreadNotificationCount(userId) {
     try {
-        const { count, error } = await supabase
+        // Detect which column exists (uses cached result if available)
+        const detectedColumn = await detectReadColumnName();
+        const useReadColumn = detectedColumn === "read";
+        
+        // Use detected column if available, otherwise try is_read first
+        let query = supabase
             .from("notifications")
             .select("id", { count: "exact", head: true })
-            .eq("user_id", userId)
-            .eq("is_read", false);
+            .eq("user_id", userId);
+        
+        if (useReadColumn) {
+            query = query.eq("read", false);
+        } else {
+            query = query.eq("is_read", false);
+        }
+        
+        let { count, error } = await query;
+
+        // If error indicates missing column, try the other one
+        if (error && (
+            error.message?.includes("is_read") ||
+            error.message?.includes("read") ||
+            error.message?.includes("schema cache") ||
+            error.code === "PGRST204"
+        )) {
+            let retryQuery = supabase
+                .from("notifications")
+                .select("id", { count: "exact", head: true })
+                .eq("user_id", userId);
+            
+            if (useReadColumn) {
+                retryQuery = retryQuery.eq("is_read", false);
+            } else {
+                retryQuery = retryQuery.eq("read", false);
+            }
+            
+            const retryResult = await retryQuery;
+            count = retryResult.count;
+            error = retryResult.error;
+            
+            // Cache the working column name
+            if (!error) {
+                detectedReadColumnName = useReadColumn ? "is_read" : "read";
+            }
+        }
 
         if (error) {
             throw error;
@@ -787,7 +1091,7 @@ export async function getUnreadNotificationCount(userId) {
     }
 }
 
-export function subscribeToNotifications(userId, { onInsert, onError } = {}) {
+export function subscribeToNotifications(userId, { onInsert, onUpdate, onError } = {}) {
     if (!userId) return null;
     const channel = supabase
         .channel(`notifications:user:${userId}`)
@@ -802,6 +1106,20 @@ export function subscribeToNotifications(userId, { onInsert, onError } = {}) {
             (payload) => {
                 if (typeof onInsert === "function") {
                     onInsert(payload.new);
+                }
+            }
+        )
+        .on(
+            "postgres_changes",
+            {
+                event: "UPDATE",
+                schema: "public",
+                table: "notifications",
+                filter: `user_id=eq.${userId}`,
+            },
+            (payload) => {
+                if (typeof onUpdate === "function") {
+                    onUpdate(payload.new, payload.old);
                 }
             }
         )
@@ -994,6 +1312,22 @@ export const notificationStyles = `
     @keyframes slideIn {
         from { transform: translateX(100%); opacity: 0; }
         to { transform: translateX(0); opacity: 1; }
+    }
+
+    .notification-dot {
+        z-index: 10;
+        animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+        }
+        50% {
+            opacity: 0.8;
+            transform: scale(1.1);
+        }
     }
 
     @media (max-width: 768px) {

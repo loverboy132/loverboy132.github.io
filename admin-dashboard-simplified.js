@@ -17,6 +17,7 @@ import {
     unsubscribeFromNotifications,
     injectNotificationStyles,
     displayNotification,
+    normalizeNotificationReadStatus,
 } from "./payment-notifications.js";
 
 // Global state
@@ -1045,19 +1046,30 @@ async function initializeNotificationCenter(userData) {
         markAllNotificationsBtn.addEventListener("click", async () => {
             if (!notificationState.userId) return;
             try {
-                await markAllNotificationsAsRead(notificationState.userId);
+                // Optimistically update UI first for better UX
                 notificationState.items = notificationState.items.map(
                     (item) => ({ ...item, is_read: true })
                 );
                 notificationState.unreadCount = 0;
                 renderNotificationList();
-                updateNotificationBadge();
+                updateNotificationBadge(); // This will hide the red dot immediately
+
+                // Then update in database
+                await markAllNotificationsAsRead(notificationState.userId);
+                
+                // Refresh from server to ensure sync
+                await refreshNotifications();
             } catch (error) {
                 console.error("Failed to mark all notifications:", error);
-                showNotification(
-                    "Unable to mark notifications as read right now.",
-                    "error"
-                );
+                
+                // Revert optimistic update on error
+                await refreshNotifications();
+                
+                // Show user-friendly error message
+                const errorMsg = error?.message?.includes("schema cache") || error?.message?.includes("is_read")
+                    ? "Database schema issue detected. Please check console for details."
+                    : "Unable to mark notifications as read right now.";
+                showNotification(errorMsg, "error");
             }
         });
     }
@@ -1071,21 +1083,39 @@ async function initializeNotificationCenter(userData) {
         if (!notificationId) return;
 
         try {
+            // Optimistically update UI first for better UX
+            const notificationItem = notificationState.items.find(item => item.id === notificationId);
+            if (notificationItem && !notificationItem.is_read) {
+                // Update local state immediately
+                notificationState.items = notificationState.items.map((item) =>
+                    item.id === notificationId
+                        ? { ...item, is_read: true }
+                        : item
+                );
+                notificationState.unreadCount = Math.max(
+                    notificationState.unreadCount - 1,
+                    0
+                );
+                renderNotificationList();
+                updateNotificationBadge(); // This will hide the red dot if unreadCount becomes 0
+            }
+
+            // Then update in database
             await markNotificationAsRead(notificationId);
-            notificationState.items = notificationState.items.map((item) =>
-                item.id === notificationId
-                    ? { ...item, is_read: true }
-                    : item
-            );
-            notificationState.unreadCount = Math.max(
-                notificationState.unreadCount - 1,
-                0
-            );
-            renderNotificationList();
-            updateNotificationBadge();
+            
+            // Refresh from server to ensure sync (handles any edge cases)
+            await refreshNotifications();
         } catch (error) {
             console.error("Failed to update notification:", error);
-            showNotification("Could not update notification", "error");
+            
+            // Revert optimistic update on error
+            await refreshNotifications();
+            
+            // Show user-friendly error message
+            const errorMsg = error?.message?.includes("schema cache") || error?.message?.includes("is_read")
+                ? "Database schema issue detected. Please check console for details."
+                : "Could not update notification";
+            showNotification(errorMsg, "error");
         }
     });
 
@@ -1094,6 +1124,11 @@ async function initializeNotificationCenter(userData) {
         notificationState.userId,
         {
             onInsert: handleIncomingNotification,
+            onUpdate: async (newNotification, oldNotification) => {
+                // Refresh notifications when updated (e.g., marked as read)
+                // This ensures the red dot updates in real-time across tabs/devices
+                await refreshNotifications();
+            },
             onError: (err) => {
                 console.error("Notification channel error:", err);
             },
@@ -1118,7 +1153,10 @@ async function refreshNotifications() {
 }
 
 function handleIncomingNotification(notification) {
-    notificationState.items = [notification, ...notificationState.items].slice(
+    // Normalize notification to ensure consistent 'is_read' property
+    const normalizedNotification = normalizeNotificationReadStatus(notification);
+    
+    notificationState.items = [normalizedNotification, ...notificationState.items].slice(
         0,
         20
     );
@@ -1127,7 +1165,7 @@ function handleIncomingNotification(notification) {
     updateNotificationBadge();
 
     try {
-        displayNotification(notification);
+        displayNotification(normalizedNotification);
     } catch (error) {
         console.warn("Unable to show toast notification:", error);
     }
@@ -1176,6 +1214,7 @@ function renderNotificationList() {
 function updateNotificationBadge() {
     const notificationBadge = document.getElementById("notification-badge");
     if (!notificationBadge) return;
+    const notificationDot = document.getElementById("notification-dot");
 
     if (notificationState.unreadCount > 0) {
         notificationBadge.textContent =
@@ -1183,8 +1222,16 @@ function updateNotificationBadge() {
                 ? "9+"
                 : notificationState.unreadCount.toString();
         notificationBadge.classList.remove("hidden");
+        // Show red dot when there are unread notifications
+        if (notificationDot) {
+            notificationDot.classList.remove("hidden");
+        }
     } else {
         notificationBadge.classList.add("hidden");
+        // Hide red dot when all notifications are read
+        if (notificationDot) {
+            notificationDot.classList.add("hidden");
+        }
     }
 }
 

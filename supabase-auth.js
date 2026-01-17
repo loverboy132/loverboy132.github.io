@@ -3325,9 +3325,23 @@ export async function deleteRating(ratingId, raterId) {
 // Delete job request
 export async function deleteJobRequest(jobRequestId, clientId) {
     try {
-        console.log(`Deleting job request ${jobRequestId} for client ${clientId}`);
+        // ============================================
+        // STEP 1: VALIDATE INPUTS
+        // ============================================
+        if (!jobRequestId) {
+            throw new Error("Job request ID is required");
+        }
+        if (!clientId) {
+            throw new Error("Client ID is required");
+        }
+
+        console.log(`[DELETE JOB] Starting deletion process`);
+        console.log(`[DELETE JOB] Job ID: ${jobRequestId} (type: ${typeof jobRequestId})`);
+        console.log(`[DELETE JOB] Client ID: ${clientId} (type: ${typeof clientId})`);
         
-        // First, check if the job request belongs to the client and get escrow amount
+        // ============================================
+        // STEP 2: FETCH JOB REQUEST AND VERIFY OWNERSHIP
+        // ============================================
         const { data: jobRequest, error: fetchError } = await supabase
             .from('job_requests')
             .select('id, client_id, status, escrow_amount, title, assigned_apprentice_id')
@@ -3335,11 +3349,27 @@ export async function deleteJobRequest(jobRequestId, clientId) {
             .single();
 
         if (fetchError) {
-            console.error("Error fetching job request:", fetchError);
+            console.error("[DELETE JOB] Error fetching job request:", fetchError);
+            console.error("[DELETE JOB] Fetch error code:", fetchError.code);
+            console.error("[DELETE JOB] Fetch error message:", fetchError.message);
             throw new Error("Job request not found");
         }
 
+        if (!jobRequest) {
+            console.error("[DELETE JOB] Job request not found in database");
+            throw new Error("Job request not found");
+        }
+
+        console.log(`[DELETE JOB] Job found:`, {
+            id: jobRequest.id,
+            client_id: jobRequest.client_id,
+            status: jobRequest.status,
+            escrow_amount: jobRequest.escrow_amount,
+            assigned_apprentice_id: jobRequest.assigned_apprentice_id
+        });
+
         if (jobRequest.client_id !== clientId) {
+            console.error(`[DELETE JOB] Ownership mismatch: Job client_id (${jobRequest.client_id}) !== provided clientId (${clientId})`);
             throw new Error("You can only delete your own job requests");
         }
 
@@ -3353,71 +3383,403 @@ export async function deleteJobRequest(jobRequestId, clientId) {
             throw new Error("Cannot delete job that is in progress or completed");
         }
 
-        // Refund escrow if job is being deleted and has escrow amount
-        if (jobRequest.escrow_amount && jobRequest.escrow_amount > 0) {
-            const clientWallet = await getUserWallet(clientId);
-            if (!clientWallet) {
-                throw new Error("Client wallet not found");
-            }
+        // Store escrow amount from DB (server-side, secure) before deletion
+        const escrowAmount = jobRequest.escrow_amount || 0;
+        const jobTitle = jobRequest.title || 'Job Request';
 
-            // Refund escrow to client wallet
-            const newClientBalance = (clientWallet.balance_ngn || 0) + jobRequest.escrow_amount;
-            const { error: clientWalletError } = await supabase
-                .from("user_wallets")
-                .update({
-                    balance_ngn: newClientBalance,
-                    updated_at: new Date().toISOString(),
-                })
-                .eq("user_id", clientId);
+        // ============================================
+        // STEP 3: DELETE ALL DEPENDENCIES FIRST
+        // ============================================
+        console.log(`[DELETE JOB] Step 3: Deleting all dependent records...`);
+        
+        // 3.1: Delete job applications
+        console.log(`[DELETE JOB] 3.1: Checking for job_applications...`);
+        const { data: applications, error: appsError } = await supabase
+            .from('job_applications')
+            .select('id', { count: 'exact' })
+            .eq('job_request_id', jobRequestId);
 
-            if (clientWalletError) {
-                throw new Error("Failed to refund escrow: " + clientWalletError.message);
-            }
-
-            // Create wallet transaction for escrow refund
-            const { error: refundTransactionError } = await supabase
-                .from("wallet_transactions")
-                .insert({
-                    user_id: clientId,
-                    transaction_type: "escrow_refund",
-                    amount_ngn: jobRequest.escrow_amount,
-                    amount_points: 0,
-                    description: `Escrow refunded for deleted job: ${jobRequest.title || 'Job Request'}`,
-                    reference: `JOB-DELETE-${jobRequestId}`,
-                    status: "completed",
-                    metadata: {
-                        job_request_id: jobRequestId,
-                        job_title: jobRequest.title,
-                        refund_type: "job_deletion"
-                    }
-                });
-
-            if (refundTransactionError) {
-                console.warn("Failed to create refund transaction:", refundTransactionError);
-            }
+        if (appsError) {
+            console.error("[DELETE JOB] Error checking applications:", appsError);
+            throw new Error(`Failed to check related applications: ${appsError.message}`);
         }
 
-        // Delete the job request (cascade will handle related records)
-        const { data: deletedRows, error: deleteError } = await supabase
+        if (applications && applications.length > 0) {
+            console.log(`[DELETE JOB] Found ${applications.length} job applications - deleting...`);
+            const { count: deletedAppsCount, error: deleteAppsError } = await supabase
+                .from('job_applications')
+                .delete({ count: 'exact' })
+                .eq('job_request_id', jobRequestId);
+            
+            if (deleteAppsError) {
+                console.error("[DELETE JOB] Error deleting applications:", deleteAppsError);
+                throw new Error(`Failed to delete related applications: ${deleteAppsError.message}`);
+            }
+            console.log(`[DELETE JOB] Successfully deleted ${deletedAppsCount || applications.length} job applications`);
+        } else {
+            console.log(`[DELETE JOB] No job applications found`);
+        }
+
+        // 3.2: Delete disputes related to this job
+        console.log(`[DELETE JOB] 3.2: Checking for disputes...`);
+        const { data: disputes, error: disputesError } = await supabase
+            .from('disputes')
+            .select('id', { count: 'exact' })
+            .eq('job_request_id', jobRequestId);
+
+        if (disputesError) {
+            console.warn("[DELETE JOB] Error checking disputes (table may not exist):", disputesError);
+            // Don't throw - disputes table might not exist
+        } else if (disputes && disputes.length > 0) {
+            console.log(`[DELETE JOB] Found ${disputes.length} disputes - deleting...`);
+            const { count: deletedDisputesCount, error: deleteDisputesError } = await supabase
+                .from('disputes')
+                .delete({ count: 'exact' })
+                .eq('job_request_id', jobRequestId);
+            
+            if (deleteDisputesError) {
+                console.warn("[DELETE JOB] Error deleting disputes:", deleteDisputesError);
+                // Don't throw - continue with deletion
+            } else {
+                console.log(`[DELETE JOB] Successfully deleted ${deletedDisputesCount || disputes.length} disputes`);
+            }
+        } else {
+            console.log(`[DELETE JOB] No disputes found`);
+        }
+
+        // 3.3: Delete notifications that reference this job in metadata
+        console.log(`[DELETE JOB] 3.3: Checking for notifications with job metadata...`);
+        try {
+            // Fetch all notifications and filter client-side for those referencing this job
+            const { data: allNotifications, error: notifError } = await supabase
+                .from('notifications')
+                .select('id, metadata');
+            
+            if (notifError) {
+                console.warn("[DELETE JOB] Error checking notifications:", notifError);
+            } else if (allNotifications && allNotifications.length > 0) {
+                // Filter notifications that reference this job in metadata
+                const jobNotifications = allNotifications.filter(notif => {
+                    const metadata = notif.metadata || {};
+                    return metadata.jobId === jobRequestId || 
+                           metadata.job_request_id === jobRequestId ||
+                           metadata.jobId === String(jobRequestId) ||
+                           metadata.job_request_id === String(jobRequestId);
+                });
+                
+                if (jobNotifications.length > 0) {
+                    console.log(`[DELETE JOB] Found ${jobNotifications.length} notifications referencing this job - deleting...`);
+                    const notificationIds = jobNotifications.map(n => n.id);
+                    const { count: deletedNotifCount, error: deleteNotifError } = await supabase
+                        .from('notifications')
+                        .delete({ count: 'exact' })
+                        .in('id', notificationIds);
+                    
+                    if (deleteNotifError) {
+                        console.warn("[DELETE JOB] Error deleting notifications:", deleteNotifError);
+                    } else {
+                        console.log(`[DELETE JOB] Successfully deleted ${deletedNotifCount || jobNotifications.length} notifications`);
+                    }
+                } else {
+                    console.log(`[DELETE JOB] No notifications found referencing this job`);
+                }
+            } else {
+                console.log(`[DELETE JOB] No notifications found`);
+            }
+        } catch (notifCheckError) {
+            console.warn("[DELETE JOB] Could not check/delete notifications:", notifCheckError);
+            // Continue - notifications are not critical
+        }
+
+        console.log(`[DELETE JOB] All dependencies deleted successfully`);
+
+        // ============================================
+        // STEP 4: VERIFY CURRENT USER CONTEXT
+        // ============================================
+        console.log(`[DELETE JOB] Step 4: Verifying current user context...`);
+        const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) {
+            console.error("[DELETE JOB] Error getting current user:", userError);
+            throw new Error(`Authentication error: ${userError.message}`);
+        }
+        
+        if (!currentUser) {
+            console.error("[DELETE JOB] No current user found");
+            throw new Error("Authentication required - no user session found");
+        }
+        
+        console.log(`[DELETE JOB] Current user ID: ${currentUser.id}`);
+        console.log(`[DELETE JOB] Client ID from parameter: ${clientId}`);
+        console.log(`[DELETE JOB] User IDs match: ${currentUser.id === clientId}`);
+        
+        // Verify the current user matches the clientId
+        if (currentUser.id !== clientId) {
+            console.error(`[DELETE JOB] User ID mismatch: current user (${currentUser.id}) !== clientId (${clientId})`);
+            throw new Error("You can only delete your own job requests");
+        }
+
+        // ============================================
+        // STEP 5: VERIFY RLS ACCESS BEFORE DELETE
+        // ============================================
+        console.log(`[DELETE JOB] Step 5: Verifying RLS access to job...`);
+        
+        // Try to select the job with current user context to verify RLS allows access
+        const { data: rlsCheck, error: rlsError } = await supabase
             .from('job_requests')
-            .delete()
+            .select('id, client_id, status, assigned_apprentice_id')
             .eq('id', jobRequestId)
-            .eq('client_id', clientId)
+            .eq('client_id', currentUser.id)
+            .maybeSingle();
+        
+        if (rlsError) {
+            console.error("[DELETE JOB] RLS check error:", rlsError);
+            console.warn("[DELETE JOB] RLS check failed, but continuing with delete attempt...");
+        } else if (!rlsCheck) {
+            console.error("[DELETE JOB] RLS check: Job not accessible with current user context");
+            console.error("[DELETE JOB] This may indicate an RLS policy issue");
+            // Don't throw yet - try the delete and see what happens
+        } else {
+            console.log(`[DELETE JOB] ✓ RLS check passed - job is accessible`);
+            console.log(`[DELETE JOB] RLS check result:`, rlsCheck);
+        }
+
+        // ============================================
+        // STEP 6: DELETE JOB REQUEST (HARD DELETE)
+        // ============================================
+        console.log(`[DELETE JOB] Step 6: Attempting hard delete from job_requests table...`);
+        console.log(`[DELETE JOB] Delete query: .eq('id', '${jobRequestId}').eq('client_id', '${clientId}')`);
+        
+        // Use currentUser.id instead of clientId parameter to ensure we're using the authenticated user
+        let { count: deletedCount, data: deletedRows, error: deleteError } = await supabase
+            .from('job_requests')
+            .delete({ count: 'exact' })
+            .eq('id', jobRequestId)
+            .eq('client_id', currentUser.id)  // Use authenticated user ID
             .select('id');
 
+        console.log(`[DELETE JOB] Delete operation completed (with client_id check)`);
+        console.log(`[DELETE JOB] Deleted count: ${deletedCount}`);
+        console.log(`[DELETE JOB] Deleted rows:`, deletedRows);
+        console.log(`[DELETE JOB] Delete error:`, deleteError);
+
+        // If delete returned 0 rows, try with just ID (RLS should still enforce ownership)
+        if (!deleteError && (deletedCount === 0 || (!deletedRows || deletedRows.length === 0))) {
+            console.warn(`[DELETE JOB] Delete with client_id check returned 0 rows, trying with ID only...`);
+            console.warn(`[DELETE JOB] This may indicate an RLS policy issue - checking if job still exists...`);
+            
+            // Verify job still exists
+            const { data: stillExists, error: existsError } = await supabase
+                .from('job_requests')
+                .select('id, client_id, status')
+                .eq('id', jobRequestId)
+                .maybeSingle();
+            
+            if (stillExists) {
+                console.error(`[DELETE JOB] Job still exists after delete attempt:`, stillExists);
+                console.error(`[DELETE JOB] Job client_id: ${stillExists.client_id}, Current user: ${currentUser.id}`);
+                console.error(`[DELETE JOB] This indicates RLS DELETE policy may be missing or incorrect`);
+            }
+            
+            // Try delete with just ID - RLS policy should enforce ownership
+            const { count: deletedCount2, data: deletedRows2, error: deleteError2 } = await supabase
+                .from('job_requests')
+                .delete({ count: 'exact' })
+                .eq('id', jobRequestId)
+                .select('id');
+            
+            console.log(`[DELETE JOB] Delete operation (ID only) completed`);
+            console.log(`[DELETE JOB] Deleted count: ${deletedCount2}`);
+            console.log(`[DELETE JOB] Deleted rows:`, deletedRows2);
+            console.log(`[DELETE JOB] Delete error:`, deleteError2);
+            
+            // Use the second attempt's results
+            deletedCount = deletedCount2;
+            deletedRows = deletedRows2;
+            deleteError = deleteError2;
+        }
+
         if (deleteError) {
-            console.error("Error deleting job request:", deleteError);
-            throw new Error("Failed to delete job request");
+            console.error("[DELETE JOB] Delete error details:", JSON.stringify(deleteError, null, 2));
+            console.error("[DELETE JOB] Delete error code:", deleteError.code);
+            console.error("[DELETE JOB] Delete error message:", deleteError.message);
+            console.error("[DELETE JOB] Delete error hint:", deleteError.hint);
+            console.error("[DELETE JOB] Delete error details:", deleteError.details);
+            
+            // Check if it's an RLS policy error
+            if (deleteError.code === '42501' || deleteError.message?.includes('permission') || deleteError.message?.includes('policy')) {
+                throw new Error(`Permission denied: Row Level Security policy may be blocking deletion. Please check RLS policies for job_requests table.`);
+            }
+            
+            throw new Error(`Failed to delete job request: ${deleteError.message || deleteError.code || 'Unknown error'}`);
         }
 
-        if (!deletedRows || deletedRows.length === 0) {
-            throw new Error("Job request not found or already deleted");
+        // ============================================
+        // STEP 6: CONFIRM DELETION - EXACTLY 1 ROW
+        // ============================================
+        if (deletedCount === null || deletedCount === undefined) {
+            console.warn(`[DELETE JOB] Delete count is null/undefined - verifying manually...`);
+            
+            // Fallback: Check if rows were returned
+            if (!deletedRows || deletedRows.length === 0) {
+                // Verify the job still exists
+                const { data: verifyStillExists, error: verifyError } = await supabase
+                    .from('job_requests')
+                    .select('id')
+                    .eq('id', jobRequestId)
+                    .maybeSingle();
+                
+                if (verifyStillExists) {
+                    console.error(`[DELETE JOB] CRITICAL: Delete returned 0 rows but job still exists!`);
+                    console.error(`[DELETE JOB] This is likely an RLS (Row Level Security) policy issue.`);
+                    console.error(`[DELETE JOB] Please run the SQL script: supabase/fix-job-requests-delete-policy.sql`);
+                    throw new Error("Delete operation failed - job still exists in database. This is likely due to a missing RLS DELETE policy. Please run the SQL script: supabase/fix-job-requests-delete-policy.sql");
+                }
+                
+                console.log("[DELETE JOB] Job was already deleted or not found");
+                return { success: true, alreadyDeleted: true, deleted: false };
+            }
+            
+            // Use row count as fallback
+            if (deletedRows.length !== 1) {
+                throw new Error(`Unexpected deletion result: ${deletedRows.length} rows deleted (expected 1)`);
+            }
+            
+            console.log(`[DELETE JOB] Deletion confirmed by row count: ${deletedRows.length} row(s) deleted`);
+        } else if (deletedCount !== 1) {
+            if (deletedCount === 0) {
+                // Verify the job still exists
+                const { data: verifyStillExists, error: verifyError } = await supabase
+                    .from('job_requests')
+                    .select('id')
+                    .eq('id', jobRequestId)
+                    .maybeSingle();
+                
+                if (verifyStillExists) {
+                    console.error(`[DELETE JOB] CRITICAL: Delete returned 0 rows but job still exists!`);
+                    console.error(`[DELETE JOB] This is likely an RLS (Row Level Security) policy issue.`);
+                    console.error(`[DELETE JOB] Please run the SQL script: supabase/fix-job-requests-delete-policy.sql`);
+                    throw new Error("Delete operation failed - job still exists in database. This is likely due to a missing RLS DELETE policy. Please run the SQL script: supabase/fix-job-requests-delete-policy.sql");
+                }
+                
+                console.log("[DELETE JOB] Job was already deleted or not found");
+                return { success: true, alreadyDeleted: true, deleted: false };
+            } else {
+                throw new Error(`Unexpected deletion result: ${deletedCount} rows deleted (expected exactly 1)`);
+            }
         }
 
-        console.log("Job request deleted successfully");
-        return { success: true };
+        console.log(`[DELETE JOB] ✓ Confirmed: Exactly 1 row deleted (count: ${deletedCount || deletedRows?.length || 0})`);
+
+        // ============================================
+        // STEP 7: VERIFY DELETION (FINAL CHECK)
+        // ============================================
+        console.log(`[DELETE JOB] Step 6: Final verification - checking if job still exists...`);
+        await new Promise(resolve => setTimeout(resolve, 100)); // Brief wait for DB consistency
+        
+        const { data: verifyDeleted, error: verifyError } = await supabase
+            .from('job_requests')
+            .select('id')
+            .eq('id', jobRequestId)
+            .maybeSingle();
+        
+        if (verifyDeleted) {
+            console.error(`[DELETE JOB] CRITICAL: Delete confirmed but job still exists in database!`);
+            console.error(`[DELETE JOB] Verification query returned:`, verifyDeleted);
+            console.error(`[DELETE JOB] This is likely an RLS (Row Level Security) policy issue.`);
+            console.error(`[DELETE JOB] Please run the SQL script: supabase/fix-job-requests-delete-policy.sql`);
+            throw new Error("Delete operation failed - job still exists after deletion. This is likely due to a missing RLS DELETE policy. Please run the SQL script: supabase/fix-job-requests-delete-policy.sql");
+        }
+        
+        if (verifyError && verifyError.code !== 'PGRST116') {
+            console.warn("[DELETE JOB] Verification query error (may be expected):", verifyError);
+        }
+        
+        console.log(`[DELETE JOB] ✓ Final verification passed - job no longer exists in database`);
+
+        // ============================================
+        // STEP 8: PROCESS REFUND (ONLY ON SUCCESS)
+        // ============================================
+        // Refund is ONLY executed here, inside the success block
+        // This ensures no refund happens if deletion failed
+        console.log(`[DELETE JOB] Step 7: Processing refund for escrow amount: ${escrowAmount}`);
+        await processRefund(clientId, escrowAmount, jobRequestId, jobTitle);
+
+        console.log("[DELETE JOB] ✓ Job request deleted successfully and refund processed");
+        return { success: true, deleted: true, refunded: escrowAmount > 0 };
     } catch (error) {
-        console.error("Error in deleteJobRequest:", error);
+        console.error("[DELETE JOB] ✗ Error in deleteJobRequest:", error);
+        console.error("[DELETE JOB] Error stack:", error.stack);
+        // NO REFUND ON ERROR - state remains consistent
+        throw error;
+    }
+}
+
+
+// ============================================
+// HELPER FUNCTION: PROCESS REFUND
+// ============================================
+async function processRefund(clientId, escrowAmount, jobRequestId, jobTitle) {
+    if (escrowAmount <= 0) {
+        console.log(`[REFUND] No refund needed (escrow amount: ${escrowAmount})`);
+        return;
+    }
+
+    try {
+        const clientWallet = await getUserWallet(clientId);
+        if (!clientWallet) {
+            console.warn("[REFUND] Client wallet not found for refund");
+            throw new Error("Client wallet not found for refund");
+        }
+
+        console.log(`[REFUND] Current wallet balance: ${clientWallet.balance_ngn}`);
+        console.log(`[REFUND] Refund amount: ${escrowAmount}`);
+        
+        // Refund escrow to client wallet
+        const newClientBalance = (clientWallet.balance_ngn || 0) + escrowAmount;
+        console.log(`[REFUND] New wallet balance will be: ${newClientBalance}`);
+        
+        const { error: clientWalletError } = await supabase
+            .from("user_wallets")
+            .update({
+                balance_ngn: newClientBalance,
+                updated_at: new Date().toISOString(),
+            })
+            .eq("user_id", clientId);
+
+        if (clientWalletError) {
+            console.error("[REFUND] Failed to update wallet:", clientWalletError);
+            throw new Error(`Failed to refund escrow: ${clientWalletError.message || clientWalletError.code || 'Unknown error'}`);
+        }
+
+        console.log(`[REFUND] Wallet updated successfully`);
+
+        // Create wallet transaction for escrow refund
+        const { error: refundTransactionError } = await supabase
+            .from("wallet_transactions")
+            .insert({
+                user_id: clientId,
+                transaction_type: "escrow_refund",
+                amount_ngn: escrowAmount,
+                amount_points: 0,
+                description: `Escrow refunded for deleted job: ${jobTitle}`,
+                reference: `JOB-DELETE-${jobRequestId}-${Date.now()}`,
+                status: "completed",
+                metadata: {
+                    job_request_id: jobRequestId,
+                    job_title: jobTitle,
+                    refund_type: "job_deletion"
+                }
+            });
+
+        if (refundTransactionError) {
+            console.warn("[REFUND] Failed to create refund transaction:", refundTransactionError);
+            // Don't throw - wallet was updated, transaction log is secondary
+        } else {
+            console.log(`[REFUND] Refund transaction logged successfully`);
+        }
+    } catch (error) {
+        console.error("[REFUND] Error processing refund:", error);
         throw error;
     }
 }
