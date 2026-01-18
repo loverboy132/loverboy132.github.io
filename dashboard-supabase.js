@@ -4680,6 +4680,24 @@ function toggleNotificationPanel(forceState) {
 
     if (shouldOpen) {
         notificationPanel.classList.remove("hidden");
+        
+        // Mobile positioning fix: ensure dropdown is positioned correctly on small screens
+        if (window.innerWidth <= 640 && notificationBell && notificationWrapper) {
+            const bellRect = notificationBell.getBoundingClientRect();
+            const wrapperRect = notificationWrapper.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const panelWidth = Math.min(380, viewportWidth * 0.92);
+            
+            // Position dropdown so its right edge aligns with bell's right edge
+            notificationPanel.style.position = 'fixed';
+            notificationPanel.style.right = `${viewportWidth - bellRect.right}px`;
+            notificationPanel.style.left = 'auto';
+            notificationPanel.style.top = `${bellRect.bottom + 8}px`;
+            notificationPanel.style.width = `${panelWidth}px`;
+            notificationPanel.style.maxWidth = '380px';
+            notificationPanel.style.transform = 'none';
+        }
+        
         setTimeout(() => {
             document.addEventListener(
                 "click",
@@ -4688,6 +4706,16 @@ function toggleNotificationPanel(forceState) {
         }, 0);
     } else {
         notificationPanel.classList.add("hidden");
+        // Reset inline styles when closing
+        if (window.innerWidth <= 640) {
+            notificationPanel.style.position = '';
+            notificationPanel.style.right = '';
+            notificationPanel.style.left = '';
+            notificationPanel.style.top = '';
+            notificationPanel.style.width = '';
+            notificationPanel.style.maxWidth = '';
+            notificationPanel.style.transform = '';
+        }
         document.removeEventListener(
             "click",
             handleNotificationOutsideClick

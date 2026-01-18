@@ -40,9 +40,11 @@
             /* Mobile navigation spacing */
             @media (max-width: 767px) {
                 .nav-link {
-                    padding: 10px 14px !important;
-                    font-size: 13px !important;
-                    margin-right: 12px !important;
+                    padding: 10px 8px !important;
+                    font-size: 12px !important;
+                    margin-right: 4px !important;
+                    min-width: fit-content;
+                    flex-shrink: 0;
                 }
                 
                 .nav-link:last-child {
@@ -50,15 +52,30 @@
                 }
                 
                 .nav-link i {
-                    margin-right: 6px !important;
-                    width: 16px !important;
-                    height: 16px !important;
+                    margin-right: 3px !important;
+                    width: 14px !important;
+                    height: 14px !important;
                     flex-shrink: 0;
+                }
+                
+                .nav-link span {
+                    font-size: 12px !important;
                 }
                 
                 #main-nav {
                     padding-left: 12px;
                     padding-right: 12px;
+                    display: flex !important;
+                    flex-wrap: nowrap !important;
+                    overflow-x: auto !important;
+                    -webkit-overflow-scrolling: touch;
+                    scrollbar-width: none;
+                    -ms-overflow-style: none;
+                    gap: 0;
+                }
+                
+                #main-nav::-webkit-scrollbar {
+                    display: none;
                 }
             }
             
@@ -237,6 +254,179 @@
 
             .image-loaded {
                 opacity: 1;
+            }
+
+            /* Mobile Notification Dropdown Fix */
+            @media (max-width: 767px) {
+                #notification-panel {
+                    max-width: 90vw !important;
+                    width: 92vw !important;
+                    right: 0 !important;
+                    left: auto !important;
+                    max-height: 70vh !important;
+                    overflow-y: auto !important;
+                    transform: none !important;
+                }
+            }
+
+            /* Mobile Header Alignment */
+            @media (max-width: 767px) {
+                header .flex.items-center.space-x-2 {
+                    align-items: center !important;
+                    gap: 8px !important;
+                }
+                
+                #notification-bell,
+                #user-avatar,
+                #logout-button {
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                }
+            }
+
+            /* Mobile Card Padding Reduction */
+            @media (max-width: 767px) {
+                .stat-card {
+                    padding: 16px !important;
+                }
+                
+                .stat-card .p-6 {
+                    padding: 16px !important;
+                }
+            }
+
+            /* Mobile Typography Scaling */
+            @media (max-width: 767px) {
+                h1 {
+                    font-size: 24px !important;
+                }
+                
+                .text-3xl {
+                    font-size: 20px !important;
+                }
+                
+                .text-2xl {
+                    font-size: 18px !important;
+                }
+                
+                .stat-card .text-2xl {
+                    font-size: 20px !important;
+                }
+                
+                .stat-card .text-sm {
+                    font-size: 12px !important;
+                }
+                
+                /* Recent Activity and section titles */
+                h2, h3 {
+                    font-size: 18px !important;
+                }
+                
+                /* Card text scaling */
+                .bg-white p-6 .text-sm,
+                .bg-white p-6 .text-base {
+                    font-size: 13px !important;
+                }
+            }
+        </style>
+
+        <!-- 
+            ============================================
+            MOBILE LAYOUT FIXES - SAFE OVERRIDES ONLY
+            ============================================
+            This style block contains mobile-specific fixes that only apply
+            on screens 768px and below. Desktop layout remains untouched.
+            All fixes use !important to override existing styles safely.
+        -->
+        <style>
+            @media (max-width: 768px) {
+                /* 
+                    NOTIFICATION WRAPPER FIX
+                    Overrides: any parent container positioning that might affect
+                    the notification panel's placement. Ensures the wrapper has
+                    position: relative so the dropdown knows where "right: 0" is.
+                */
+                #notification-wrapper {
+                    position: relative !important;
+                }
+
+                /* 
+                    TABS CONTAINER FIX
+                    Overrides: any display or overflow properties that prevent
+                    horizontal scrolling. Forces flex display and enables smooth
+                    horizontal scrolling for the navigation tabs.
+                */
+                #main-nav {
+                    display: flex !important;
+                    overflow-x: auto !important;
+                    -webkit-overflow-scrolling: touch !important;
+                    scrollbar-width: none !important;
+                    -ms-overflow-style: none !important;
+                }
+
+                /* 
+                    TABS SCROLLBAR HIDDEN (Webkit browsers)
+                    Overrides: default webkit scrollbar display.
+                    Hides the scrollbar while maintaining scroll functionality.
+                */
+                #main-nav::-webkit-scrollbar {
+                    display: none !important;
+                }
+
+                /* 
+                    TAB ITEMS FIX - EXACTLY 3 TABS VISIBLE
+                    Overrides: flex-basis, flex-grow, flex-shrink properties.
+                    Sets each tab to take up 32% width so exactly 3 tabs fit
+                    with a little breathing room, allowing smooth horizontal scroll.
+                */
+                #main-nav .nav-link {
+                    flex: 0 0 32% !important;
+                    min-width: 0 !important;
+                }
+            }
+
+            /* 
+                ============================================
+                NOTIFICATION DROPDOWN FIX - SMALL MOBILE
+                ============================================
+                Specific fix for screens 640px and below to prevent
+                notification dropdown from being cut off on the left side.
+                Forces right alignment and removes transform that pushes it off-screen.
+            */
+            @media (max-width: 640px) {
+                /* 
+                    NOTIFICATION WRAPPER FIX
+                    Ensures the parent element has position: relative so the dropdown
+                    knows where "right: 0" is relative to the bell icon.
+                    Also prevents overflow clipping.
+                */
+                #notification-wrapper {
+                    position: relative !important;
+                    overflow: visible !important;
+                }
+
+                /* Ensure parent containers don't clip */
+                header,
+                header > div,
+                .flex.items-center {
+                    overflow: visible !important;
+                }
+
+                /* 
+                    NOTIFICATION DROPDOWN FIX
+                    Base styles - JavaScript will override with dynamic positioning.
+                    Ensures no transform or left positioning that could push it off-screen.
+                */
+                #notification-panel {
+                    left: auto !important;
+                    transform: none !important;
+                    width: 92vw !important;
+                    max-width: 380px !important;
+                    margin-left: 0 !important;
+                    margin-right: 0 !important;
+                    z-index: 9999 !important;
+                }
             }
         </style>
     </head>

@@ -498,6 +498,49 @@
         .mark-read-btn:hover {
             color: #2563eb !important;
         }
+
+        /* 
+            ============================================
+            NOTIFICATION DROPDOWN FIX - SMALL MOBILE
+            ============================================
+            Specific fix for screens 640px and below to prevent
+            notification dropdown from being cut off on the left side.
+            Forces right alignment and removes transform that pushes it off-screen.
+        */
+        @media (max-width: 640px) {
+            /* 
+                NOTIFICATION WRAPPER FIX
+                Ensures the parent element has position: relative so the dropdown
+                knows where "right: 0" is relative to the bell icon.
+                Also prevents overflow clipping.
+            */
+            #notification-wrapper {
+                position: relative !important;
+                overflow: visible !important;
+            }
+
+            /* Ensure parent containers don't clip */
+            .top-bar,
+            .top-bar > div,
+            .flex.items-center {
+                overflow: visible !important;
+            }
+
+            /* 
+                NOTIFICATION DROPDOWN FIX
+                Base styles - JavaScript will override with dynamic positioning.
+                Ensures no transform or left positioning that could push it off-screen.
+            */
+            #notification-panel {
+                left: auto !important;
+                transform: none !important;
+                width: 92vw !important;
+                max-width: 380px !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+                z-index: 9999 !important;
+            }
+        }
     </style>
 </head>
 <body>
