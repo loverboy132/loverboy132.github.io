@@ -1999,7 +1999,7 @@ export async function reviewJob(jobRequestId, approved, reviewNotes, clientId) {
         // Verify the client owns the job request and get escrow amount
         const { data: job, error: fetchError } = await supabase
             .from("job_requests")
-            .select("assigned_apprentice_id, fixed_price, budget_min, budget_max, client_id, escrow_amount, title")
+            .select("assigned_apprentice_id, fixed_price, budget_min, budget_max, client_id, escrow_amount, title, status")
             .eq("id", jobRequestId)
             .eq("client_id", clientId)
             .eq("status", "pending_review")
@@ -2019,77 +2019,137 @@ export async function reviewJob(jobRequestId, approved, reviewNotes, clientId) {
         };
 
         if (approved) {
-            // If approved, mark as completed and release payment to apprentice
-            updateData.status = "completed";
-
-            // Calculate payment (use escrow amount or average of min and max budget)
-            const payment = escrowAmount;
-
-            // Get apprentice wallet
-            const apprenticeWallet = await getUserWallet(job.assigned_apprentice_id);
-            if (!apprenticeWallet) {
-                throw new Error("Apprentice wallet not found");
-            }
-
-            // Credit apprentice wallet
-            const newApprenticeBalance = (apprenticeWallet.balance_ngn || 0) + payment;
-            const { error: apprenticeWalletError } = await supabase
-                .from("user_wallets")
-                .update({
-                    balance_ngn: newApprenticeBalance,
-                    updated_at: new Date().toISOString(),
-                })
-                .eq("user_id", job.assigned_apprentice_id);
-
-            if (apprenticeWalletError) {
-                throw new Error("Failed to credit apprentice wallet: " + apprenticeWalletError.message);
-            }
-
-            // Create wallet transaction for apprentice (escrow release)
-            const { error: apprenticeTransactionError } = await supabase
+            // Safety check: Prevent double payment by checking if payment was already made.
+            // Some databases may not have a `status` column on `wallet_transactions`,
+            // so we only check by reference and (optionally) transaction_type.
+            const paymentReference = `JOB-PAYMENT-${jobRequestId}`;
+            const { data: existingPayments, error: paymentCheckError } = await supabase
                 .from("wallet_transactions")
-                .insert({
-                    user_id: job.assigned_apprentice_id,
-                    transaction_type: "escrow_release",
-                    amount_ngn: payment,
-                    amount_points: 0,
-                    description: `Payment released for completed job: ${job.title}`,
-                    reference: `JOB-PAYMENT-${jobRequestId}`,
-                    status: "completed",
-                    metadata: {
-                        job_request_id: jobRequestId,
-                        job_title: job.title,
-                        payment_type: "job_completion"
-                    }
-                });
+                .select("id")
+                .eq("reference", paymentReference)
+                .eq("transaction_type", "escrow_release")
+                .limit(1);
 
-            if (apprenticeTransactionError) {
-                console.warn("Failed to create apprentice wallet transaction:", apprenticeTransactionError);
+            if (paymentCheckError) {
+                throw new Error("Failed to check existing payment: " + paymentCheckError.message);
             }
 
-            // Add earnings to apprentice profile
-            const { data: currentProfile, error: profileError } = await supabase
-                .from("profiles")
-                .select("total_earnings, completed_jobs")
-                .eq("id", job.assigned_apprentice_id)
-                .single();
+            const paymentAlreadyProcessed =
+                Array.isArray(existingPayments) && existingPayments.length > 0;
 
-            if (profileError) throw profileError;
+            if (paymentAlreadyProcessed) {
+                console.warn(`Payment already processed for job ${jobRequestId}. Skipping payment dispatch.`);
+                // Still update the job status, but skip payment
+                updateData.status = "completed";
+                updateData.payment = escrowAmount;
+            } else {
+                // If approved, mark as completed and release payment to apprentice
+                updateData.status = "completed";
 
-            const newTotalEarnings =
-                (currentProfile.total_earnings || 0) + payment;
-            const newCompletedJobs = (currentProfile.completed_jobs || 0) + 1;
+                // Calculate payment (use escrow amount or average of min and max budget)
+                const payment = escrowAmount;
 
-            await supabase
-                .from("profiles")
-                .update({
-                    total_earnings: newTotalEarnings,
-                    completed_jobs: newCompletedJobs,
-                    updated_at: new Date().toISOString(),
-                })
-                .eq("id", job.assigned_apprentice_id);
+                // First, update job status to completed (atomic operation)
+                const { data: updatedJob, error: statusUpdateError } = await supabase
+                    .from("job_requests")
+                    .update({
+                        status: "completed",
+                        review_approved: approved,
+                        review_notes: reviewNotes,
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", jobRequestId)
+                    .select()
+                    .single();
 
-            updateData.payment = payment;
+                if (statusUpdateError) {
+                    throw new Error("Failed to update job status: " + statusUpdateError.message);
+                }
+
+                // Only proceed with payment if status update was successful
+                try {
+                    // Get apprentice wallet
+                    const apprenticeWallet = await getUserWallet(job.assigned_apprentice_id);
+                    if (!apprenticeWallet) {
+                        throw new Error("Apprentice wallet not found");
+                    }
+
+                    // Credit apprentice wallet
+                    const newApprenticeBalance = (apprenticeWallet.balance_ngn || 0) + payment;
+                    const { error: apprenticeWalletError } = await supabase
+                        .from("user_wallets")
+                        .update({
+                            balance_ngn: newApprenticeBalance,
+                            updated_at: new Date().toISOString(),
+                        })
+                        .eq("user_id", job.assigned_apprentice_id);
+
+                    if (apprenticeWalletError) {
+                        throw new Error("Failed to credit apprentice wallet: " + apprenticeWalletError.message);
+                    }
+
+                    // Create wallet transaction for apprentice (escrow release)
+                    const { error: apprenticeTransactionError } = await supabase
+                        .from("wallet_transactions")
+                        .insert({
+                            user_id: job.assigned_apprentice_id,
+                            transaction_type: "escrow_release",
+                            amount_ngn: payment,
+                            amount_points: 0,
+                            description: `Payment released for completed job: ${job.title}`,
+                            reference: paymentReference,
+                            status: "completed",
+                            metadata: {
+                                job_request_id: jobRequestId,
+                                job_title: job.title,
+                                payment_type: "job_completion"
+                            }
+                        });
+
+                    if (apprenticeTransactionError) {
+                        throw new Error("Failed to create apprentice wallet transaction: " + apprenticeTransactionError.message);
+                    }
+
+                    // Add earnings to apprentice profile
+                    const { data: currentProfile, error: profileError } = await supabase
+                        .from("profiles")
+                        .select("total_earnings, completed_jobs")
+                        .eq("id", job.assigned_apprentice_id)
+                        .single();
+
+                    if (profileError) throw profileError;
+
+                    const newTotalEarnings =
+                        (currentProfile.total_earnings || 0) + payment;
+                    const newCompletedJobs = (currentProfile.completed_jobs || 0) + 1;
+
+                    await supabase
+                        .from("profiles")
+                        .update({
+                            total_earnings: newTotalEarnings,
+                            completed_jobs: newCompletedJobs,
+                            updated_at: new Date().toISOString(),
+                        })
+                        .eq("id", job.assigned_apprentice_id);
+
+                    // Log successful payment dispatch
+                    console.log(`Funds of ₦${payment.toLocaleString()} dispatched to Apprentice ID: ${job.assigned_apprentice_id} for Job ID: ${jobRequestId}`);
+
+                    updateData.payment = payment;
+                    return { ...updatedJob, approved, payment };
+                } catch (paymentError) {
+                    // If payment fails, revert job status back to pending_review
+                    console.error("Payment failed, reverting job status:", paymentError);
+                    await supabase
+                        .from("job_requests")
+                        .update({
+                            status: "pending_review",
+                            updated_at: new Date().toISOString(),
+                        })
+                        .eq("id", jobRequestId);
+                    throw new Error("Failed to dispatch funds to apprentice: " + paymentError.message);
+                }
+            }
         } else {
             // If rejected, refund escrow back to client and set status back to in_progress
             updateData.status = "in_progress";
@@ -2137,6 +2197,7 @@ export async function reviewJob(jobRequestId, approved, reviewNotes, clientId) {
             }
         }
 
+        // Update job status (for rejected case or if payment was already made)
         const { data, error } = await supabase
             .from("job_requests")
             .update(updateData)
@@ -2751,34 +2812,168 @@ export async function submitFinalSubmissionFeedback(finalSubmissionId, memberId,
             newStatus = "disputed";
         }
 
-        if (newStatus !== "pending") {
-            await supabase
-                .from("job_final_submissions")
-                .update({ 
-                    status: newStatus,
-                    updated_at: new Date().toISOString()
-                })
-                .eq("id", finalSubmissionId);
-
-            // If approved, update job status to completed
-            if (newStatus === "approved") {
-                const { data: submissionData } = await supabase
+        // If approving, run payout first; only finalize submission/job status if payout succeeds.
+        if (newStatus === "approved") {
+            try {
+                // Step 1: Get data (job_request_id, apprentice_id) from the submission
+                const { data: submission, error: submissionError } = await supabase
                     .from("job_final_submissions")
-                    .select("job_request_id")
+                    .select("job_request_id, apprentice_id")
                     .eq("id", finalSubmissionId)
                     .single();
 
-                if (submissionData) {
-                    await supabase
-                        .from("job_requests")
-                        .update({ 
-                            status: "completed",
-                            completed_at: new Date().toISOString(),
-                            updated_at: new Date().toISOString()
-                        })
-                        .eq("id", submissionData.job_request_id);
+                if (submissionError || !submission) {
+                    throw new Error("Failed to fetch submission details: " + (submissionError?.message || "Unknown error"));
                 }
+
+                const jobRequestId = submission.job_request_id;
+                const apprenticeId = submission.apprentice_id;
+
+                if (!jobRequestId) {
+                    throw new Error("Missing job_request_id for this submission");
+                }
+                if (!apprenticeId) {
+                    throw new Error("Missing apprentice_id for this submission");
+                }
+
+                // Step 2: Update submission status to "approved" BEFORE processing payout
+                // This ensures the RPC function sees the correct status
+                // If payout fails, we'll rollback this status update
+                const { data: currentSubmission, error: fetchCurrentError } = await supabase
+                    .from("job_final_submissions")
+                    .select("status")
+                    .eq("id", finalSubmissionId)
+                    .single();
+
+                const previousStatus = currentSubmission?.status || "pending_review";
+
+                const { error: statusUpdateError } = await supabase
+                    .from("job_final_submissions")
+                    .update({
+                        status: "approved",
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", finalSubmissionId);
+
+                if (statusUpdateError) {
+                    throw new Error(
+                        "Failed to update submission status: " + statusUpdateError.message
+                    );
+                }
+
+                // Step 3: Process payout using secure RPC function
+                // This function validates ownership, prevents duplicates, and handles wallet updates atomically
+                // It also fetches and validates job details internally, so we don't need to fetch them separately
+                console.log("[FinalSubmission] Processing payout via RPC", {
+                    finalSubmissionId,
+                    jobRequestId,
+                    apprenticeId,
+                    payerId: memberId,
+                });
+
+                const { data: payoutResult, error: payoutError } = await supabase.rpc(
+                    "process_job_payout",
+                    {
+                        p_final_submission_id: finalSubmissionId,
+                        p_job_request_id: jobRequestId,
+                        p_apprentice_id: apprenticeId,
+                        p_payer_id: memberId,
+                    }
+                );
+
+                if (payoutError) {
+                    // Rollback submission status if payout failed
+                    await supabase
+                        .from("job_final_submissions")
+                        .update({
+                            status: previousStatus,
+                            updated_at: new Date().toISOString(),
+                        })
+                        .eq("id", finalSubmissionId);
+
+                    // Extract meaningful error message
+                    const errorMessage = payoutError.message || payoutError.details || "Unknown payout error";
+                    console.error("[FinalSubmission] Payout RPC error:", {
+                        code: payoutError.code,
+                        message: errorMessage,
+                        hint: payoutError.hint,
+                        details: payoutError.details,
+                    });
+                    throw new Error(`Payout processing failed: ${errorMessage}`);
+                }
+
+                if (!payoutResult || !payoutResult.success) {
+                    // Rollback submission status if payout was unsuccessful
+                    await supabase
+                        .from("job_final_submissions")
+                        .update({
+                            status: previousStatus,
+                            updated_at: new Date().toISOString(),
+                        })
+                        .eq("id", finalSubmissionId);
+
+                    throw new Error(
+                        payoutResult?.message || "Payout processing returned unsuccessful result"
+                    );
+                }
+
+                // Log payout result
+                if (payoutResult.skipped) {
+                    console.warn(
+                        `[FinalSubmission] Payout skipped - already processed. Transaction ID: ${payoutResult.existing_transaction_id}`
+                    );
+                } else {
+                    console.log("[FinalSubmission] Payout processed successfully:", {
+                        transactionId: payoutResult.transaction_id,
+                        amount: payoutResult.amount_ngn,
+                        previousBalance: payoutResult.previous_balance,
+                        newBalance: payoutResult.new_balance,
+                    });
+                }
+
+                // Submission status is already "approved" from Step 2, no need to update again
+
+                // Step 4: Mark job as completed (only after payout succeeds)
+                // Try to update job status - if it's already completed, this will be a no-op
+                // We don't need to check status first since the RPC function already validated the job state
+                const { error: jobStatusError } = await supabase
+                    .from("job_requests")
+                    .update({
+                        status: "completed",
+                        completed_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", jobRequestId)
+                    .neq("status", "completed"); // Only update if not already completed
+
+                // Log warning if update failed, but don't throw error (job might already be completed)
+                if (jobStatusError) {
+                    console.warn(
+                        `[FinalSubmission] Could not update job status to completed: ${jobStatusError.message}. Job may already be completed.`
+                    );
+                }
+            } catch (paymentError) {
+                // Critical: do not mark job/submission as approved/completed if payout failed.
+                // The error message should be clear and actionable
+                const errorDetails = paymentError?.message || String(paymentError);
+                console.error("[FinalSubmission] Payout processing error:", {
+                    error: paymentError,
+                    finalSubmissionId,
+                    memberId,
+                });
+                throw new Error(
+                    `Approval saved, but payout failed. ${errorDetails} Please try again or contact support if the issue persists.`
+                );
             }
+        } else if (newStatus !== "pending") {
+            // Non-approval status updates can proceed normally.
+            await supabase
+                .from("job_final_submissions")
+                .update({
+                    status: newStatus,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq("id", finalSubmissionId);
         }
 
         return data;
