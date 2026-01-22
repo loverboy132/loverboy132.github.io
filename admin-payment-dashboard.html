@@ -504,19 +504,29 @@
         @media (max-width: 768px) {
             .container {
                 padding: 16px;
+                width: 100%;
+                max-width: 100%;
+                box-sizing: border-box;
             }
 
             .stats-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr !important;
+                gap: 16px !important;
             }
 
             .filters-row {
-                flex-direction: column;
+                flex-direction: column !important;
                 align-items: stretch;
+                gap: 16px !important;
+            }
+
+            .filter-group {
+                width: 100% !important;
             }
 
             .filter-input {
-                min-width: auto;
+                min-width: auto !important;
+                width: 100% !important;
             }
 
             .payment-header {
@@ -526,6 +536,12 @@
 
             .payment-actions {
                 justify-content: flex-start;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .payment-actions .btn {
+                width: 100% !important;
             }
 
             .content-header {
@@ -536,6 +552,54 @@
 
             .content-actions {
                 justify-content: center;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .content-actions .btn {
+                width: 100% !important;
+            }
+
+            /* Modals */
+            .modal {
+                padding: 0 !important;
+                align-items: flex-end !important;
+            }
+
+            .modal-content,
+            .modal .bg-white {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                border-radius: 16px 16px 0 0 !important;
+                max-height: 90vh !important;
+                overflow-y: auto !important;
+            }
+
+            .modal .flex.justify-end,
+            .modal .flex.space-x-4 {
+                flex-direction: column !important;
+                gap: 12px !important;
+            }
+
+            .modal .flex.justify-end > *,
+            .modal .flex.space-x-4 > * {
+                width: 100% !important;
+                margin: 0 !important;
+            }
+
+            /* Tables */
+            table {
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                width: 100%;
+            }
+
+            /* Payment cards */
+            .payment-card {
+                width: 100% !important;
+                margin-bottom: 16px;
             }
         }
 

@@ -320,7 +320,20 @@
         /* Responsive */
         @media (max-width: 768px) {
             .mobile-menu-toggle {
-                display: block;
+                display: block !important;
+                position: fixed;
+                top: 15px;
+                left: 15px;
+                z-index: 1001;
+                background: #667eea;
+                color: white;
+                border: none;
+                padding: 12px;
+                border-radius: 8px;
+                cursor: pointer;
+                min-width: 44px;
+                min-height: 44px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
             }
 
             .sidebar {
@@ -328,14 +341,32 @@
                 transition: transform 0.3s ease;
                 width: 100%;
                 max-width: 280px;
+                z-index: 1000;
             }
 
             .sidebar.open {
                 transform: translateX(0);
             }
+            
+            /* Sidebar overlay */
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 999;
+            }
+            
+            .sidebar-overlay.active {
+                display: block;
+            }
 
             .main-content {
-                margin-left: 0;
+                margin-left: 0 !important;
+                width: 100% !important;
             }
 
             .top-bar {
@@ -347,11 +378,38 @@
             }
 
             .quick-actions {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr !important;
+                gap: 16px !important;
             }
 
             .stats-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr !important;
+                gap: 16px !important;
+            }
+            
+            /* Ensure all cards are full width */
+            .action-card,
+            .stat-card,
+            .recent-activity {
+                width: 100% !important;
+                margin-bottom: 16px;
+            }
+            
+            /* Stack filter rows */
+            .filters-row {
+                flex-direction: column !important;
+            }
+            
+            .filter-group {
+                width: 100% !important;
+            }
+            
+            /* Tables should scroll horizontally */
+            table {
+                display: block;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                width: 100%;
             }
         }
 
@@ -545,6 +603,9 @@
 </head>
 <body>
     <div class="admin-container">
+        <!-- Sidebar Overlay -->
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+        
         <!-- Sidebar -->
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-header">
@@ -1131,6 +1192,45 @@
     <!-- Scripts -->
     <script type="module" src="admin-dashboard-simplified.js"></script>
     <script src="dark-mode.js"></script>
+    <script>
+        // Mobile sidebar toggle function
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            
+            if (sidebar && overlay) {
+                sidebar.classList.toggle('open');
+                overlay.classList.toggle('active');
+                
+                // Prevent body scroll when sidebar is open
+                if (sidebar.classList.contains('open')) {
+                    document.body.style.overflow = 'hidden';
+                } else {
+                    document.body.style.overflow = '';
+                }
+            }
+        }
+        
+        // Close sidebar when clicking outside on mobile
+        document.addEventListener('DOMContentLoaded', function() {
+            const overlay = document.getElementById('sidebar-overlay');
+            if (overlay) {
+                overlay.addEventListener('click', function() {
+                    toggleSidebar();
+                });
+            }
+            
+            // Close sidebar when clicking a nav item on mobile
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    if (window.innerWidth <= 768) {
+                        toggleSidebar();
+                    }
+                });
+            });
+        });
+    </script>
 </body>
 </html>
 

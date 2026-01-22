@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
         <title>Craftnet - Discover, Earn, and Showcase Your Work</title>
         <script src="https://cdn.tailwindcss.com"></script>
-        <link11
+        <link
             href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
             rel="stylesheet"
         />
@@ -28,6 +28,18 @@
                 transform: translateY(-2px);
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             }
+
+            @media (max-width: 767px) {
+                body {
+                    padding-top: 104px;
+                }
+            }
+
+            @media (min-width: 768px) {
+                body {
+                    padding-top: 176px;
+                }
+            }
         </style>
     </head>
     <body class="bg-white text-gray-800">
@@ -40,8 +52,8 @@
             >
                 <a href="index.html" class="flex items-center">
                     <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
-                        width="96" height="96" viewBox="0 0 300.000000 300.000000"
-                        preserveAspectRatio="xMidYMid meet" class="h-12 sm:h-16 md:h-24 w-auto"
+                        viewBox="0 0 300.000000 300.000000"
+                        preserveAspectRatio="xMidYMid meet" class="h-20 sm:h-24 md:h-36 w-auto"
                         fill="currentColor"
                         style="color: #1d4ed8;"
                     >
@@ -164,7 +176,7 @@
         </div>
 
         <!-- Hero Section -->
-        <main class="hero-bg pt-24 sm:pt-32 pb-16 sm:pb-20">
+        <main class="hero-bg pb-16 sm:pb-20">
             <div class="container mx-auto px-4 sm:px-6 text-center">
                 <div class="max-w-4xl mx-auto">
                     <h1
@@ -382,7 +394,7 @@
                         <h4 class="text-white font-semibold mb-4">Contact</h4>
                         <ul class="space-y-2 text-sm">
                             <li>support@craftiva.com</li>
-                            <li>+234 (0) 800 000 0000</li>
+                            <li>+234 (9) 155 164 087</li>
                             <li>Lagos, Nigeria</li>
                         </ul>
                     </div>
