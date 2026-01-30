@@ -135,17 +135,39 @@
     </div>
 
     <script type="module">
-        import { handleApprenticeSignup, showError } from './supabase-auth.js';
+        console.log('🚀 Apprentice signup module loading...');
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            console.log('📄 DOMContentLoaded fired for apprentice signup');
+
+            let handleApprenticeSignup, showError;
+            try {
+                const authModule = await import('./supabase-auth.js');
+                handleApprenticeSignup = authModule.handleApprenticeSignup;
+                showError = authModule.showError;
+                console.log('✅ Apprentice signup imports successful');
+            } catch (error) {
+                console.error('❌ Failed to import supabase-auth.js:', error);
+                // Fallback error handling
+                showError = (elementId, message) => {
+                    const errorEl = document.getElementById(elementId);
+                    if (errorEl) {
+                        errorEl.textContent = message;
+                        errorEl.classList.remove('hidden-view', 'hidden');
+                    }
+                    alert(`Error: ${message}`);
+                };
+            }
+
             const signupApprenticeForm = document.getElementById('signup-apprentice-form');
-            
+            console.log('📝 Apprentice form element:', signupApprenticeForm);
+
             // Handle referral code from URL parameter
             function getReferralCodeFromUrl() {
                 const urlParams = new URLSearchParams(window.location.search);
                 return urlParams.get('ref');
             }
-            
+
             // Pre-fill referral code if present in URL
             const urlReferralCode = getReferralCodeFromUrl();
             if (urlReferralCode) {
@@ -153,18 +175,21 @@
                 referralCodeInput.value = urlReferralCode;
                 referralCodeInput.readOnly = true;
                 referralCodeInput.classList.add('bg-gray-100');
-                
+
                 // Show a message that referral code was applied
                 const referralMessage = document.createElement('p');
                 referralMessage.className = 'text-green-600 text-sm mt-2';
                 referralMessage.textContent = `Referral code applied: ${urlReferralCode}`;
                 referralCodeInput.parentNode.appendChild(referralMessage);
             }
-            
+
             if (signupApprenticeForm) {
+                console.log('🎧 Attaching submit listener to apprentice form');
                 signupApprenticeForm.addEventListener('submit', (e) => {
+                    console.log('🔥 Apprentice form submit event fired!');
                     e.preventDefault();
-                    
+                    console.log('🛑 Prevented default form submission');
+
                     // Get form elements with null checks
                     const nameEl = document.getElementById('apprentice-name');
                     const skillEl = document.getElementById('apprentice-skill');
@@ -172,27 +197,30 @@
                     const emailEl = document.getElementById('apprentice-email');
                     const passwordEl = document.getElementById('apprentice-password');
                     const referralCodeEl = document.getElementById('referral-code');
-                    
+
                     if (!nameEl || !skillEl || !locationEl || !emailEl || !passwordEl) {
                         showError("signup-apprentice-error", "Form fields are missing. Please refresh the page.");
                         return;
                     }
-                    
+
                     const name = nameEl.value.trim();
                     const skill = skillEl.value.trim();
                     const location = locationEl.value.trim();
                     const email = emailEl.value.trim();
                     const password = passwordEl.value;
                     const referralCode = referralCodeEl ? referralCodeEl.value.trim() : "";
-                    
+
                     // Validate required fields
                     if (!name || !skill || !location || !email || !password) {
                         showError("signup-apprentice-error", "Please fill in all required fields.");
                         return;
                     }
-                    
+
+                    console.log('📤 Calling handleApprenticeSignup with:', { name, skill, location, email, passwordLength: password.length, referralCode });
                     handleApprenticeSignup(name, skill, location, email, password, referralCode || null);
                 });
+            } else {
+                console.error('❌ Apprentice signup form not found!');
             }
         });
     </script>

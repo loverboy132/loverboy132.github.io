@@ -191,11 +191,33 @@
         </div>
 
         <script type="module">
-            import { handleMemberSignup, showError } from "./supabase-auth.js";
+            console.log('🚀 Member signup module loading...');
 
-            document.addEventListener("DOMContentLoaded", () => {
+            document.addEventListener("DOMContentLoaded", async () => {
+                console.log('📄 DOMContentLoaded fired for member signup');
+
+                let handleMemberSignup, showError;
+                try {
+                    const authModule = await import('./supabase-auth.js');
+                    handleMemberSignup = authModule.handleMemberSignup;
+                    showError = authModule.showError;
+                    console.log('✅ Member signup imports successful');
+                } catch (error) {
+                    console.error('❌ Failed to import supabase-auth.js:', error);
+                    // Fallback error handling
+                    showError = (elementId, message) => {
+                        const errorEl = document.getElementById(elementId);
+                        if (errorEl) {
+                            errorEl.textContent = message;
+                            errorEl.classList.remove('hidden-view', 'hidden');
+                        }
+                        alert(`Error: ${message}`);
+                    };
+                }
+
                 const signupMemberForm =
                     document.getElementById("signup-member-form");
+                console.log('📝 Member form element:', signupMemberForm);
 
                 // Handle referral code from URL parameter
                 function getReferralCodeFromUrl() {
@@ -222,21 +244,24 @@
                 }
 
                 if (signupMemberForm) {
+                    console.log('🎧 Attaching submit listener to member form');
                     signupMemberForm.addEventListener("submit", (e) => {
+                        console.log('🔥 Member form submit event fired!');
                         e.preventDefault();
-                        
+                        console.log('🛑 Prevented default form submission');
+
                         // Get form elements with null checks
                         const nameEl = document.getElementById("member-name");
                         const emailEl = document.getElementById("member-email");
                         const passwordEl = document.getElementById("member-password");
                         const creativeTypeEl = document.getElementById("creative-type");
                         const referralCodeEl = document.getElementById("referral-code");
-                        
+
                         if (!nameEl || !emailEl || !passwordEl || !creativeTypeEl) {
                             showError("signup-member-error", "Form fields are missing. Please refresh the page.");
                             return;
                         }
-                        
+
                         const name = nameEl.value.trim();
                         const email = emailEl.value.trim();
                         const password = passwordEl.value;
@@ -249,6 +274,7 @@
                             return;
                         }
 
+                        console.log('📤 Calling handleMemberSignup with:', { name, email, passwordLength: password.length, creativeType, referralCode });
                         handleMemberSignup(
                             name,
                             email,
@@ -257,6 +283,8 @@
                             referralCode || null
                         );
                     });
+                } else {
+                    console.error('❌ Member signup form not found!');
                 }
             });
         </script>
