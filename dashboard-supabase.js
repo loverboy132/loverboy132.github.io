@@ -36,6 +36,7 @@ import {
     getTopUsers,
     getTrendingCreators,
     followUser,
+    checkUserFollow,
     getFileUrl,
     checkStorageBucket,
     createJobRequest,
@@ -85,8 +86,14 @@ import {
     saveApprenticeProfile,
     saveMemberProfile,
     fetchProfileCardStats,
+    createPersonalJobRequest,
+    getIncomingPersonalRequests,
+    respondToPersonalRequest,
+    getSentPersonalRequests,
+    checkExistingPersonalRequest,
 } from "./supabase-auth.js";
-import { uploadCV, getCVSignedUrl, getUserWallet, createFundingRequest, getCraftnetBankAccounts, uploadProofOfPayment } from "./manual-payment-system.js";
+import { uploadCV, getCVSignedUrl, getUserWallet, createFundingRequest, getCraftnetBankAccounts, uploadProofOfPayment, getTransactionTypeDisplay } from "./manual-payment-system.js";
+import { getTransactionIcon, getTransactionIconClass, getAmountClass, getAmountPrefix } from "./manual-payment-system.js";
 import {
     getUserNotifications,
     markNotificationAsRead,
@@ -330,12 +337,23 @@ const apprenticeContentTemplates = {
                 </div>
             </div>
         </div>
+
+        <!-- Personal Job Requests Section -->
+        <div class="mt-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">Personal Job Requests</h2>
+            <div id="personal-requests-container" class="bg-white rounded-lg shadow p-6">
+                <div class="text-center py-4">
+                    <div class="animate-pulse text-gray-500">Loading personal requests...</div>
+                </div>
+            </div>
+        </div>
     `;
     },
     jobs: async (userData) => {
         // Get available job requests for apprentices to apply to
         let availableJobs = [];
         let myApplications = [];
+        let assignedJobs = [];
         let apprenticeStats = {
             pendingApplications: 0,
             activeJobs: 0,
@@ -347,14 +365,34 @@ const apprenticeContentTemplates = {
             availableJobs = await getAllJobRequests();
             myApplications = await getApprenticeJobApplications(userData.id);
             apprenticeStats = await getApprenticeStats(userData.id);
+
+            // Get jobs assigned to this apprentice (including accepted personal requests)
+            const { data: assignedJobsData, error: assignedError } = await supabase
+                .from("job_requests")
+                .select(`
+                    *,
+                    client:profiles!job_requests_client_id_fkey(
+                        id,
+                        name,
+                        email,
+                        creative_type,
+                        location
+                    )
+                `)
+                .eq("assigned_apprentice_id", userData.id)
+                .in("status", ["in_progress", "pending_review"]);
+
+            if (!assignedError && assignedJobsData) {
+                assignedJobs = assignedJobsData;
+            }
         } catch (error) {
             console.error("Error fetching job data:", error);
         }
 
         return `
         <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">Available Jobs</h1>
-            <p class="text-gray-600">Browse and apply for jobs that match your skills.</p>
+            <h1 class="text-3xl font-bold text-gray-900">Find Work</h1>
+            <p class="text-gray-600">Browse available jobs and track your applications.</p>
         </div>
         
         <!-- Job Stats Overview -->
@@ -497,6 +535,123 @@ const apprenticeContentTemplates = {
                         <i data-feather="briefcase" class="w-16 h-16 text-gray-300 mx-auto mb-4"></i>
                         <h4 class="text-xl font-semibold text-gray-700 mb-2">No Available Jobs</h4>
                         <p class="text-gray-500">Check back later for new job opportunities!</p>
+                    </div>
+                `
+                }
+            </div>
+        </div>
+
+        <!-- My Assigned Jobs -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-gray-900">My Jobs</h3>
+                <p class="text-gray-600">Jobs you've been assigned to work on</p>
+            </div>
+            <div class="p-6">
+                ${
+                    assignedJobs.length > 0
+                        ? `
+                    <div class="space-y-6 job-request-list">
+                        ${assignedJobs
+                            .map(
+                                (job) => `
+                            <div class="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="flex-1">
+                                        <h4 class="text-xl font-semibold text-gray-900">${
+                                            job.title
+                                        }</h4>
+                                        <p class="text-gray-600 mt-1">${
+                                            job.description
+                                        }</p>
+                                        <div class="flex items-center mt-2">
+                                            <img src="https://placehold.co/32x32/EBF4FF/3B82F6?text=${
+                                                job.client?.name?.charAt(0) ||
+                                                "C"
+                                            }"
+                                                 alt="${job.client?.name}"
+                                                 class="w-8 h-8 rounded-full mr-2">
+                                            <span class="text-sm text-gray-600">${
+                                                job.client?.name ||
+                                                "Anonymous Client"
+                                            }</span>
+                                        </div>
+                                    </div>
+                                    <div class="text-right">
+                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                                            job.status === "in_progress"
+                                                ? "bg-blue-100 text-blue-800"
+                                                : job.status === "pending_review"
+                                                ? "bg-yellow-100 text-yellow-800"
+                                                : "bg-gray-100 text-gray-800"
+                                        }">
+                                            ${
+                                                job.status === "in_progress"
+                                                    ? "In Progress"
+                                                    : job.status === "pending_review"
+                                                    ? "Pending Review"
+                                                    : job.status
+                                            }
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center space-x-4">
+                                        <span class="text-sm text-gray-600">
+                                            <i data-feather="dollar-sign" class="w-4 h-4 inline mr-1"></i>
+                                            ₦${job.fixed_price || job.budget_max || "N/A"}
+                                        </span>
+                                        <span class="text-sm text-gray-600">
+                                            <i data-feather="calendar" class="w-4 h-4 inline mr-1"></i>
+                                            Due: ${job.deadline ? new Date(job.deadline).toLocaleDateString() : "No deadline"}
+                                        </span>
+                                    </div>
+                                    <div class="flex space-x-2">
+                                        ${
+                                            job.status === "in_progress"
+                                                ? `
+                                        <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm load-progress-updates-btn"
+                                                data-job-id="${job.id}">
+                                            <i data-feather="message-circle" class="w-4 h-4 mr-2"></i>
+                                            Progress Updates
+                                        </button>
+                                        <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm load-final-submissions-btn"
+                                                data-job-id="${job.id}">
+                                            <i data-feather="upload" class="w-4 h-4 mr-2"></i>
+                                            Submit Work
+                                        </button>
+                                        `
+                                                : job.status === "pending_review"
+                                                ? `
+                                        <span class="text-yellow-600 font-medium">Waiting for client review</span>
+                                        `
+                                                : ""
+                                        }
+                                    </div>
+                                </div>
+                                ${
+                                    job.status === "in_progress"
+                                        ? `
+                                <div class="border-t border-gray-200 pt-4 mt-4">
+                                    <h5 class="font-semibold text-gray-900 mb-3">Progress Updates</h5>
+                                    <div id="progress-updates-${job.id}" class="progress-updates-container">
+                                        <!-- Progress updates will be loaded here -->
+                                    </div>
+                                </div>
+                                `
+                                        : ""
+                                }
+                            </div>
+                            `
+                            )
+                            .join("")}
+                    </div>
+                `
+                        : `
+                    <div class="text-center py-12">
+                        <i data-feather="briefcase" class="w-16 h-16 text-gray-300 mx-auto mb-4"></i>
+                        <h4 class="text-xl font-semibold text-gray-700 mb-2">No Assigned Jobs</h4>
+                        <p class="text-gray-500">You haven't been assigned to any jobs yet. Apply to available jobs to get started!</p>
                     </div>
                 `
                 }
@@ -649,23 +804,83 @@ const apprenticeContentTemplates = {
     `;
     },
     earnings: async (userData) => {
-        // Get real earnings data
+        // Get real earnings data from Supabase
         let stats = {
             totalEarned: 0,
             availableBalance: 0,
             thisMonth: 0,
             goalProgress: 0,
+            monthlyEarnings: [],
+            recentTransactions: []
         };
 
         try {
-            const apprenticeStats = await getApprenticeStats(userData.id);
-            stats.totalEarned = apprenticeStats.totalEarned;
-            stats.availableBalance = Math.round(stats.totalEarned * 0.8); // 80% available for withdrawal
-            stats.thisMonth = Math.round(stats.totalEarned * 0.3); // 30% earned this month
-            stats.goalProgress = Math.min(
-                100,
-                Math.round((stats.totalEarned / 7500000) * 100)
-            ); // Goal of ₦7,500,000
+            const userId = userData.id;
+
+            // Get apprentice stats
+            const apprenticeStats = await getApprenticeStats(userId);
+            stats.totalEarned = apprenticeStats.totalEarned || 0;
+            stats.completedJobs = apprenticeStats.completedJobs || 0;
+            stats.activeJobs = apprenticeStats.activeJobs || 0;
+            stats.pendingJobs = apprenticeStats.pendingJobs || 0;
+
+            // Get wallet balance
+            const wallet = await getUserWallet(userId);
+            stats.availableBalance = wallet?.balance_ngn || 0;
+
+            // Calculate goal progress (₦7,500,000 goal)
+            stats.goalProgress = Math.min(100, Math.round((stats.totalEarned / 7500000) * 100));
+
+            // Calculate job completion progress
+            const totalJobsAssigned = stats.completedJobs + stats.activeJobs + stats.pendingJobs;
+            stats.jobCompletionProgress = totalJobsAssigned > 0 ? Math.round((stats.completedJobs / totalJobsAssigned) * 100) : 0;
+
+            // Get monthly earnings for the last 4 months
+            const currentDate = new Date();
+            stats.monthlyEarnings = [];
+
+            for (let i = 3; i >= 0; i--) {
+                const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+                const monthStart = monthDate.toISOString().split('T')[0];
+                const nextMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1);
+                const monthEnd = nextMonth.toISOString().split('T')[0];
+
+                const { data: monthlyTransactions } = await supabase
+                    .from('wallet_transactions')
+                    .select('amount_ngn')
+                    .eq('user_id', userId)
+                    .eq('transaction_type', 'job_payment')
+                    .gte('created_at', monthStart)
+                    .lt('created_at', monthEnd);
+
+                const monthlyTotal = monthlyTransactions?.reduce((sum, tx) => sum + (tx.amount_ngn || 0), 0) || 0;
+                stats.monthlyEarnings.push({
+                    month: monthDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' }),
+                    amount: monthlyTotal
+                });
+            }
+
+            // Get this month's earnings
+            const thisMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+            stats.thisMonth = stats.monthlyEarnings[3]?.amount || 0;
+
+            // Get recent transactions (last 5)
+            const { data: transactions } = await supabase
+                .from('wallet_transactions')
+                .select(`
+                    id,
+                    transaction_type,
+                    amount_ngn,
+                    description,
+                    created_at,
+                    reference
+                `)
+                .eq('user_id', userId)
+                .order('created_at', { ascending: false })
+                .limit(5);
+
+            stats.recentTransactions = transactions || [];
+
         } catch (error) {
             console.error("Error fetching earnings data:", error);
         }
@@ -676,42 +891,36 @@ const apprenticeContentTemplates = {
             <p class="text-gray-600">Manage your finances and track your growth.</p>
         </div>
         
-        <!-- Earnings Overview -->
+        <!-- Earnings & Progress Overview -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div class="stat-card bg-white p-6 rounded-lg shadow text-center">
                 <div class="p-3 rounded-full bg-green-100 text-green-600 mx-auto w-12 h-12 flex items-center justify-center mb-3">
                     <i data-feather="dollar-sign" class="w-6 h-6"></i>
                 </div>
                 <h3 class="text-sm font-medium text-gray-500">Total Earned</h3>
-                <p class="text-3xl font-bold mt-2 text-green-600">₦${(
-                    stats.totalEarned * 1500
-                ).toLocaleString()}</p>
+                <p class="text-3xl font-bold mt-2 text-green-600">₦${stats.totalEarned.toLocaleString()}</p>
             </div>
             <div class="stat-card bg-white p-6 rounded-lg shadow text-center">
                 <div class="p-3 rounded-full bg-blue-100 text-blue-600 mx-auto w-12 h-12 flex items-center justify-center mb-3">
                     <i data-feather="credit-card" class="w-6 h-6"></i>
                 </div>
                 <h3 class="text-sm font-medium text-gray-500">Available Balance</h3>
-                <p class="text-3xl font-bold mt-2 text-blue-600">₦${(
-                    stats.availableBalance * 1500
-                ).toLocaleString()}</p>
+                <p class="text-3xl font-bold mt-2 text-blue-600">₦${stats.availableBalance.toLocaleString()}</p>
             </div>
             <div class="stat-card bg-white p-6 rounded-lg shadow text-center">
-                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mx-auto w-12 h-12 flex items-center justify-center mb-3">
-                    <i data-feather="trending-up" class="w-6 h-6"></i>
+                <div class="p-3 rounded-full bg-orange-100 text-orange-600 mx-auto w-12 h-12 flex items-center justify-center mb-3">
+                    <i data-feather="briefcase" class="w-6 h-6"></i>
                 </div>
-                <h3 class="text-sm font-medium text-gray-500">This Month</h3>
-                <p class="text-3xl font-bold mt-2 text-yellow-600">₦${(
-                    stats.thisMonth * 1500
-                ).toLocaleString()}</p>
+                <h3 class="text-sm font-medium text-gray-500">Jobs Completed</h3>
+                <p class="text-3xl font-bold mt-2 text-orange-600">${stats.completedJobs}</p>
             </div>
             <div class="stat-card bg-white p-6 rounded-lg shadow text-center">
                 <div class="p-3 rounded-full bg-purple-100 text-purple-600 mx-auto w-12 h-12 flex items-center justify-center mb-3">
                     <i data-feather="target" class="w-6 h-6"></i>
                 </div>
-                <h3 class="text-sm font-medium text-gray-500">Goal Progress</h3>
+                <h3 class="text-sm font-medium text-gray-500">Completion Rate</h3>
                 <p class="text-3xl font-bold mt-2 text-purple-600">${
-                    stats.goalProgress
+                    stats.jobCompletionProgress
                 }%</p>
             </div>
         </div>
@@ -730,15 +939,13 @@ const apprenticeContentTemplates = {
                         <p class="text-gray-600 text-sm mb-4">Withdraw your available balance to your bank account or mobile money.</p>
                         <div class="flex items-center justify-between mb-4">
                             <span class="text-sm text-gray-600">Available for withdrawal:</span>
-                            <span class="font-bold text-green-600">₦${(
-                                stats.availableBalance * 1500
-                            ).toLocaleString()}</span>
+                            <span class="font-bold text-green-600">₦${stats.availableBalance.toLocaleString()}</span>
                         </div>
                         <div class="flex space-x-2">
-                            <button class="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 text-sm font-medium" ${
+                            <button class="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed" ${
                                 stats.availableBalance === 0 ? "disabled" : ""
                             }>Withdraw All</button>
-                            <button class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 text-sm font-medium" ${
+                            <button class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed" ${
                                 stats.availableBalance === 0 ? "disabled" : ""
                             }>Custom Amount</button>
                         </div>
@@ -774,62 +981,61 @@ const apprenticeContentTemplates = {
                 </div>
                 <div class="p-6">
                     <div class="space-y-4">
+                        ${stats.monthlyEarnings.slice(-4).reverse().map((monthData, index) => `
                         <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">December 2024</span>
-                            <span class="font-semibold text-green-600">₦${(
-                                stats.thisMonth * 1500
-                            ).toLocaleString()}</span>
+                            <span class="text-sm text-gray-600">${monthData.month}</span>
+                            <span class="font-semibold text-green-600">₦${monthData.amount.toLocaleString()}</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div class="bg-green-600 h-2 rounded-full" style="width: ${Math.min(
-                                100,
-                                (stats.thisMonth / 1000) * 100
-                            )}%"></div>
+                            <div class="bg-green-600 h-2 rounded-full" style="width: ${Math.min(100, (monthData.amount / Math.max(...stats.monthlyEarnings.map(m => m.amount), 1)) * 100)}%"></div>
                         </div>
-                        
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">November 2024</span>
-                            <span class="font-semibold text-green-600">₦${(
-                                Math.round(stats.totalEarned * 0.2) * 1500
-                            ).toLocaleString()}</span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div class="bg-green-600 h-2 rounded-full" style="width: ${Math.min(
-                                100,
-                                ((stats.totalEarned * 0.2) / 1000) * 100
-                            )}%"></div>
-                        </div>
-                        
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">October 2024</span>
-                            <span class="font-semibold text-green-600">₦${(
-                                Math.round(stats.totalEarned * 0.3) * 1500
-                            ).toLocaleString()}</span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div class="bg-green-600 h-2 rounded-full" style="width: ${Math.min(
-                                100,
-                                ((stats.totalEarned * 0.3) / 1000) * 100
-                            )}%"></div>
-                        </div>
-                        
-                        <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">September 2024</span>
-                            <span class="font-semibold text-green-600">₦${(
-                                Math.round(stats.totalEarned * 0.2) * 1500
-                            ).toLocaleString()}</span>
-                        </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div class="bg-green-600 h-2 rounded-full" style="width: ${Math.min(
-                                100,
-                                ((stats.totalEarned * 0.2) / 1000) * 100
-                            )}%"></div>
-                        </div>
+                        `).join('')}
                     </div>
                     
                     <div class="mt-6 text-center">
                         <button class="text-blue-600 hover:text-blue-700 font-medium">View Detailed Analytics →</button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Job Progress Overview -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-gray-900">Job Progress</h3>
+                <p class="text-gray-600">Track your job completion and activity</p>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="text-center">
+                        <div class="p-4 rounded-full bg-green-100 text-green-600 mx-auto w-16 h-16 flex items-center justify-center mb-3">
+                            <i data-feather="check-circle" class="w-8 h-8"></i>
+                        </div>
+                        <h4 class="font-semibold text-gray-900">Completed Jobs</h4>
+                        <p class="text-2xl font-bold text-green-600 mt-1">${stats.completedJobs}</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="p-4 rounded-full bg-blue-100 text-blue-600 mx-auto w-16 h-16 flex items-center justify-center mb-3">
+                            <i data-feather="clock" class="w-8 h-8"></i>
+                        </div>
+                        <h4 class="font-semibold text-gray-900">Active Jobs</h4>
+                        <p class="text-2xl font-bold text-blue-600 mt-1">${stats.activeJobs}</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="p-4 rounded-full bg-yellow-100 text-yellow-600 mx-auto w-16 h-16 flex items-center justify-center mb-3">
+                            <i data-feather="alert-circle" class="w-8 h-8"></i>
+                        </div>
+                        <h4 class="font-semibold text-gray-900">Pending Applications</h4>
+                        <p class="text-2xl font-bold text-yellow-600 mt-1">${stats.pendingJobs}</p>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <h4 class="font-semibold text-gray-900 mb-3">Completion Progress</h4>
+                    <div class="w-full bg-gray-200 rounded-full h-3">
+                        <div class="bg-green-600 h-3 rounded-full transition-all duration-300" style="width: ${stats.jobCompletionProgress}%"></div>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-2">${stats.jobCompletionProgress}% of assigned jobs completed</p>
                 </div>
             </div>
         </div>
@@ -842,26 +1048,26 @@ const apprenticeContentTemplates = {
             </div>
             <div class="p-6">
                 ${
-                    stats.totalEarned > 0
+                    stats.recentTransactions.length > 0
                         ? `
                     <div class="space-y-4">
+                        ${stats.recentTransactions.map(transaction => `
                         <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                             <div class="flex items-center">
-                                <div class="p-2 rounded-full bg-green-100 text-green-600 mr-4">
-                                    <i data-feather="plus" class="w-4 h-4"></i>
+                                <div class="p-2 rounded-full ${getTransactionIcon(transaction.transaction_type)} mr-4">
+                                    <i data-feather="${getTransactionIconClass(transaction.transaction_type)}" class="w-4 h-4"></i>
                                 </div>
                                 <div>
-                                    <h4 class="font-semibold text-gray-900">Completed Job</h4>
-                                    <p class="text-sm text-gray-600">Payment received for completed work</p>
+                                    <h4 class="font-semibold text-gray-900">${getTransactionTypeDisplay(transaction.transaction_type)}</h4>
+                                    <p class="text-sm text-gray-600">${transaction.description || 'Transaction'}</p>
                                 </div>
                             </div>
                             <div class="text-right">
-                                <span class="font-bold text-green-600">+₦${(
-                                    Math.round(stats.totalEarned * 0.4) * 1500
-                                ).toLocaleString()}</span>
-                                <p class="text-xs text-gray-500">Completed</p>
+                                <span class="font-bold ${getAmountClass(transaction.transaction_type)}">${getAmountPrefix(transaction.transaction_type)}₦${Math.abs(transaction.amount_ngn || 0).toLocaleString()}</span>
+                                <p class="text-xs text-gray-500">${new Date(transaction.created_at).toLocaleDateString()}</p>
                             </div>
                         </div>
+                        `).join('')}
                     </div>
                 `
                         : `
@@ -1448,7 +1654,7 @@ const memberContentTemplates = {
                             }
                         </div>
                         <div class="flex space-x-2">
-                            <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 follow-btn" 
+                            <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 follow-btn"
                                     data-user-id="${user.id}">
                                 ${
                                     currentUserRole === "member" &&
@@ -1457,6 +1663,16 @@ const memberContentTemplates = {
                                         : "Follow"
                                 }
                             </button>
+                            ${
+                                currentUserRole === "member" &&
+                                user.role === "apprentice"
+                                    ? `<button class="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 send-personal-request-btn"
+                                               data-user-id="${user.id}"
+                                               data-user-name="${user.name || 'Apprentice'}">
+                                            Send Personal Job Request
+                                        </button>`
+                                    : ""
+                            }
                         </div>
                     </div>
                 `
@@ -1533,7 +1749,7 @@ const memberContentTemplates = {
                             }
                         </div>
                         <div class="flex space-x-2">
-                            <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 follow-btn" 
+                            <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 follow-btn"
                                     data-user-id="${user.id}">
                                 ${
                                     currentUserRole === "member" &&
@@ -1542,6 +1758,16 @@ const memberContentTemplates = {
                                         : "Follow"
                                 }
                             </button>
+                            ${
+                                currentUserRole === "member" &&
+                                user.role === "apprentice"
+                                    ? `<button class="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 send-personal-request-btn"
+                                               data-user-id="${user.id}"
+                                               data-user-name="${user.name || 'Apprentice'}">
+                                            Send Personal Job Request
+                                        </button>`
+                                    : ""
+                            }
                         </div>
                     </div>
                 `
@@ -3074,6 +3300,38 @@ function attachDynamicEventListeners(tabId, userData) {
                 }
             }, 100);
 
+            // Check connection status and show/hide personal job request buttons
+            setTimeout(async () => {
+                await updatePersonalRequestButtonVisibility();
+
+                // Add event listeners for personal job request buttons (only once)
+                if (!document.hasPersonalRequestListener) {
+                    document.addEventListener('click', async (e) => {
+                        if (e.target.classList.contains('send-personal-request-btn') || e.target.closest('.send-personal-request-btn')) {
+                            e.preventDefault();
+                            const btn = e.target.classList.contains('send-personal-request-btn') ? e.target : e.target.closest('.send-personal-request-btn');
+                            const apprenticeId = btn.dataset.userId;
+                            const apprenticeName = btn.dataset.userName;
+
+                            if (!apprenticeId) return; // Skip if no data attribute
+
+                            // Double-check for existing pending request before opening modal
+                            const { data: { user } } = await supabase.auth.getUser();
+                            if (user) {
+                                const hasPendingRequest = await checkExistingPersonalRequest(user.id, apprenticeId);
+                                if (hasPendingRequest) {
+                                    showNotification('You already have a pending personal job request to this apprentice', 'error');
+                                    return;
+                                }
+                            }
+
+                            showPersonalJobRequestModal(apprenticeId, apprenticeName);
+                        }
+                    });
+                    document.hasPersonalRequestListener = true;
+                }
+            }, 200);
+
             async function handleSearch() {
                 const searchInput = document.getElementById("search-input");
                 const filterSelect = document.getElementById(
@@ -4050,6 +4308,9 @@ async function displaySearchResults(results) {
     if (typeof feather !== "undefined") {
         feather.replace();
     }
+
+    // Update personal request button visibility for search results
+    setTimeout(() => updatePersonalRequestButtonVisibility(), 100);
 }
 
 async function loadTrendingCreators(userData) {
@@ -5420,6 +5681,11 @@ async function switchContent(tabId, userData) {
             console.error("mainContent element not found!");
         }
 
+        // Load personal requests for apprentice home tab
+        if (userData.role === "apprentice" && tabId === "home") {
+            setTimeout(() => loadPersonalRequestsForApprentice(), 100);
+        }
+
         // Initialize wallet interface if wallet tab is selected
         if (tabId === "wallet" && window.initializeWalletInterface) {
             try {
@@ -6432,6 +6698,18 @@ async function initializeDashboardOnReady() {
                               "cursor-not-allowed"
                           );
                           originalBtn.disabled = true;
+
+                          // Show personal job request button after successful connection
+                          const personalRequestBtn = document.querySelector(
+                              `[data-user-id="${userId}"].send-personal-request-btn`
+                          );
+                          if (personalRequestBtn) {
+                              // Double-check there's no pending request
+                              const hasPendingRequest = await checkExistingPersonalRequest(user.id, userId);
+                              if (!hasPendingRequest) {
+                                  personalRequestBtn.classList.remove('hidden');
+                              }
+                          }
                       }
 
                       // Update follower count in UI
@@ -10488,6 +10766,16 @@ function renderApprenticeCV(profile) {
                     </ul>
                 </div>
             ` : ''}
+
+            <!-- Action Buttons for Members -->
+            ${currentUser && currentUser.role === 'member' ? `
+                <div class="mt-8 pt-6 border-t border-gray-200">
+                    <button onclick="showPersonalJobRequestModal('${profile.id}', '${profile.name || 'this apprentice'}')"
+                            class="w-full bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-medium transition-colors">
+                        <i class="fas fa-paper-plane mr-2"></i>Send Personal Job Request
+                    </button>
+                </div>
+            ` : ''}
         </div>
     `;
 }
@@ -10715,3 +11003,306 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Error setting up profile form handlers on DOMContentLoaded:', error);
     }
 });
+
+// ==============================================
+// PERSONAL JOB REQUESTS SYSTEM
+// ==============================================
+
+// Global variables for personal requests
+let currentApprenticeId = null;
+
+// Function to update personal request button visibility
+async function updatePersonalRequestButtonVisibility() {
+    const personalRequestBtns = document.querySelectorAll('.send-personal-request-btn');
+    if (personalRequestBtns.length > 0) {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                for (const btn of personalRequestBtns) {
+                    const apprenticeId = btn.dataset.userId;
+                    if (!apprenticeId) continue; // Skip if no data attribute
+
+                    try {
+                        const hasPendingRequest = await checkExistingPersonalRequest(user.id, apprenticeId);
+
+                        // Hide button if there's already a pending request
+                        if (hasPendingRequest) {
+                            btn.classList.add('hidden');
+                        } else {
+                            btn.classList.remove('hidden');
+                        }
+                    } catch (error) {
+                        console.error('Error checking pending request for apprentice', apprenticeId, ':', error);
+                        // Show button on error (fail open) - user can try to send request and get proper error
+                        btn.classList.remove('hidden');
+                    }
+                }
+            } else {
+                console.warn('No authenticated user found, hiding all personal request buttons');
+                // Hide all buttons if not authenticated
+                for (const btn of personalRequestBtns) {
+                    btn.classList.add('hidden');
+                }
+            }
+        } catch (authError) {
+            console.error('Error getting user authentication:', authError);
+            // Hide buttons on auth error
+            for (const btn of personalRequestBtns) {
+                btn.classList.add('hidden');
+            }
+        }
+    }
+}
+
+// Show personal job request modal
+function showPersonalJobRequestModal(apprenticeId, apprenticeName) {
+    currentApprenticeId = apprenticeId;
+
+    // Create modal HTML
+    const modalHTML = `
+        <div id="personal-job-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">Send Personal Job Request</h3>
+                    <p class="text-sm text-gray-600 mt-1">Send a direct job request to ${apprenticeName}</p>
+                </div>
+
+                <form id="personal-job-form" class="px-6 py-4">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
+                            <input type="text" id="job-title" required
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                   placeholder="e.g. Logo Design for My Business">
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Job Description</label>
+                            <textarea id="job-description" rows="4" required
+                                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                      placeholder="Describe the job requirements, deliverables, and any specific instructions..."></textarea>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Agreed Price (₦)</label>
+                            <input type="number" id="job-price" required min="3000" max="50000"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                   placeholder="3000 - 50000">
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <button type="button" id="cancel-personal-job-btn"
+                                class="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">
+                            Cancel
+                        </button>
+                        <button type="submit"
+                                class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50">
+                            Send Request
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Add event listener for cancel button
+    document.getElementById('cancel-personal-job-btn').addEventListener('click', closePersonalJobModal);
+
+    // Handle form submission
+    document.getElementById('personal-job-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Sending...';
+
+        try {
+            const jobData = {
+                title: document.getElementById('job-title').value.trim(),
+                description: document.getElementById('job-description').value.trim(),
+                fixedPrice: parseFloat(document.getElementById('job-price').value)
+            };
+
+            await createPersonalJobRequest(currentApprenticeId, jobData);
+
+            displayNotification('Personal job request sent successfully!', 'success');
+            closePersonalJobModal();
+
+            // Update button visibility since we now have a pending request
+            setTimeout(() => updatePersonalRequestButtonVisibility(), 1000);
+
+            // Refresh current page if it's a profile page
+            if (window.location.hash.includes('profile')) {
+                // Could refresh profile data here
+            }
+
+        } catch (error) {
+            console.error('Error sending personal job request:', error);
+            displayNotification(error.message || 'Failed to send job request', 'error');
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Send Request';
+        }
+    });
+}
+
+// Close personal job request modal
+function closePersonalJobModal() {
+    const modal = document.getElementById('personal-job-modal');
+    if (modal) {
+        modal.remove();
+    }
+    currentApprenticeId = null;
+}
+
+// Handle apprentice response to personal request
+async function handlePersonalRequestResponse(jobId, response) {
+    // Find and disable the buttons to prevent double-clicks
+    const acceptBtn = document.querySelector(`button[onclick*="handlePersonalRequestResponse('${jobId}', 'accept')"]`);
+    const rejectBtn = document.querySelector(`button[onclick*="handlePersonalRequestResponse('${jobId}', 'reject')"]`);
+
+    if (acceptBtn) {
+        acceptBtn.disabled = true;
+        acceptBtn.textContent = 'Processing...';
+    }
+    if (rejectBtn) {
+        rejectBtn.disabled = true;
+        rejectBtn.textContent = 'Processing...';
+    }
+
+    try {
+        await respondToPersonalRequest(jobId, response);
+        displayNotification(`Job request ${response === 'accept' ? 'accepted' : 'rejected'} successfully!`, 'success');
+
+        // Refresh apprentice dashboard if needed
+        if (typeof loadApprenticeDashboard === 'function') {
+            loadApprenticeDashboard();
+        }
+
+    } catch (error) {
+        console.error('Error responding to personal request:', error);
+
+        // Re-enable buttons on error
+        if (acceptBtn) {
+            acceptBtn.disabled = false;
+            acceptBtn.textContent = 'Accept';
+        }
+        if (rejectBtn) {
+            rejectBtn.disabled = false;
+            rejectBtn.textContent = 'Reject';
+        }
+
+        displayNotification(error.message || 'Failed to respond to job request', 'error');
+    }
+}
+
+// Expose function globally for inline onclick handlers
+window.handlePersonalRequestResponse = handlePersonalRequestResponse;
+
+// Load personal requests for apprentice dashboard
+async function loadPersonalRequestsForApprentice() {
+    const container = document.getElementById('personal-requests-container');
+    if (!container) return;
+
+    try {
+        // Get authenticated user
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            throw new Error('Authentication required to load personal requests');
+        }
+
+        const requests = await getIncomingPersonalRequests(user.id);
+        const html = await loadPersonalRequestsForApprenticeHTML(requests);
+        container.innerHTML = html;
+    } catch (error) {
+        console.error('Error loading personal requests:', error);
+        container.innerHTML = '<div class="text-center py-8 text-red-500">Error loading personal requests</div>';
+    }
+}
+
+// Load personal requests for apprentice dashboard
+async function loadPersonalRequestsForApprenticeHTML(requests) {
+    try {
+        if (!requests || requests.length === 0) {
+            return '<div class="text-center py-8 text-gray-500">No personal job requests yet</div>';
+        }
+
+        return requests.map(request => `
+            <div class="bg-white rounded-lg shadow-md p-6 mb-4">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">${request.title}</h3>
+                        <p class="text-sm text-gray-600">From: ${request.client_name}</p>
+                        <p class="text-lg font-bold text-green-600 mt-2">₦${request.fixed_price.toLocaleString()}</p>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-sm text-gray-500">${new Date(request.created_at).toLocaleDateString()}</div>
+                    </div>
+                </div>
+
+                <p class="text-gray-700 mb-4">${request.description}</p>
+
+                <div class="flex space-x-3">
+                    <button onclick="handlePersonalRequestResponse('${request.id}', 'accept')"
+                            class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium">
+                        Accept
+                    </button>
+                    <button onclick="handlePersonalRequestResponse('${request.id}', 'reject')"
+                            class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium">
+                        Reject
+                    </button>
+                </div>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('Error loading personal requests:', error);
+        return '<div class="text-center py-8 text-red-500">Error loading personal requests</div>';
+    }
+}
+
+// Load sent personal requests for client dashboard
+async function loadPersonalRequestsForClient() {
+    try {
+        // Get authenticated user
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            throw new Error('Authentication required to load personal requests');
+        }
+
+        const requests = await getSentPersonalRequests(user.id);
+
+        if (requests.length === 0) {
+            return '<div class="text-center py-8 text-gray-500">No sent personal job requests</div>';
+        }
+
+        return requests.map(request => `
+            <div class="bg-white rounded-lg shadow-md p-6 mb-4">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900">${request.title}</h3>
+                        <p class="text-sm text-gray-600">To: ${request.apprentice_name}</p>
+                        <p class="text-lg font-bold text-green-600 mt-2">₦${request.fixed_price.toLocaleString()}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="px-3 py-1 rounded-full text-sm font-medium ${
+                            request.status === 'personal_pending' ? 'bg-yellow-100 text-yellow-800' :
+                            request.status === 'personal_accepted' ? 'bg-green-100 text-green-800' :
+                            'bg-red-100 text-red-800'
+                        }">
+                            ${request.status.replace('personal_', '').replace('_', ' ')}
+                        </span>
+                        <div class="text-sm text-gray-500 mt-1">${new Date(request.updated_at).toLocaleDateString()}</div>
+                    </div>
+                </div>
+            </div>
+        `).join('');
+
+    } catch (error) {
+        console.error('Error loading sent personal requests:', error);
+        return '<div class="text-center py-8 text-red-500">Error loading sent requests</div>';
+    }
+}

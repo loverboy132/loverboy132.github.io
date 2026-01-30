@@ -1031,6 +1031,28 @@ export async function getTrendingCreators(role = "member", limit = 10) {
 }
 
 // Follow a user
+// Check if a user is following another user
+export async function checkUserFollow(followerId, followingId) {
+    try {
+        const { data, error } = await supabase
+            .from("follows")
+            .select("id")
+            .eq("follower_id", followerId)
+            .eq("following_id", followingId)
+            .single();
+
+        if (error && error.code === "PGRST116") {
+            return false; // Not following
+        }
+
+        if (error) throw error;
+        return true; // Following
+    } catch (error) {
+        console.error("Error checking follow status:", error);
+        return false;
+    }
+}
+
 export async function followUser(followerId, followingId) {
     try {
         // Check if already following
@@ -1836,8 +1858,7 @@ export async function getApprenticeStats(apprenticeId) {
                 `
                 total_earnings,
                 completed_jobs,
-                pending_jobs:job_applications(count),
-                active_jobs:job_requests(count)
+                pending_jobs:job_applications(count)
             `
             )
             .eq("id", apprenticeId)
@@ -1852,7 +1873,7 @@ export async function getApprenticeStats(apprenticeId) {
             .eq("apprentice_id", apprenticeId)
             .eq("status", "pending");
 
-        // Get active jobs count
+        // Get active jobs count (using explicit query to avoid FK ambiguity)
         const { count: activeJobs } = await supabase
             .from("job_requests")
             .select("*", { count: "exact", head: true })
@@ -3981,6 +4002,104 @@ async function processRefund(clientId, escrowAmount, jobRequestId, jobTitle) {
 
 // ==============================================
 // REFERRAL WALLET SYSTEM FUNCTIONS
+// ==============================================
+
+// ==============================================
+// PERSONAL JOB REQUEST FUNCTIONS
+// ==============================================
+
+// Create personal job request (member sends to specific apprentice)
+export async function createPersonalJobRequest(apprenticeId, jobData) {
+    try {
+        const { data, error } = await supabase.rpc('create_personal_job_request', {
+            p_apprentice_id: apprenticeId,
+            p_title: jobData.title,
+            p_description: jobData.description,
+            p_fixed_price: jobData.fixedPrice,
+            p_skills_required: jobData.skillsRequired || null,
+            p_location: jobData.location || null,
+            p_deadline: jobData.deadline || null
+        });
+
+        if (error) throw error;
+        return data;
+    } catch (error) {
+        console.error("Error creating personal job request:", error);
+        throw error;
+    }
+}
+
+// Get incoming personal job requests for apprentice
+export async function getIncomingPersonalRequests(apprenticeId) {
+    try {
+        const { data, error } = await supabase.rpc('get_incoming_personal_requests', {
+            p_apprentice_id: apprenticeId
+        });
+
+        if (error) throw error;
+        return data || [];
+    } catch (error) {
+        console.error("Error getting incoming personal requests:", error);
+        throw error;
+    }
+}
+
+// Respond to personal job request (accept or reject)
+export async function respondToPersonalRequest(jobId, response) {
+    try {
+        const { data, error } = await supabase.rpc('respond_to_personal_request', {
+            p_job_id: jobId,
+            p_response: response // 'accept' or 'reject'
+        });
+
+        if (error) throw error;
+        return data;
+    } catch (error) {
+        console.error("Error responding to personal request:", error);
+        throw error;
+    }
+}
+
+// Get sent personal requests for client (to see responses)
+export async function getSentPersonalRequests(clientId) {
+    try {
+        const { data, error } = await supabase.rpc('get_sent_personal_requests', {
+            p_client_id: clientId
+        });
+
+        if (error) throw error;
+        return data || [];
+    } catch (error) {
+        console.error("Error getting sent personal requests:", error);
+        throw error;
+    }
+}
+
+// Check if there's already a pending personal job request to a specific apprentice
+export async function checkExistingPersonalRequest(clientId, apprenticeId) {
+    try {
+        const { data, error } = await supabase
+            .from('job_requests')
+            .select('id')
+            .eq('client_id', clientId)
+            .eq('assigned_apprentice_id', apprenticeId)
+            .eq('status', 'personal_pending')
+            .single();
+
+        if (error && error.code === 'PGRST116') {
+            return false; // No pending request found
+        }
+
+        if (error) throw error;
+        return true; // Pending request exists
+    } catch (error) {
+        console.error("Error checking existing personal request:", error);
+        return false;
+    }
+}
+
+// ==============================================
+// REFERRAL FUNCTIONS
 // ==============================================
 
 // Get user's referral wallet

@@ -57,6 +57,120 @@ function generateSubscriptionReference(planKey) {
 // WALLET MANAGEMENT FUNCTIONS
 // ==============================================
 
+// Atomic wallet balance update function to prevent sync issues
+export async function updateWalletBalanceAtomically(userId, balanceChanges) {
+    const { balance_ngn = 0, balance_points = 0, total_deposited = null, total_withdrawn = null } = balanceChanges;
+
+    try {
+        console.log('Starting atomic wallet update:', {
+            userId,
+            balanceChanges,
+            timestamp: new Date().toISOString()
+        });
+
+        // Get current wallet state
+        const currentWallet = await getUserWallet(userId);
+        if (!currentWallet) {
+            throw new Error('Wallet not found for user');
+        }
+
+        console.log('Current wallet state:', {
+            balance_ngn: currentWallet.balance_ngn || 0,
+            balance_points: currentWallet.balance_points || 0,
+            total_deposited: currentWallet.total_deposited || 0,
+            total_withdrawn: currentWallet.total_withdrawn || 0
+        });
+
+        // Calculate new balances
+        const newBalanceNgn = (currentWallet.balance_ngn || 0) + balance_ngn;
+        const newBalancePoints = (currentWallet.balance_points || 0) + balance_points;
+        const newTotalDeposited = total_deposited !== null ? (currentWallet.total_deposited || 0) + total_deposited : null;
+        const newTotalWithdrawn = total_withdrawn !== null ? (currentWallet.total_withdrawn || 0) + total_withdrawn : null;
+
+        console.log('Calculated new balances:', {
+            new_balance_ngn: newBalanceNgn,
+            new_balance_points: newBalancePoints,
+            new_total_deposited: newTotalDeposited,
+            new_total_withdrawn: newTotalWithdrawn
+        });
+
+        // Validate balances (prevent negative balances)
+        if (newBalanceNgn < 0) {
+            throw new Error(`Insufficient NGN balance. Required: ${Math.abs(balance_ngn)}, Available: ${currentWallet.balance_ngn || 0}`);
+        }
+        if (newBalancePoints < 0) {
+            throw new Error(`Insufficient points balance. Required: ${Math.abs(balance_points)}, Available: ${currentWallet.balance_points || 0}`);
+        }
+
+        // Update wallet atomically using RPC function
+        let updatedWallet = null;
+
+        try {
+            // Try RPC function first (bypasses RLS and ensures atomicity)
+            const { data: rpcResult, error: rpcError } = await supabase.rpc('update_user_wallet', {
+                p_user_id: userId,
+                p_balance_ngn: newBalanceNgn,
+                p_balance_points: newBalancePoints,
+                p_total_deposited: newTotalDeposited,
+                p_total_withdrawn: newTotalWithdrawn
+            });
+
+            if (rpcError) {
+                if (rpcError.code === '42883') {
+                    console.warn('RPC function update_user_wallet does not exist, falling back to direct update');
+                } else {
+                    throw rpcError;
+                }
+            } else {
+                updatedWallet = rpcResult;
+                console.log('Wallet updated via RPC successfully');
+            }
+        } catch (rpcErr) {
+            console.warn('RPC update failed, falling back to direct update:', rpcErr);
+        }
+
+        // Fallback to direct update if RPC failed or doesn't exist
+        if (!updatedWallet) {
+            const updateData = {
+                balance_ngn: newBalanceNgn,
+                balance_points: newBalancePoints,
+                updated_at: new Date().toISOString()
+            };
+
+            if (newTotalDeposited !== null) updateData.total_deposited = newTotalDeposited;
+            if (newTotalWithdrawn !== null) updateData.total_withdrawn = newTotalWithdrawn;
+
+            const { data: directResult, error: directError } = await supabase
+                .from('user_wallets')
+                .update(updateData)
+                .eq('user_id', userId)
+                .select('balance_ngn, balance_points, total_deposited, total_withdrawn')
+                .single();
+
+            if (directError) {
+                throw new Error('Failed to update wallet balance: ' + directError.message);
+            }
+
+            updatedWallet = directResult;
+            console.log('Wallet updated via direct update successfully');
+        }
+
+        console.log('Wallet update completed successfully:', {
+            old_balance_ngn: currentWallet.balance_ngn || 0,
+            old_balance_points: currentWallet.balance_points || 0,
+            new_balance_ngn: updatedWallet.balance_ngn,
+            new_balance_points: updatedWallet.balance_points,
+            change_ngn: balance_ngn,
+            change_points: balance_points
+        });
+
+        return updatedWallet;
+    } catch (error) {
+        console.error('Atomic wallet update failed:', error);
+        throw error;
+    }
+}
+
 // Get user's wallet balance
 export async function getUserWallet(userId) {
     try {
@@ -1222,6 +1336,8 @@ export async function approveWithdrawalRequest(requestId, bankTransactionId = nu
                     // RPC didn't deduct points, we need to do it manually
                     console.warn('RPC approved but did not deduct points, deducting manually...');
                     rpcSucceeded = false;
+                } else if (updatedWallet) {
+                    console.log(`RPC successfully deducted points: ${(wallet.balance_points || 0) - (updatedWallet.balance_points || 0)} points deducted`);
                 }
             }
         } catch (rpcError) {
@@ -1288,85 +1404,22 @@ export async function approveWithdrawalRequest(requestId, bankTransactionId = nu
                 throw new Error('User wallet not found');
             }
 
-            console.log(`[Withdrawal Approval] Current balance: ${currentWallet.balance_points} points, Deducting: ${pointsToDeduct} points`);
+            console.log(`[Withdrawal Approval] Current balance before deduction: NGN=${currentWallet.balance_ngn || 0}, Points=${currentWallet.balance_points || 0}`);
+            console.log(`[Withdrawal Approval] Deducting: NGN=${ngnToDeduct}, Points=${pointsToDeduct}`);
 
             // Verify user still has sufficient balance
             if ((currentWallet.balance_points || 0) < pointsToDeduct) {
                 throw new Error(`User balance insufficient. Required: ${pointsToDeduct} points, Available: ${currentWallet.balance_points || 0} points`);
             }
 
-            // Deduct points from wallet using RPC function (bypasses RLS)
-            const newBalance = (currentWallet.balance_points || 0) - pointsToDeduct;
-            const newBalanceNgn = (currentWallet.balance_ngn || 0) - ngnToDeduct;
-            const newTotalWithdrawn = (currentWallet.total_withdrawn || 0) + ngnToDeduct;
-            
-            let updatedWallet = null;
-            let walletUpdateError = null;
-            
-            // Try RPC function first (bypasses RLS)
-            try {
-                const { data: rpcUpdatedWallet, error: rpcError } = await supabase
-                    .rpc('update_user_wallet', {
-                        p_user_id: withdrawalRequest.user_id,
-                        p_balance_ngn: newBalanceNgn,
-                        p_balance_points: newBalance,
-                        p_total_deposited: null, // Don't change total_deposited
-                        p_total_withdrawn: newTotalWithdrawn
-                    });
+            // Deduct points from wallet using atomic update function
+            const balanceChanges = {
+                balance_ngn: -ngnToDeduct,
+                balance_points: -pointsToDeduct,
+                total_withdrawn: ngnToDeduct
+            };
 
-                if (rpcError) {
-                    if (rpcError.code === '42883') {
-                        console.warn('[Withdrawal Approval] RPC function update_user_wallet does not exist, falling back to direct update');
-                        walletUpdateError = null; // Reset to try fallback
-                    } else {
-                        console.error('[Withdrawal Approval] RPC function error:', rpcError);
-                        walletUpdateError = rpcError;
-                    }
-                } else if (rpcUpdatedWallet) {
-                    const walletData = Array.isArray(rpcUpdatedWallet) ? rpcUpdatedWallet[0] : rpcUpdatedWallet;
-                    if (walletData && walletData.user_id) {
-                        console.log('[Withdrawal Approval] Wallet updated successfully via RPC');
-                        updatedWallet = walletData;
-                    }
-                }
-            } catch (rpcErr) {
-                console.warn('[Withdrawal Approval] RPC call failed, falling back to direct update:', rpcErr);
-                walletUpdateError = null; // Reset to try fallback
-            }
-
-            // Fallback to direct update if RPC doesn't exist or failed
-            if (!updatedWallet && !walletUpdateError) {
-                const { data: directUpdatedWallet, error: directError } = await supabase
-                    .from('user_wallets')
-                    .update({
-                        balance_points: newBalance,
-                        balance_ngn: newBalanceNgn,
-                        total_withdrawn: newTotalWithdrawn,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('user_id', withdrawalRequest.user_id)
-                    .select();
-
-                if (directError) {
-                    console.error('[Withdrawal Approval] Direct wallet update error:', directError);
-                    walletUpdateError = directError;
-                } else if (directUpdatedWallet && directUpdatedWallet.length > 0) {
-                    updatedWallet = directUpdatedWallet[0];
-                }
-            }
-
-            if (walletUpdateError) {
-                throw new Error('Failed to update wallet balance: ' + walletUpdateError.message);
-            }
-
-            // Verify the update actually worked
-            const verifyWallet = await getUserWallet(withdrawalRequest.user_id);
-            if (verifyWallet && Math.abs((verifyWallet.balance_points || 0) - newBalance) > 0.01) {
-                console.error(`[Withdrawal Approval] WARNING: Wallet update verification failed! Expected balance: ${newBalance}, Actual balance: ${verifyWallet.balance_points}`);
-                throw new Error(`Wallet balance verification failed. Expected: ${newBalance}, Got: ${verifyWallet.balance_points}. This may be due to RLS policies. Please ensure the update_user_wallet RPC function exists.`);
-            }
-
-            console.log(`[Withdrawal Approval] Wallet updated successfully. New balance: ${verifyWallet?.balance_points || updatedWallet?.balance_points || newBalance} points`);
+            const updatedWallet = await updateWalletBalanceAtomically(withdrawalRequest.user_id, balanceChanges);
 
             // Create wallet transaction record (without metadata column if it doesn't exist)
             const transactionData = {
@@ -2968,4 +3021,57 @@ export async function rejectSubscriptionPayment(requestId, reason) {
         console.error("Error rejecting subscription payment:", error);
         throw error;
     }
+}
+
+// Transaction display helper functions
+export function getTransactionIcon(type) {
+    const colors = {
+        'deposit': 'text-green-500',
+        'withdrawal': 'text-red-500',
+        'escrow_hold': 'text-orange-500',
+        'escrow_release': 'text-green-500',
+        'escrow_refund': 'text-blue-500',
+        'job_payment': 'text-purple-500',
+        'fee_deduction': 'text-gray-500'
+    };
+    return colors[type] || 'text-gray-500';
+}
+
+export function getTransactionIconClass(type) {
+    const icons = {
+        'deposit': 'fa-plus-circle',
+        'withdrawal': 'fa-minus-circle',
+        'escrow_hold': 'fa-lock',
+        'escrow_release': 'fa-unlock',
+        'escrow_refund': 'fa-undo',
+        'job_payment': 'fa-briefcase',
+        'fee_deduction': 'fa-coins'
+    };
+    return icons[type] || 'fa-circle';
+}
+
+export function getAmountClass(type) {
+    const classes = {
+        'deposit': 'text-green-600',
+        'withdrawal': 'text-red-600',
+        'escrow_hold': 'text-orange-600',
+        'escrow_release': 'text-green-600',
+        'escrow_refund': 'text-blue-600',
+        'job_payment': 'text-purple-600',
+        'fee_deduction': 'text-gray-600'
+    };
+    return classes[type] || 'text-gray-600';
+}
+
+export function getAmountPrefix(type) {
+    const prefixes = {
+        'deposit': '+',
+        'withdrawal': '-',
+        'escrow_hold': '-',
+        'escrow_release': '+',
+        'escrow_refund': '+',
+        'job_payment': '+',
+        'fee_deduction': '-'
+    };
+    return prefixes[type] || '';
 }

@@ -77,6 +77,23 @@
                 #main-nav::-webkit-scrollbar {
                     display: none;
                 }
+
+                /* Make header fixed and dashboard layout scrollable */
+                header {
+                    position: fixed !important;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    z-index: 40;
+                }
+
+                #dashboard-layout {
+                    position: relative;
+                    top: 56px;
+                    height: calc(100vh - 56px);
+                    overflow-y: auto;
+                    overflow-x: hidden;
+                }
             }
             
             /* Tablet and desktop navigation spacing */
@@ -443,7 +460,7 @@
         <div id="dashboard-layout" class="min-h-screen bg-gray-100 hidden">
             <header class="bg-white shadow-md sticky top-0 z-40">
                 <div class="container mx-auto px-3 sm:px-4 lg:px-8">
-                    <div class="flex items-center justify-between h-14 sm:h-16">
+                    <div class="flex items-center justify-between h-8 sm:h-16">
                         <a
                             href="index.html"
                             class="flex items-center"

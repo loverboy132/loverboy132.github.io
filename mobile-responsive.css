@@ -606,9 +606,6 @@ body {
     
     /* Dashboard-specific fixes - header is sticky with h-14 (56px) on mobile */
     /* The nav is inside the header, so total header height is ~104px on mobile */
-    #dashboard-layout {
-        padding-top: 0 !important;
-    }
     
     /* Dashboard header container includes nav, so total is ~104px */
     #dashboard-layout header.sticky {
@@ -657,6 +654,11 @@ body {
     footer .text-center {
         text-align: center !important;
         margin-top: 24px;
+    }
+
+    /* Dashboard layout offset for fixed header on mobile */
+    #dashboard-layout {
+        padding-top: 64px !important;
     }
 }
 

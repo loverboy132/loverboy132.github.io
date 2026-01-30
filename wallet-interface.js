@@ -1,5 +1,6 @@
 // wallet-interface.js - User Wallet Interface
 import { supabase } from "./supabase-auth.js";
+import { getTransactionIcon, getTransactionIconClass, getAmountClass } from "./manual-payment-system.js";
 // Load ENV_CONFIG with fallback for production
 let ENV_CONFIG;
 try {
@@ -68,16 +69,23 @@ async function loadWalletBalance() {
         // Update wallet display
         const balanceElement = document.getElementById('wallet-balance');
         const pointsElement = document.getElementById('wallet-points');
-        
+
         if (balanceElement) {
             const balance = wallet.balance_ngn ?? 0;
             balanceElement.textContent = formatCurrency(balance);
         }
-        
+
         if (pointsElement) {
             const points = wallet.balance_points ?? 0;
             pointsElement.textContent = formatPoints(points);
         }
+
+        console.log('Wallet balance loaded:', {
+            balance_ngn: wallet.balance_ngn ?? 0,
+            balance_points: wallet.balance_points ?? 0,
+            user_id: user.id,
+            timestamp: new Date().toISOString()
+        });
         
         // Update wallet summary
         updateWalletSummary(wallet);
@@ -154,47 +162,8 @@ function displayWalletTransactions(transactions) {
     `).join('');
 }
 
-// Get transaction icon class
-function getTransactionIconClass(type) {
-    const icons = {
-        'deposit': 'fa-plus-circle',
-        'withdrawal': 'fa-minus-circle',
-        'escrow_hold': 'fa-lock',
-        'escrow_release': 'fa-unlock',
-        'escrow_refund': 'fa-undo',
-        'job_payment': 'fa-briefcase',
-        'fee_deduction': 'fa-coins'
-    };
-    return icons[type] || 'fa-circle';
-}
 
-// Get transaction icon color class
-function getTransactionIcon(type) {
-    const colors = {
-        'deposit': 'text-green-500',
-        'withdrawal': 'text-red-500',
-        'escrow_hold': 'text-orange-500',
-        'escrow_release': 'text-green-500',
-        'escrow_refund': 'text-blue-500',
-        'job_payment': 'text-purple-500',
-        'fee_deduction': 'text-gray-500'
-    };
-    return colors[type] || 'text-gray-500';
-}
 
-// Get amount CSS class
-function getAmountClass(type) {
-    const classes = {
-        'deposit': 'text-green-600',
-        'withdrawal': 'text-red-600',
-        'escrow_hold': 'text-orange-600',
-        'escrow_release': 'text-green-600',
-        'escrow_refund': 'text-blue-600',
-        'job_payment': 'text-purple-600',
-        'fee_deduction': 'text-gray-600'
-    };
-    return classes[type] || 'text-gray-600';
-}
 
 // Get amount prefix
 function getAmountPrefix(type) {
@@ -906,6 +875,13 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
+
+// Refresh wallet balance after any transaction
+export async function refreshWalletBalance() {
+    console.log('Refreshing wallet balance...');
+    await loadWalletBalance();
+}
+
 // Make functions globally available
 window.initializeWalletInterface = initializeWalletInterface;
 window.showAddFundsModal = showAddFundsModal;
@@ -914,3 +890,4 @@ window.showTransactionsModal = showTransactionsModal;
 window.closeModal = closeModal;
 window.removeUploadedFile = removeUploadedFile;
 window.copyToClipboard = copyToClipboard;
+window.refreshWalletBalance = refreshWalletBalance;
