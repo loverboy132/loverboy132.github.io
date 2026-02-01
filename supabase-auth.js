@@ -1,5 +1,5 @@
 // supabase-auth.js - Fixed version
-import { supabase } from "./supabase-client.js";
+import { supabase, POINT_TO_NGN_RATE } from "./supabase-client.js";
 export { supabase } from "./supabase-client.js";
 import {
     notifyJobApplicationSubmitted,
@@ -4819,10 +4819,10 @@ export function getReferralCommissionPercentage(subscriptionTier) {
     }
 }
 
-// Convert points to USD and NGN
+// Convert points to USD and NGN using global rate
 export function convertPointsToCurrency(points) {
     const usd = points / 10; // 10 pts = $1
-    const ngn = usd * 1500; // $1 = ₦1500
+    const ngn = points * POINT_TO_NGN_RATE; // Use global NGN rate
     return { usd, ngn };
 }
 

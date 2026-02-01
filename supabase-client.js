@@ -49,6 +49,9 @@ const getRedirectUrl = () => {
     return redirectUrl;
 };
 
+// Global currency conversion constant - SINGLE SOURCE OF TRUTH
+export const POINT_TO_NGN_RATE = 150; // 1 point = ₦150
+
 export const supabase = createClient(
     ENV_CONFIG.SUPABASE_URL,
     ENV_CONFIG.SUPABASE_ANON_KEY,

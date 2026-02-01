@@ -1,6 +1,7 @@
 // manual-payment-system.js - Manual Payment System Implementation
 // Based on manual.txt specifications
 import { supabase } from "./supabase-auth.js";
+import { POINT_TO_NGN_RATE } from "./supabase-client.js";
 import { 
     notifyFundingRequestCreated,
     notifyFundingRequestApproved,
@@ -635,12 +636,18 @@ export async function approveFundingRequest(requestId, accountDetails = null) {
             throw new Error(`Funding request is already ${fundingRequest.status}`);
         }
 
-        // Apply platform fee: only 90% of funded amount is credited to wallet/points
-        const amountAfterFee = Math.round(fundingRequest.amount_ngn * 0.9);
+        // NO FEE: credit 100% of funded amount to wallet/points
+        const amountAfterFee = Math.round(fundingRequest.amount_ngn);
 
-        // Calculate points to add (1 point = ₦150) based on net amount after fee
+        // Calculate points to add (1 point = ₦150) - NO FEE applied
         const pointsToAdd = ngnToPoints(amountAfterFee);
+        const creditedNgn = pointsToNgn(pointsToAdd);
         let creditedAmount = amountAfterFee;
+
+        // Safety check for deposit value mismatch
+        if (creditedNgn !== amountAfterFee) {
+            console.error("DEPOSIT VALUE MISMATCH — FEES STILL APPLIED");
+        }
 
         // Try to call the RPC function first (if it exists)
         let rpcSucceeded = false;
@@ -975,9 +982,9 @@ export async function approveFundingRequest(requestId, accountDetails = null) {
                 wallet_id: wallet.id
             });
             
-            // Credit only 90% of the funded amount to the wallet
+            // NO FEE: credit 100% of the funded amount to the wallet
             const amountToCredit = Math.round(
-                (updatedRequest.amount_ngn || fundingRequest.amount_ngn) * 0.9
+                (updatedRequest.amount_ngn || fundingRequest.amount_ngn)
             );
             creditedAmount = amountToCredit;
             const newBalanceNgn = (wallet.balance_ngn || 0) + amountToCredit;
@@ -1180,7 +1187,7 @@ export async function approveFundingRequest(requestId, accountDetails = null) {
                     transaction_type: 'deposit',
                     amount_ngn: amountToCredit,
                     amount_points: pointsToAdd,
-                    description: `Wallet funding approved - Request ID: ${requestId}`,
+                    description: `Deposit (No Fee) - Request ID: ${requestId}`,
                     reference: accountDetails || `FR-${requestId}`,
                     status: 'completed',
                     metadata: {
@@ -2173,14 +2180,14 @@ function referencesWithdrawalExtendedColumnsNotNull(error) {
 // UTILITY FUNCTIONS
 // ==============================================
 
-// Convert NGN to points (1 point = ₦150)
+// Convert NGN to points using global rate
 export function ngnToPoints(ngnAmount) {
-    return ngnAmount / 150;
+    return ngnAmount / POINT_TO_NGN_RATE;
 }
 
-// Convert points to NGN (1 point = ₦150)
+// Convert points to NGN using global rate
 export function pointsToNgn(pointsAmount) {
-    return pointsAmount * 150;
+    return pointsAmount * POINT_TO_NGN_RATE;
 }
 
 // Format currency for display

@@ -92,6 +92,7 @@ import {
     getSentPersonalRequests,
     checkExistingPersonalRequest,
 } from "./supabase-auth.js";
+import { POINT_TO_NGN_RATE } from "./supabase-client.js";
 import { uploadCV, getCVSignedUrl, getUserWallet, createFundingRequest, getCraftnetBankAccounts, uploadProofOfPayment, getTransactionTypeDisplay } from "./manual-payment-system.js";
 import { getTransactionIcon, getTransactionIconClass, getAmountClass, getAmountPrefix } from "./manual-payment-system.js";
 import {
@@ -119,6 +120,9 @@ const mainNav = document.getElementById("main-nav");
 const notificationBell = document.getElementById("notification-bell");
 const notificationPanel = document.getElementById("notification-panel");
 const notificationList = document.getElementById("notification-list");
+
+// --- Constants ---
+// Points are the single source of truth - NGN is always derived from points
 
 // Helper function to generate fallback avatar (data URI) when placehold.co times out
 function generateFallbackAvatar(text, size = 100) {
@@ -385,6 +389,14 @@ const apprenticeContentTemplates = {
             if (!assignedError && assignedJobsData) {
                 assignedJobs = assignedJobsData;
             }
+
+            // Update apprentice stats to derive NGN from points instead of using balance_ngn
+            const wallet = await getUserWallet(userData.id);
+            if (wallet) {
+                apprenticeStats.availableBalance = (wallet.balance_points || 0) * POINT_TO_NGN_RATE;
+            } else {
+                apprenticeStats.availableBalance = 0;
+            }
         } catch (error) {
             console.error("Error fetching job data:", error);
         }
@@ -439,7 +451,7 @@ const apprenticeContentTemplates = {
                 </div>
                 <h3 class="text-sm font-medium text-gray-500">Total Earned</h3>
                 <p class="text-3xl font-bold mt-2 text-purple-600">₦${(
-                    apprenticeStats.totalEarned * 1500
+                    apprenticeStats.totalEarned * POINT_TO_NGN_RATE
                 ).toLocaleString()}</p>
             </div>
         </div>
@@ -606,19 +618,24 @@ const apprenticeContentTemplates = {
                                             Due: ${job.deadline ? new Date(job.deadline).toLocaleDateString() : "No deadline"}
                                         </span>
                                     </div>
-                                    <div class="flex space-x-2">
+                                    <div class="flex flex-wrap gap-2">
                                         ${
                                             job.status === "in_progress"
                                                 ? `
-                                        <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm load-progress-updates-btn"
-                                                data-job-id="${job.id}">
-                                            <i data-feather="message-circle" class="w-4 h-4 mr-2"></i>
-                                            Progress Updates
-                                        </button>
-                                        <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm load-final-submissions-btn"
+                                        <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm submit-progress-update-btn"
                                                 data-job-id="${job.id}">
                                             <i data-feather="upload" class="w-4 h-4 mr-2"></i>
-                                            Submit Work
+                                            Submit Progress Update
+                                        </button>
+                                        <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm submit-final-work-btn"
+                                                data-job-id="${job.id}">
+                                            <i data-feather="check-circle" class="w-4 h-4 mr-2"></i>
+                                            Submit Final Work
+                                        </button>
+                                        <button class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm load-apprentice-progress-updates-btn"
+                                                data-job-id="${job.id}">
+                                            <i data-feather="message-circle" class="w-4 h-4 mr-2"></i>
+                                            View Progress
                                         </button>
                                         `
                                                 : job.status === "pending_review"
@@ -824,9 +841,9 @@ const apprenticeContentTemplates = {
             stats.activeJobs = apprenticeStats.activeJobs || 0;
             stats.pendingJobs = apprenticeStats.pendingJobs || 0;
 
-            // Get wallet balance
+            // Get wallet balance - derive NGN from points instead of using balance_ngn
             const wallet = await getUserWallet(userId);
-            stats.availableBalance = wallet?.balance_ngn || 0;
+            stats.availableBalance = wallet ? (wallet.balance_points || 0) * POINT_TO_NGN_RATE : 0;
 
             // Calculate goal progress (₦7,500,000 goal)
             stats.goalProgress = Math.min(100, Math.round((stats.totalEarned / 7500000) * 100));
@@ -2064,7 +2081,7 @@ const memberContentTemplates = {
                     <div>
                         <p class="text-blue-100 text-sm">Available Points</p>
                         <p class="text-3xl font-bold">${(referralWallet?.available_points || 0).toFixed(2)}</p>
-                        <p class="text-blue-100 text-sm">₦${((referralWallet?.available_points || 0) * 150).toFixed(0)} NGN</p>
+                        <p class="text-blue-100 text-sm">₦${((referralWallet?.available_points || 0) * POINT_TO_NGN_RATE).toFixed(0)} NGN</p>
                     </div>
                     <div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                         <i data-feather="wallet" class="w-6 h-6"></i>
@@ -2427,7 +2444,7 @@ const memberContentTemplates = {
                 </div>
                 <h3 class="text-sm font-medium text-gray-500">Total Spent</h3>
                 <p class="text-3xl font-bold mt-2 text-purple-600">₦${(
-                    clientStats.totalSpent * 1500
+                    clientStats.totalSpent * POINT_TO_NGN_RATE
                 ).toLocaleString()}</p>
             </div>
         </div>
@@ -7364,13 +7381,13 @@ async function updateApprenticeStats(userData) {
         );
         if (earningsStats.length >= 4) {
             earningsStats[0].textContent = `₦${(
-                stats.totalEarned * 1500
+                stats.totalEarned * POINT_TO_NGN_RATE
             ).toLocaleString()}`;
             earningsStats[1].textContent = `₦${(
-                stats.availableBalance * 1500
+                stats.availableBalance * POINT_TO_NGN_RATE
             ).toLocaleString()}`;
             earningsStats[2].textContent = `₦${(
-                stats.thisMonth * 1500
+                stats.thisMonth * POINT_TO_NGN_RATE
             ).toLocaleString()}`;
             earningsStats[3].textContent = `${stats.goalProgress}%`;
         }
@@ -11306,3 +11323,65 @@ async function loadPersonalRequestsForClient() {
         return '<div class="text-center py-8 text-red-500">Error loading sent requests</div>';
     }
 }
+
+// Wallet Interface Initialization
+async function initializeWalletInterface() {
+    console.log('🔄 initializeWalletInterface called');
+
+    try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (authError || !user) {
+            console.error('❌ Authentication required for wallet interface');
+            return;
+        }
+
+        // Fetch wallet data
+        const wallet = await getUserWallet(user.id);
+        console.log('📦 Wallet data fetched:', wallet);
+
+        if (!wallet) {
+            console.warn('⚠️ No wallet data found');
+            return;
+        }
+
+        // Points are the SINGLE source of truth for wallet value
+        const points = wallet.balance_points || 0;
+        const displayed_ngn = points * POINT_TO_NGN_RATE;
+
+        console.log('Wallet render → points:', points, 'NGN:', displayed_ngn);
+
+        // Safety check for POINT↔NGN consistency
+        if (displayed_ngn !== points * POINT_TO_NGN_RATE) {
+            console.error("POINT↔NGN DESYNC DETECTED");
+        }
+
+        // Update wallet balance display elements
+        const balanceElement = document.getElementById('wallet-balance');
+        const pointsElement = document.getElementById('wallet-points');
+
+        console.log('🎯 DOM elements found:', {
+            balanceElement: !!balanceElement,
+            pointsElement: !!pointsElement
+        });
+
+        if (balanceElement) {
+            balanceElement.textContent = `₦${displayed_ngn.toLocaleString()}`;
+            console.log('✅ Updated balance element to:', balanceElement.textContent);
+        } else {
+            console.error('❌ Balance element not found!');
+        }
+
+        if (pointsElement) {
+            pointsElement.textContent = `${points.toFixed(2)} pts`;
+            console.log('✅ Updated points element to:', pointsElement.textContent);
+        } else {
+            console.error('❌ Points element not found!');
+        }
+
+    } catch (error) {
+        console.error('❌ Error initializing wallet interface:', error);
+    }
+}
+
+// Expose wallet interface function globally
+window.initializeWalletInterface = initializeWalletInterface;
