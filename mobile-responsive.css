@@ -1136,6 +1136,185 @@ body {
     }
 }
 
+/* ==============================================
+   DASHBOARD HEADER ALIGNMENT FIX
+   ============================================== */
+
+/* Fix dashboard header alignment on mobile - ensure logo and action buttons align properly */
+@media (max-width: 767px) {
+    /* Dashboard header container - ensure proper height and alignment */
+    #dashboard-layout header .flex.items-center.justify-between.h-8 {
+        min-height: 56px !important;
+        height: auto !important;
+        align-items: center !important;
+        padding: 8px 0 !important;
+    }
+
+    /* Right-side action buttons container - ensure proper spacing and alignment */
+    #dashboard-layout header .flex.items-center.space-x-2 > * {
+        flex-shrink: 0 !important;
+    }
+
+    /* User avatar and logout button - ensure consistent sizing */
+    #dashboard-layout header #user-avatar,
+    #dashboard-layout header #logout-button {
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+    }
+
+    /* Notification bell button - match sizing */
+    #dashboard-layout header #notification-bell {
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+    }
+}
+
+/* ==============================================
+   LOGO SIZE INCREASE ONLY (NO HEADER CHANGES)
+   ============================================== */
+
+/* CRITICAL: Ensure header doesn't grow with logo */
+header,
+.header {
+    min-height: auto !important;
+    height: auto !important;
+}
+
+/* ==============================================
+   DASHBOARD HEADER + LOGO FIXES
+   ============================================== */
+
+/* Dashboard header logo size - keep compact */
+#dashboard-layout header svg,
+#dashboard-layout header img {
+    height: 40px !important;
+    width: auto !important;
+}
+
+/* Dashboard header height - ensure it accommodates logo */
+#dashboard-layout header .flex.items-center.justify-between {
+    min-height: 64px !important;
+}
+
+/* Fix sticky header content overlap */
+#dashboard-layout #main-content {
+    padding-top: 64px !important;
+}
+
+@media (min-width: 640px) {
+    #dashboard-layout #main-content {
+        padding-top: 72px !important;
+    }
+}
+
+/* ==============================================
+   ENSURE HEADER STAYS COMPACT (LANDING PAGE)
+   ============================================== */
+
+@media (max-width: 767px) {
+    /* Only apply to landing page headers, not dashboard */
+    body:not(#dashboard-layout) header {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+        min-height: auto !important;
+        height: auto !important;
+    }
+
+    /* Ensure flex items stay aligned */
+    body:not(#dashboard-layout) header .flex {
+        align-items: center !important;
+        gap: 0.5rem !important;
+    }
+}
+
+/* Standard mobile (376px - 768px) - Larger logo */
+@media (min-width: 376px) and (max-width: 768px) {
+    header svg.h-20,
+    header img.h-20,
+    header .logo {
+        height: 72px !important;  /* Even larger for standard mobile */
+        width: auto !important;
+    }
+}
+
+
+
+/* ==============================================
+   HOME PAGE LOGO SIZING
+   ============================================== */
+
+/* Mobile homepage header relaxation */
+@media (max-width: 480px) {
+  .home-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    min-height: 56px;
+    padding: 0 16px;
+
+    z-index: 1000;
+    background: inherit;
+  }
+}
+
+/* Force logo container visibility */
+@media (max-width: 480px) {
+  .home-logo {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    overflow: visible;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1001;
+  }
+}
+
+/* Restore logo rendering */
+@media (max-width: 480px) {
+  .home-logo img,
+  .home-logo svg {
+    width: 110px;
+    height: auto;
+    display: block;
+    visibility: visible;
+    opacity: 1;
+    max-width: none;
+  }
+}
+
+/* Ensure content offset still works */
+@media (max-width: 480px) {
+  .home-page main {
+    padding-top: 72px;
+  }
+}
+
+/* Remove hidden clamps */
+@media (max-width: 480px) {
+  .home-header {
+    overflow: visible !important;
+  }
+}
+
+
+/* Ensure header height doesn't change with larger logo */
+.home-page header {
+    align-items: center !important;
+    min-height: auto !important;
+    height: auto !important;
+}
+
 /* Safe area for notched devices */
 @supports (padding: max(0px)) {
     @media (max-width: 767px) {
@@ -1143,11 +1322,106 @@ body {
             padding-left: max(16px, env(safe-area-inset-left));
             padding-right: max(16px, env(safe-area-inset-right));
         }
-        
+
         header {
             padding-left: max(16px, env(safe-area-inset-left)) !important;
             padding-right: max(16px, env(safe-area-inset-right)) !important;
         }
     }
+}
+
+/* ==============================================
+   DASHBOARD HEADER MOBILE OPTIMIZATIONS (≤ 480px)
+   ============================================== */
+
+@media (max-width: 480px) {
+  /* Dashboard header height and padding */
+  #dashboard-layout header,
+  .dashboard-header,
+  .top-bar,
+  .header,
+  .nav-header {
+    min-height: 48px !important;
+    height: 48px !important;
+    padding: 6px 12px !important;
+  }
+
+  /* Dashboard header logo size */
+  #dashboard-layout header svg,
+  #dashboard-layout header img {
+    height: 32px !important;
+    width: auto !important;
+    max-width: 120px !important;
+  }
+
+  /* Dashboard header icons - all types */
+  #dashboard-layout header svg:not(.h-12):not(.h-14):not(.h-16):not(.h-20),
+  #dashboard-layout header img:not(.h-12):not(.h-14):not(.h-16):not(.h-20),
+  #dashboard-layout header i,
+  .dashboard-header svg,
+  .dashboard-header img,
+  .dashboard-header i,
+  .header svg,
+  .header img,
+  .header i {
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 18px !important;
+  }
+
+  /* Dashboard header buttons containing icons */
+  #dashboard-layout header button,
+  .dashboard-header button,
+  .header button {
+    padding: 6px !important;
+    min-width: 44px !important;
+    min-height: 36px !important;
+  }
+
+  /* Dashboard header icon spacing */
+  #dashboard-layout header .flex.items-center.space-x-2,
+  #dashboard-layout header .flex.items-center.space-x-4,
+  .dashboard-header .icon-group,
+  .dashboard-header .nav-icons,
+  .header .icon-group,
+  .header .nav-icons {
+    gap: 10px !important;
+  }
+
+  /* Dashboard header avatar/profile icon */
+  #dashboard-layout header .avatar,
+  #dashboard-layout header .profile-icon,
+  #dashboard-layout header img[alt*="profile"],
+  #dashboard-layout header img[alt*="avatar"],
+  .dashboard-header .avatar,
+  .dashboard-header .profile-icon,
+  .header .avatar,
+  .header .profile-icon {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  /* Dashboard header user info text */
+  #dashboard-layout header .text-sm,
+  #dashboard-layout header .text-xs,
+  .dashboard-header .text-sm,
+  .dashboard-header .text-xs {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Notification badge positioning */
+  #dashboard-layout header .notification-dot,
+  #dashboard-layout header .notification-badge,
+  .dashboard-header .notification-dot,
+  .dashboard-header .notification-badge {
+    top: -2px !important;
+    right: -2px !important;
+  }
+
+  /* Adjust main content top padding for compact header */
+  #dashboard-layout #main-content {
+    padding-top: 48px !important;
+  }
 }
 

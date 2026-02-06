@@ -276,6 +276,185 @@ html.dark .border-gray-800 {
     border-color: var(--dark-border) !important;
 }
 
+/* ==============================================
+   MOBILE NAVIGATION DRAWER - CRITICAL DARK MODE FIX
+   ============================================== */
+
+/* Mobile menu drawer background */
+html.dark .mobile-nav-drawer,
+html.dark .mobile-menu,
+html.dark [class*="mobile-nav"] {
+    background-color: var(--dark-bg-secondary) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+/* Mobile menu items - ENSURE VISIBILITY */
+html.dark .mobile-nav-item,
+html.dark .mobile-menu-item,
+html.dark .mobile-nav a,
+html.dark nav a {
+    color: var(--dark-text-primary) !important;
+    font-size: 18px !important;  /* Larger text for readability */
+    font-weight: 500 !important;
+}
+
+html.dark .mobile-nav-item:hover,
+html.dark .mobile-menu-item:hover,
+html.dark .mobile-nav a:hover {
+    color: var(--dark-accent) !important;
+    background-color: var(--dark-bg-tertiary) !important;
+}
+
+/* Mobile menu header */
+html.dark .mobile-nav-header,
+html.dark .mobile-menu-header {
+    background-color: var(--dark-bg-secondary) !important;
+    border-color: var(--dark-border) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+/* Mobile menu close button */
+html.dark .mobile-nav-close,
+html.dark .mobile-menu-close {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .mobile-nav-close:hover,
+html.dark .mobile-menu-close:hover {
+    color: var(--dark-accent) !important;
+}
+
+/* Mobile menu overlay */
+html.dark .mobile-nav-overlay {
+    background-color: rgba(0, 0, 0, 0.8) !important;
+}
+
+/* Hamburger menu button */
+html.dark .mobile-menu-toggle,
+html.dark .hamburger {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .mobile-menu-toggle svg,
+html.dark .hamburger svg {
+    stroke: var(--dark-text-primary) !important;
+}
+
+/* ==============================================
+   MOBILE-SPECIFIC TEXT VISIBILITY
+   ============================================== */
+
+@media (max-width: 767px) {
+    /* Ensure ALL mobile text is visible in dark mode */
+    html.dark body,
+    html.dark * {
+        color: var(--dark-text-primary) !important;
+    }
+
+    /* Hero section on mobile */
+    html.dark .hero-bg h1,
+    html.dark .hero-bg h2,
+    html.dark .hero-bg p {
+        color: white !important;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Mobile navigation text - super important */
+    html.dark nav a,
+    html.dark nav button,
+    html.dark .nav-link,
+    html.dark .menu-item {
+        color: var(--dark-text-primary) !important;
+        font-weight: 500 !important;
+    }
+
+    /* Mobile buttons need high contrast */
+    html.dark button,
+    html.dark .btn {
+        color: white !important;
+        font-size: 16px !important;
+        font-weight: 600 !important;
+    }
+
+    /* Mobile cards and sections */
+    html.dark .card,
+    html.dark section {
+        background-color: var(--dark-bg-secondary) !important;
+    }
+
+    html.dark .card h3,
+    html.dark .card h4,
+    html.dark .card p {
+        color: var(--dark-text-primary) !important;
+    }
+}
+
+/* ==============================================
+   LANDING PAGE MOBILE FIXES
+   ============================================== */
+
+@media (max-width: 767px) {
+    /* Hero heading - white and bold */
+    html.dark .hero-bg h1 {
+        color: white !important;
+        font-size: 32px !important;
+        font-weight: 800 !important;
+        line-height: 1.2 !important;
+    }
+
+    /* Hero description */
+    html.dark .hero-bg p {
+        color: rgba(255, 255, 255, 0.9) !important;
+        font-size: 16px !important;
+        line-height: 1.6 !important;
+    }
+
+    /* CTA Buttons */
+    html.dark .hero-bg button,
+    html.dark .hero-bg .btn {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+        padding: 14px 24px !important;
+        min-height: 48px !important;
+    }
+
+    /* Feature cards */
+    html.dark .feature-card,
+    html.dark [class*="feature"] {
+        background-color: var(--dark-bg-secondary) !important;
+        border: 1px solid var(--dark-border) !important;
+    }
+
+    html.dark .feature-card h3,
+    html.dark .feature-card h4 {
+        color: var(--dark-text-primary) !important;
+        font-size: 20px !important;
+        font-weight: 700 !important;
+    }
+
+    html.dark .feature-card p {
+        color: var(--dark-text-secondary) !important;
+        font-size: 16px !important;
+    }
+
+    /* FAQ section */
+    html.dark #faq .bg-gray-50 {
+        background-color: var(--dark-bg-tertiary) !important;
+    }
+
+    html.dark #faq h3 {
+        color: var(--dark-text-primary) !important;
+        font-size: 18px !important;
+        font-weight: 600 !important;
+    }
+
+    html.dark #faq p {
+        color: var(--dark-text-secondary) !important;
+        font-size: 16px !important;
+        line-height: 1.6 !important;
+    }
+}
+
 /* Admin Dashboard Specific */
 html.dark .sidebar {
     background: linear-gradient(135deg, #4c1d95 0%, #5b21b6 100%) !important;
@@ -716,6 +895,277 @@ html.dark .bg-gray-200 {
     color: var(--dark-text-primary) !important;
 }
 
+/* ==============================================
+   FIX INLINE STYLED TEXT
+   ============================================== */
+
+/* Common dark text colors that become invisible */
+html.dark [style*="color: black"],
+html.dark [style*="color: #000"],
+html.dark [style*="color: #000000"],
+html.dark [style*="color: rgb(0, 0, 0)"] {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Very dark grays */
+html.dark [style*="color: #111"],
+html.dark [style*="color: #222"],
+html.dark [style*="color: #333"],
+html.dark [style*="color: #444"] {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Medium grays */
+html.dark [style*="color: #555"],
+html.dark [style*="color: #666"],
+html.dark [style*="color: #777"],
+html.dark [style*="color: #888"] {
+    color: var(--dark-text-secondary) !important;
+}
+
+/* ==============================================
+   ADDITIONAL TAILWIND CLASS COVERAGE
+   ============================================== */
+
+/* Text colors that might not be covered */
+html.dark .text-black {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .text-white {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Ensure colored text is visible on dark backgrounds */
+html.dark .text-green-600,
+html.dark .text-green-700,
+html.dark .text-green-800 {
+    color: #6ee7b7 !important;  /* Lighter green for visibility */
+}
+
+html.dark .text-red-600,
+html.dark .text-red-700,
+html.dark .text-red-800 {
+    color: #fca5a5 !important;  /* Lighter red for visibility */
+}
+
+html.dark .text-yellow-600,
+html.dark .text-yellow-700,
+html.dark .text-yellow-800 {
+    color: #fcd34d !important;  /* Lighter yellow for visibility */
+}
+
+html.dark .text-purple-600,
+html.dark .text-purple-700,
+html.dark .text-purple-800 {
+    color: #c4b5fd !important;  /* Lighter purple for visibility */
+}
+
+html.dark .text-pink-600,
+html.dark .text-pink-700,
+html.dark .text-pink-800 {
+    color: #f9a8d4 !important;  /* Lighter pink for visibility */
+}
+
+html.dark .text-orange-600,
+html.dark .text-orange-700,
+html.dark .text-orange-800 {
+    color: #fdba74 !important;  /* Lighter orange for visibility */
+}
+
+/* ==============================================
+   ENSURE PROPER COLOR INHERITANCE
+   ============================================== */
+
+/* List items */
+html.dark li,
+html.dark ul,
+html.dark ol {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Labels and legends */
+html.dark label,
+html.dark legend,
+html.dark fieldset {
+    color: var(--dark-text-secondary) !important;
+}
+
+/* Code blocks and pre */
+html.dark code,
+html.dark pre {
+    background-color: var(--dark-bg-tertiary) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+/* Blockquotes */
+html.dark blockquote {
+    border-left-color: var(--dark-border) !important;
+    color: var(--dark-text-secondary) !important;
+}
+
+/* Small and caption text */
+html.dark small,
+html.dark caption {
+    color: var(--dark-text-tertiary) !important;
+}
+
+/* Strong and bold */
+html.dark strong,
+html.dark b {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Emphasis and italic */
+html.dark em,
+html.dark i:not([data-feather]) {
+    color: var(--dark-text-secondary) !important;
+}
+
+/* ==============================================
+   DASHBOARD SPECIFIC DARK MODE FIXES
+   ============================================== */
+
+/* Job cards and listings */
+html.dark .job-card,
+html.dark .job-request-card,
+html.dark .apprentice-card {
+    background-color: var(--dark-bg-secondary) !important;
+    border-color: var(--dark-border) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+/* Stats and metrics */
+html.dark .stat-value,
+html.dark .metric-value,
+html.dark .count {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .stat-label,
+html.dark .metric-label {
+    color: var(--dark-text-secondary) !important;
+}
+
+/* Badges and pills */
+html.dark .badge,
+html.dark .pill,
+html.dark .tag {
+    background-color: var(--dark-bg-tertiary) !important;
+    color: var(--dark-text-primary) !important;
+}
+
+/* Navigation tabs */
+html.dark .tab,
+html.dark .nav-tab {
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark .tab.active,
+html.dark .tab:hover,
+html.dark .nav-tab.active,
+html.dark .nav-tab:hover {
+    color: var(--dark-accent) !important;
+    border-bottom-color: var(--dark-accent) !important;
+}
+
+/* Dropdown menus */
+html.dark .dropdown,
+html.dark .dropdown-menu {
+    background-color: var(--dark-bg-secondary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+html.dark .dropdown-item {
+    color: var(--dark-text-primary) !important;
+}
+
+html.dark .dropdown-item:hover {
+    background-color: var(--dark-bg-tertiary) !important;
+}
+
+/* Search and filter inputs */
+html.dark .search-input,
+html.dark .filter-input {
+    background-color: var(--dark-bg-tertiary) !important;
+    color: var(--dark-text-primary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+/* Empty states */
+html.dark .empty-state {
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark .empty-state-icon {
+    color: var(--dark-text-tertiary) !important;
+}
+
+/* Loading spinners */
+html.dark .spinner,
+html.dark .loader {
+    border-color: var(--dark-border) !important;
+    border-top-color: var(--dark-accent) !important;
+}
+
+/* Tooltips and popovers */
+html.dark .tooltip,
+html.dark .popover {
+    background-color: var(--dark-bg-tertiary) !important;
+    color: var(--dark-text-primary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+/* Breadcrumbs */
+html.dark .breadcrumb {
+    color: var(--dark-text-secondary) !important;
+}
+
+html.dark .breadcrumb-item.active {
+    color: var(--dark-text-primary) !important;
+}
+
+/* Pagination */
+html.dark .pagination .page-link {
+    background-color: var(--dark-bg-secondary) !important;
+    color: var(--dark-text-primary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+html.dark .pagination .page-link:hover,
+html.dark .pagination .page-item.active .page-link {
+    background-color: var(--dark-accent) !important;
+    color: white !important;
+}
+
+/* Alerts and notifications */
+html.dark .alert {
+    background-color: var(--dark-bg-tertiary) !important;
+    color: var(--dark-text-primary) !important;
+    border-color: var(--dark-border) !important;
+}
+
+html.dark .alert-success {
+    background-color: rgba(16, 185, 129, 0.2) !important;
+    color: #6ee7b7 !important;
+}
+
+html.dark .alert-warning {
+    background-color: rgba(251, 191, 36, 0.2) !important;
+    color: #fcd34d !important;
+}
+
+html.dark .alert-error,
+html.dark .alert-danger {
+    background-color: rgba(239, 68, 68, 0.2) !important;
+    color: #fca5a5 !important;
+}
+
+html.dark .alert-info {
+    background-color: rgba(59, 130, 246, 0.2) !important;
+    color: #93c5fd !important;
+}
+
 /* Smooth transitions */
 * {
     transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
@@ -724,5 +1174,55 @@ html.dark .bg-gray-200 {
 /* Override for elements that shouldn't transition */
 img, svg, video, canvas, audio, iframe, embed, object {
     transition: none;
+}
+
+/* ==============================================
+   MOBILE DASHBOARD HEADER OPTIMIZATIONS
+   ============================================== */
+
+@media (max-width: 768px) {
+  /* Header container */
+  .dashboard-header,
+  .header,
+  header {
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    min-height: unset !important;
+  }
+
+  /* Header icon sizes - notification, profile/avatar, and SVG icons */
+  .dashboard-header img,
+  .dashboard-header svg,
+  .header img,
+  .header svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  /* Bottom navigation icons */
+  .bottom-nav svg,
+  .bottom-nav img {
+    width: 22px !important;
+    height: 22px !important;
+  }
+
+  /* Bottom navigation container padding */
+  .bottom-nav {
+    padding-top: 6px !important;
+    padding-bottom: 6px !important;
+  }
+
+  /* Bottom navigation icon labels */
+  .bottom-nav span,
+  .nav-label {
+    font-size: 11px !important;
+    margin-top: 2px !important;
+  }
+
+  /* Ensure tap targets remain usable */
+  button,
+  .nav-item {
+    min-height: 44px;
+  }
 }
 

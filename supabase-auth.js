@@ -1,5 +1,5 @@
 // supabase-auth.js - Fixed version
-import { supabase, POINT_TO_NGN_RATE } from "./supabase-client.js";
+import { supabase } from "./supabase-client.js";
 export { supabase } from "./supabase-client.js";
 import {
     notifyJobApplicationSubmitted,
@@ -7,6 +7,10 @@ import {
     notifyJobAlert,
 } from "./payment-notifications.js";
 import { getUserWallet } from "./manual-payment-system.js";
+
+// Constants
+export const FINAL_SUBMISSION_BUCKET = "final-submissions";
+export const PERSONAL_FINAL_BUCKET = "personal-final-submissions";
 
 // --- Error Handling ---
 export function showError(elementId, message) {
@@ -1031,28 +1035,6 @@ export async function getTrendingCreators(role = "member", limit = 10) {
 }
 
 // Follow a user
-// Check if a user is following another user
-export async function checkUserFollow(followerId, followingId) {
-    try {
-        const { data, error } = await supabase
-            .from("follows")
-            .select("id")
-            .eq("follower_id", followerId)
-            .eq("following_id", followingId)
-            .single();
-
-        if (error && error.code === "PGRST116") {
-            return false; // Not following
-        }
-
-        if (error) throw error;
-        return true; // Following
-    } catch (error) {
-        console.error("Error checking follow status:", error);
-        return false;
-    }
-}
-
 export async function followUser(followerId, followingId) {
     try {
         // Check if already following
@@ -1179,6 +1161,38 @@ export function getFileUrl(bucket, path) {
         console.error("Error getting file URL:", error);
         throw error;
     }
+}
+
+export function getFinalSubmissionPublicUrl(filePath) {
+  if (!filePath) return null;
+  const { data } = supabase.storage
+    .from("final-submissions")
+    .getPublicUrl(filePath);
+  return data?.publicUrl ?? null;
+}
+
+export async function hasFinalSubmissions(jobRequestId) {
+  if (!jobRequestId) return false;
+  const { data, error } = await supabase
+    .from("job_final_submissions")
+    .select("id", { count: "exact", head: true })
+    .eq("job_request_id", jobRequestId);
+  if (error) return false;
+  return (data?.length ?? 0) > 0;
+}
+
+export async function getJobRequestById(jobRequestId) {
+  if (!jobRequestId) return null;
+  const { data, error } = await supabase
+    .from("job_requests")
+    .select("id, job_type, client_id, assigned_apprentice_id, status")
+    .eq("id", jobRequestId)
+    .single();
+  if (error) {
+    console.error("Error fetching job request:", error);
+    return null;
+  }
+  return data;
 }
 
 // Check if storage bucket exists and is accessible
@@ -1858,7 +1872,8 @@ export async function getApprenticeStats(apprenticeId) {
                 `
                 total_earnings,
                 completed_jobs,
-                pending_jobs:job_applications(count)
+                pending_jobs:job_applications(count),
+                active_jobs:job_requests(count)
             `
             )
             .eq("id", apprenticeId)
@@ -1873,7 +1888,7 @@ export async function getApprenticeStats(apprenticeId) {
             .eq("apprentice_id", apprenticeId)
             .eq("status", "pending");
 
-        // Get active jobs count (using explicit query to avoid FK ambiguity)
+        // Get active jobs count
         const { count: activeJobs } = await supabase
             .from("job_requests")
             .select("*", { count: "exact", head: true })
@@ -2406,44 +2421,43 @@ export async function submitJobFeedback(jobUpdateId, memberId, feedbackData) {
     }
 }
 
-// Submit final work for a job
-export async function submitFinalWork(jobRequestId, apprenticeId, submissionData) {
-    try {
-        // Verify the apprentice is assigned to this job
-        const { data: job, error: fetchError } = await supabase
-            .from("job_requests")
-            .select("assigned_apprentice_id, status")
-            .eq("id", jobRequestId)
-            .eq("assigned_apprentice_id", apprenticeId)
-            .eq("status", "in_progress")
-            .single();
+// Submit final work for a job - RPC ONLY
+export async function submitFinalWork(jobRequestId, jobId, submissionData) {
+    // Validate at least one ID provided
+    if (!jobRequestId && !jobId) {
+        throw new Error("Missing jobRequestId or jobId - at least one must be provided");
+    }
 
-        if (fetchError || !job) {
-            throw new Error("Job not found or unauthorized");
+    console.log("[RPC SUBMIT] submitFinalWork called", {
+        jobRequestId,
+        jobId,
+        submissionData
+    });
+
+    const { data, error } = await supabase.rpc(
+        "submit_final_work_v2",  // ← CHANGED: New function name
+        {
+            p_job_request_id: jobRequestId ?? null,
+            p_job_id: jobId ?? null,  // ← ADDED: Support for normal jobs
+            p_title: submissionData.title ?? null,
+            p_description: submissionData.description ?? null,
+            p_file_urls: submissionData.fileUrls ?? [],
+            p_links: submissionData.links ?? []
         }
+    );
 
-        const { data, error } = await supabase
-            .from("job_final_submissions")
-            .insert({
-                job_request_id: jobRequestId,
-                apprentice_id: apprenticeId,
-                title: submissionData.title,
-                description: submissionData.description,
-                file_urls: submissionData.fileUrls || [],
-                links: submissionData.links || [],
-                status: "pending_review",
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
-
-        if (error) throw error;
-        return data;
-    } catch (error) {
-        console.error("Error submitting final work:", error);
+    if (error) {
+        console.error("RPC submit_final_work_v2 failed:", error);
         throw error;
     }
+
+    // Handle new response format
+    if (data && data.success === false) {
+        throw new Error(data.error || "Submission failed");
+    }
+
+    console.log("[RPC SUBMIT] success:", data);
+    return data;
 }
 
 // Review final submission (approve/reject/request revision)
@@ -2758,7 +2772,29 @@ export async function getProgressUpdates(jobRequestId, userRole, userId) {
         const { data, error } = await query;
 
         if (error) throw error;
-        return data;
+
+        // Convert storage paths to signed URLs
+        const updatesWithUrls = await Promise.all((data || []).map(async (update) => {
+            if (update.file_url) {
+                // Check if it's already a full URL
+                if (update.file_url.startsWith('http')) {
+                    return update;
+                }
+
+                // Convert storage path to signed URL
+                const { data: signedUrl } = await supabase.storage
+                    .from('progress-files')  // Your bucket name
+                    .createSignedUrl(update.file_url, 3600); // 1 hour expiry
+
+                return {
+                    ...update,
+                    file_url: signedUrl?.signedUrl || update.file_url
+                };
+            }
+            return update;
+        }));
+
+        return updatesWithUrls;
     } catch (error) {
         console.error("Error fetching progress updates:", error);
         throw error;
@@ -2882,7 +2918,34 @@ export async function submitFinalSubmissionFeedback(finalSubmissionId, memberId,
                     );
                 }
 
-                // Step 3: Process payout using secure RPC function
+                // Step 3: Update job status to "completed" BEFORE processing payout
+                // The payout RPC requires the job to be in "completed" status
+                const { error: jobStatusError } = await supabase
+                    .from("job_requests")
+                    .update({
+                        status: "completed",
+                        completed_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                    })
+                    .eq("id", jobRequestId)
+                    .eq("status", "pending_review"); // Only update if currently pending_review
+
+                if (jobStatusError) {
+                    // Rollback submission status if job update failed
+                    await supabase
+                        .from("job_final_submissions")
+                        .update({
+                            status: previousStatus,
+                            updated_at: new Date().toISOString(),
+                        })
+                        .eq("id", finalSubmissionId);
+
+                    throw new Error(
+                        "Failed to update job status to completed: " + jobStatusError.message
+                    );
+                }
+
+                // Step 4: Process payout using secure RPC function
                 // This function validates ownership, prevents duplicates, and handles wallet updates atomically
                 // It also fetches and validates job details internally, so we don't need to fetch them separately
                 console.log("[FinalSubmission] Processing payout via RPC", {
@@ -2952,27 +3015,6 @@ export async function submitFinalSubmissionFeedback(finalSubmissionId, memberId,
                     });
                 }
 
-                // Submission status is already "approved" from Step 2, no need to update again
-
-                // Step 4: Mark job as completed (only after payout succeeds)
-                // Try to update job status - if it's already completed, this will be a no-op
-                // We don't need to check status first since the RPC function already validated the job state
-                const { error: jobStatusError } = await supabase
-                    .from("job_requests")
-                    .update({
-                        status: "completed",
-                        completed_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString(),
-                    })
-                    .eq("id", jobRequestId)
-                    .neq("status", "completed"); // Only update if not already completed
-
-                // Log warning if update failed, but don't throw error (job might already be completed)
-                if (jobStatusError) {
-                    console.warn(
-                        `[FinalSubmission] Could not update job status to completed: ${jobStatusError.message}. Job may already be completed.`
-                    );
-                }
             } catch (paymentError) {
                 // Critical: do not mark job/submission as approved/completed if payout failed.
                 // The error message should be clear and actionable
@@ -4004,104 +4046,6 @@ async function processRefund(clientId, escrowAmount, jobRequestId, jobTitle) {
 // REFERRAL WALLET SYSTEM FUNCTIONS
 // ==============================================
 
-// ==============================================
-// PERSONAL JOB REQUEST FUNCTIONS
-// ==============================================
-
-// Create personal job request (member sends to specific apprentice)
-export async function createPersonalJobRequest(apprenticeId, jobData) {
-    try {
-        const { data, error } = await supabase.rpc('create_personal_job_request', {
-            p_apprentice_id: apprenticeId,
-            p_title: jobData.title,
-            p_description: jobData.description,
-            p_fixed_price: jobData.fixedPrice,
-            p_skills_required: jobData.skillsRequired || null,
-            p_location: jobData.location || null,
-            p_deadline: jobData.deadline || null
-        });
-
-        if (error) throw error;
-        return data;
-    } catch (error) {
-        console.error("Error creating personal job request:", error);
-        throw error;
-    }
-}
-
-// Get incoming personal job requests for apprentice
-export async function getIncomingPersonalRequests(apprenticeId) {
-    try {
-        const { data, error } = await supabase.rpc('get_incoming_personal_requests', {
-            p_apprentice_id: apprenticeId
-        });
-
-        if (error) throw error;
-        return data || [];
-    } catch (error) {
-        console.error("Error getting incoming personal requests:", error);
-        throw error;
-    }
-}
-
-// Respond to personal job request (accept or reject)
-export async function respondToPersonalRequest(jobId, response) {
-    try {
-        const { data, error } = await supabase.rpc('respond_to_personal_request', {
-            p_job_id: jobId,
-            p_response: response // 'accept' or 'reject'
-        });
-
-        if (error) throw error;
-        return data;
-    } catch (error) {
-        console.error("Error responding to personal request:", error);
-        throw error;
-    }
-}
-
-// Get sent personal requests for client (to see responses)
-export async function getSentPersonalRequests(clientId) {
-    try {
-        const { data, error } = await supabase.rpc('get_sent_personal_requests', {
-            p_client_id: clientId
-        });
-
-        if (error) throw error;
-        return data || [];
-    } catch (error) {
-        console.error("Error getting sent personal requests:", error);
-        throw error;
-    }
-}
-
-// Check if there's already a pending personal job request to a specific apprentice
-export async function checkExistingPersonalRequest(clientId, apprenticeId) {
-    try {
-        const { data, error } = await supabase
-            .from('job_requests')
-            .select('id')
-            .eq('client_id', clientId)
-            .eq('assigned_apprentice_id', apprenticeId)
-            .eq('status', 'personal_pending')
-            .single();
-
-        if (error && error.code === 'PGRST116') {
-            return false; // No pending request found
-        }
-
-        if (error) throw error;
-        return true; // Pending request exists
-    } catch (error) {
-        console.error("Error checking existing personal request:", error);
-        return false;
-    }
-}
-
-// ==============================================
-// REFERRAL FUNCTIONS
-// ==============================================
-
 // Get user's referral wallet
 export async function getReferralWallet(userId) {
     try {
@@ -4819,10 +4763,10 @@ export function getReferralCommissionPercentage(subscriptionTier) {
     }
 }
 
-// Convert points to USD and NGN using global rate
+// Convert points to USD and NGN
 export function convertPointsToCurrency(points) {
     const usd = points / 10; // 10 pts = $1
-    const ngn = points * POINT_TO_NGN_RATE; // Use global NGN rate
+    const ngn = usd * 1500; // $1 = ₦1500
     return { usd, ngn };
 }
 
@@ -5214,6 +5158,24 @@ export async function getUserDetails(userId) {
         console.error('Error fetching user details:', error);
         throw error;
     }
+}
+
+// Get final submission by ID
+export async function getFinalSubmissionById(finalSubmissionId, userId, userRole) {
+    if (!finalSubmissionId) throw new Error("Missing finalSubmissionId");
+
+    const { data, error } = await supabase
+        .from("job_final_submissions")
+        .select(`
+            *,
+            apprentice:apprentice_id(id, name, email),
+            job_request:job_requests(id, title, client_id, apprentice_id, job_type)
+        `)
+        .eq("id", finalSubmissionId)
+        .single();
+
+    if (error) throw error;
+    return data;
 }
 
 

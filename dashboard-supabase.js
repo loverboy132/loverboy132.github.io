@@ -36,7 +36,6 @@ import {
     getTopUsers,
     getTrendingCreators,
     followUser,
-    checkUserFollow,
     getFileUrl,
     checkStorageBucket,
     createJobRequest,
@@ -61,6 +60,8 @@ import {
     submitProgressUpdateFeedback,
     submitFinalWork,
     getFinalSubmissions,
+    getFinalSubmissionById,
+    hasFinalSubmissions,
     submitFinalSubmissionFeedback,
     getPendingProgressUpdates,
     getPendingFinalSubmissions,
@@ -86,15 +87,12 @@ import {
     saveApprenticeProfile,
     saveMemberProfile,
     fetchProfileCardStats,
-    createPersonalJobRequest,
-    getIncomingPersonalRequests,
-    respondToPersonalRequest,
-    getSentPersonalRequests,
-    checkExistingPersonalRequest,
+    FINAL_SUBMISSION_BUCKET,
+    PERSONAL_FINAL_BUCKET,
+    getFinalSubmissionPublicUrl,
+    getJobRequestById,
 } from "./supabase-auth.js";
-import { POINT_TO_NGN_RATE } from "./supabase-client.js";
-import { uploadCV, getCVSignedUrl, getUserWallet, createFundingRequest, getCraftnetBankAccounts, uploadProofOfPayment, getTransactionTypeDisplay } from "./manual-payment-system.js";
-import { getTransactionIcon, getTransactionIconClass, getAmountClass, getAmountPrefix } from "./manual-payment-system.js";
+import { uploadCV, getCVSignedUrl, getUserWallet, createFundingRequest, getCraftnetBankAccounts, uploadProofOfPayment } from "./manual-payment-system.js";
 import {
     getUserNotifications,
     markNotificationAsRead,
@@ -108,6 +106,34 @@ import {
     normalizeNotificationReadStatus,
 } from "./payment-notifications.js";
 
+// DEBUG: Direct inserts enabled for RLS debugging
+
+// PERMANENT FAIL-FAST GUARD
+window.__BLOCK_FINAL_SUBMISSION_WITHOUT_JOB_REQUEST_ID__ = true;
+
+// Debug helper to check job visibility for troubleshooting
+async function debugCheckJobVisibility(jobRequestId) {
+  try {
+    console.log("DEBUG: checking job_requests visibility for", jobRequestId);
+    const { data: jr, error: e1 } = await supabase
+      .from('job_requests')
+      .select('id, assigned_apprentice_id, client_id, status')
+      .eq('id', jobRequestId)
+      .maybeSingle();
+    console.log("DEBUG job_requests result:", jr, e1);
+
+    console.log("DEBUG: checking jobs visibility for same id");
+    const { data: js, error: e2 } = await supabase
+      .from('jobs')
+      .select('id, apprentice_id, member_id, status')
+      .eq('id', jobRequestId)
+      .maybeSingle();
+    console.log("DEBUG jobs result:", js, e2);
+  } catch (err) {
+    console.error("debugCheckJobVisibility failed", err);
+  }
+}
+
 // --- DOM Elements ---
 const loadingScreen = document.getElementById("loading-screen");
 const dashboardLayout = document.getElementById("dashboard-layout");
@@ -120,9 +146,6 @@ const mainNav = document.getElementById("main-nav");
 const notificationBell = document.getElementById("notification-bell");
 const notificationPanel = document.getElementById("notification-panel");
 const notificationList = document.getElementById("notification-list");
-
-// --- Constants ---
-// Points are the single source of truth - NGN is always derived from points
 
 // Helper function to generate fallback avatar (data URI) when placehold.co times out
 function generateFallbackAvatar(text, size = 100) {
@@ -194,6 +217,7 @@ const finalWorkModal = document.getElementById("final-work-modal");
 const finalWorkForm = document.getElementById("final-work-form");
 const progressFeedbackModal = document.getElementById("progress-feedback-modal");
 const finalSubmissionReviewModal = document.getElementById("final-submission-review-modal");
+const viewFinalSubmissionModal = document.getElementById("view-final-submission-modal");
 const progressFeedbackForm = document.getElementById("progress-feedback-form");
 const finalSubmissionReviewForm = document.getElementById("final-submission-review-form");
 
@@ -341,23 +365,12 @@ const apprenticeContentTemplates = {
                 </div>
             </div>
         </div>
-
-        <!-- Personal Job Requests Section -->
-        <div class="mt-8">
-            <h2 class="text-2xl font-bold text-gray-900 mb-6">Personal Job Requests</h2>
-            <div id="personal-requests-container" class="bg-white rounded-lg shadow p-6">
-                <div class="text-center py-4">
-                    <div class="animate-pulse text-gray-500">Loading personal requests...</div>
-                </div>
-            </div>
-        </div>
     `;
     },
     jobs: async (userData) => {
         // Get available job requests for apprentices to apply to
         let availableJobs = [];
         let myApplications = [];
-        let assignedJobs = [];
         let apprenticeStats = {
             pendingApplications: 0,
             activeJobs: 0,
@@ -369,42 +382,14 @@ const apprenticeContentTemplates = {
             availableJobs = await getAllJobRequests();
             myApplications = await getApprenticeJobApplications(userData.id);
             apprenticeStats = await getApprenticeStats(userData.id);
-
-            // Get jobs assigned to this apprentice (including accepted personal requests)
-            const { data: assignedJobsData, error: assignedError } = await supabase
-                .from("job_requests")
-                .select(`
-                    *,
-                    client:profiles!job_requests_client_id_fkey(
-                        id,
-                        name,
-                        email,
-                        creative_type,
-                        location
-                    )
-                `)
-                .eq("assigned_apprentice_id", userData.id)
-                .in("status", ["in_progress", "pending_review"]);
-
-            if (!assignedError && assignedJobsData) {
-                assignedJobs = assignedJobsData;
-            }
-
-            // Update apprentice stats to derive NGN from points instead of using balance_ngn
-            const wallet = await getUserWallet(userData.id);
-            if (wallet) {
-                apprenticeStats.availableBalance = (wallet.balance_points || 0) * POINT_TO_NGN_RATE;
-            } else {
-                apprenticeStats.availableBalance = 0;
-            }
         } catch (error) {
             console.error("Error fetching job data:", error);
         }
 
         return `
         <div class="mb-8">
-            <h1 class="text-3xl font-bold text-gray-900">Find Work</h1>
-            <p class="text-gray-600">Browse available jobs and track your applications.</p>
+            <h1 class="text-3xl font-bold text-gray-900">Available Jobs</h1>
+            <p class="text-gray-600">Browse and apply for jobs that match your skills.</p>
         </div>
         
         <!-- Job Stats Overview -->
@@ -451,7 +436,7 @@ const apprenticeContentTemplates = {
                 </div>
                 <h3 class="text-sm font-medium text-gray-500">Total Earned</h3>
                 <p class="text-3xl font-bold mt-2 text-purple-600">₦${(
-                    apprenticeStats.totalEarned * POINT_TO_NGN_RATE
+                    apprenticeStats.totalEarned * 1500
                 ).toLocaleString()}</p>
             </div>
         </div>
@@ -547,128 +532,6 @@ const apprenticeContentTemplates = {
                         <i data-feather="briefcase" class="w-16 h-16 text-gray-300 mx-auto mb-4"></i>
                         <h4 class="text-xl font-semibold text-gray-700 mb-2">No Available Jobs</h4>
                         <p class="text-gray-500">Check back later for new job opportunities!</p>
-                    </div>
-                `
-                }
-            </div>
-        </div>
-
-        <!-- My Assigned Jobs -->
-        <div class="bg-white rounded-lg shadow mb-8">
-            <div class="p-6 border-b border-gray-200">
-                <h3 class="text-xl font-bold text-gray-900">My Jobs</h3>
-                <p class="text-gray-600">Jobs you've been assigned to work on</p>
-            </div>
-            <div class="p-6">
-                ${
-                    assignedJobs.length > 0
-                        ? `
-                    <div class="space-y-6 job-request-list">
-                        ${assignedJobs
-                            .map(
-                                (job) => `
-                            <div class="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                                <div class="flex justify-between items-start mb-4">
-                                    <div class="flex-1">
-                                        <h4 class="text-xl font-semibold text-gray-900">${
-                                            job.title
-                                        }</h4>
-                                        <p class="text-gray-600 mt-1">${
-                                            job.description
-                                        }</p>
-                                        <div class="flex items-center mt-2">
-                                            <img src="https://placehold.co/32x32/EBF4FF/3B82F6?text=${
-                                                job.client?.name?.charAt(0) ||
-                                                "C"
-                                            }"
-                                                 alt="${job.client?.name}"
-                                                 class="w-8 h-8 rounded-full mr-2">
-                                            <span class="text-sm text-gray-600">${
-                                                job.client?.name ||
-                                                "Anonymous Client"
-                                            }</span>
-                                        </div>
-                                    </div>
-                                    <div class="text-right">
-                                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                                            job.status === "in_progress"
-                                                ? "bg-blue-100 text-blue-800"
-                                                : job.status === "pending_review"
-                                                ? "bg-yellow-100 text-yellow-800"
-                                                : "bg-gray-100 text-gray-800"
-                                        }">
-                                            ${
-                                                job.status === "in_progress"
-                                                    ? "In Progress"
-                                                    : job.status === "pending_review"
-                                                    ? "Pending Review"
-                                                    : job.status
-                                            }
-                                        </span>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between">
-                                    <div class="flex items-center space-x-4">
-                                        <span class="text-sm text-gray-600">
-                                            <i data-feather="dollar-sign" class="w-4 h-4 inline mr-1"></i>
-                                            ₦${job.fixed_price || job.budget_max || "N/A"}
-                                        </span>
-                                        <span class="text-sm text-gray-600">
-                                            <i data-feather="calendar" class="w-4 h-4 inline mr-1"></i>
-                                            Due: ${job.deadline ? new Date(job.deadline).toLocaleDateString() : "No deadline"}
-                                        </span>
-                                    </div>
-                                    <div class="flex flex-wrap gap-2">
-                                        ${
-                                            job.status === "in_progress"
-                                                ? `
-                                        <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm submit-progress-update-btn"
-                                                data-job-id="${job.id}">
-                                            <i data-feather="upload" class="w-4 h-4 mr-2"></i>
-                                            Submit Progress Update
-                                        </button>
-                                        <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm submit-final-work-btn"
-                                                data-job-id="${job.id}">
-                                            <i data-feather="check-circle" class="w-4 h-4 mr-2"></i>
-                                            Submit Final Work
-                                        </button>
-                                        <button class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm load-apprentice-progress-updates-btn"
-                                                data-job-id="${job.id}">
-                                            <i data-feather="message-circle" class="w-4 h-4 mr-2"></i>
-                                            View Progress
-                                        </button>
-                                        `
-                                                : job.status === "pending_review"
-                                                ? `
-                                        <span class="text-yellow-600 font-medium">Waiting for client review</span>
-                                        `
-                                                : ""
-                                        }
-                                    </div>
-                                </div>
-                                ${
-                                    job.status === "in_progress"
-                                        ? `
-                                <div class="border-t border-gray-200 pt-4 mt-4">
-                                    <h5 class="font-semibold text-gray-900 mb-3">Progress Updates</h5>
-                                    <div id="progress-updates-${job.id}" class="progress-updates-container">
-                                        <!-- Progress updates will be loaded here -->
-                                    </div>
-                                </div>
-                                `
-                                        : ""
-                                }
-                            </div>
-                            `
-                            )
-                            .join("")}
-                    </div>
-                `
-                        : `
-                    <div class="text-center py-12">
-                        <i data-feather="briefcase" class="w-16 h-16 text-gray-300 mx-auto mb-4"></i>
-                        <h4 class="text-xl font-semibold text-gray-700 mb-2">No Assigned Jobs</h4>
-                        <p class="text-gray-500">You haven't been assigned to any jobs yet. Apply to available jobs to get started!</p>
                     </div>
                 `
                 }
@@ -772,28 +635,28 @@ const apprenticeContentTemplates = {
                                     <div class="border-t border-gray-200 pt-4">
                                         <h5 class="font-semibold text-gray-900 mb-3">Job Progress</h5>
                                         <div class="flex items-center space-x-4 mb-4">
-                                            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm submit-progress-update-btn" 
-                                                    data-job-id="${app.job_request.id}">
+                                            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm submit-progress-update-btn"
+                                                    data-job-id="${app.job_request.job_id || app.job_request.id}">
                                                 <i data-feather="upload" class="w-4 h-4 mr-2"></i>
                                                 Submit Progress Update
                                             </button>
-                                            <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm submit-final-work-btn" 
-                                                    data-job-id="${app.job_request.id}">
+                                            <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm submit-final-work-btn"
+                                                    data-job-request-id="${app.job_request.id}">
                                                 <i data-feather="check-circle" class="w-4 h-4 mr-2"></i>
                                                 Submit Final Work
                                             </button>
-                                            <button class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm load-apprentice-progress-updates-btn" 
-                                                    data-job-id="${app.job_request.id}">
+                                            <button class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm load-apprentice-progress-updates-btn"
+                                                    data-job-id="${app.job_request.job_id || app.job_request.id}">
                                                 <i data-feather="eye" class="w-4 h-4 mr-2"></i>
                                                 View Progress & Feedback
                                             </button>
                                         </div>
-                                        <div id="progress-updates-${app.job_request.id}" class="progress-updates-container">
+                                        <div id="progress-updates-${app.job_request.job_id || app.job_request.id}" class="progress-updates-container">
                                             <!-- Progress updates will be loaded here -->
                                         </div>
                                         <div class="mt-2">
-                                            <button class="text-sm text-gray-500 hover:text-gray-700 load-apprentice-progress-updates-btn" 
-                                                    data-job-id="${app.job_request.id}">
+                                            <button class="text-sm text-gray-500 hover:text-gray-700 load-apprentice-progress-updates-btn"
+                                                    data-job-id="${app.job_request.job_id || app.job_request.id}">
                                                 <i data-feather="refresh-cw" class="w-4 h-4 inline mr-1"></i>
                                                 Refresh Progress Updates
                                             </button>
@@ -821,83 +684,23 @@ const apprenticeContentTemplates = {
     `;
     },
     earnings: async (userData) => {
-        // Get real earnings data from Supabase
+        // Get real earnings data
         let stats = {
             totalEarned: 0,
             availableBalance: 0,
             thisMonth: 0,
             goalProgress: 0,
-            monthlyEarnings: [],
-            recentTransactions: []
         };
 
         try {
-            const userId = userData.id;
-
-            // Get apprentice stats
-            const apprenticeStats = await getApprenticeStats(userId);
-            stats.totalEarned = apprenticeStats.totalEarned || 0;
-            stats.completedJobs = apprenticeStats.completedJobs || 0;
-            stats.activeJobs = apprenticeStats.activeJobs || 0;
-            stats.pendingJobs = apprenticeStats.pendingJobs || 0;
-
-            // Get wallet balance - derive NGN from points instead of using balance_ngn
-            const wallet = await getUserWallet(userId);
-            stats.availableBalance = wallet ? (wallet.balance_points || 0) * POINT_TO_NGN_RATE : 0;
-
-            // Calculate goal progress (₦7,500,000 goal)
-            stats.goalProgress = Math.min(100, Math.round((stats.totalEarned / 7500000) * 100));
-
-            // Calculate job completion progress
-            const totalJobsAssigned = stats.completedJobs + stats.activeJobs + stats.pendingJobs;
-            stats.jobCompletionProgress = totalJobsAssigned > 0 ? Math.round((stats.completedJobs / totalJobsAssigned) * 100) : 0;
-
-            // Get monthly earnings for the last 4 months
-            const currentDate = new Date();
-            stats.monthlyEarnings = [];
-
-            for (let i = 3; i >= 0; i--) {
-                const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-                const monthStart = monthDate.toISOString().split('T')[0];
-                const nextMonth = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 1);
-                const monthEnd = nextMonth.toISOString().split('T')[0];
-
-                const { data: monthlyTransactions } = await supabase
-                    .from('wallet_transactions')
-                    .select('amount_ngn')
-                    .eq('user_id', userId)
-                    .eq('transaction_type', 'job_payment')
-                    .gte('created_at', monthStart)
-                    .lt('created_at', monthEnd);
-
-                const monthlyTotal = monthlyTransactions?.reduce((sum, tx) => sum + (tx.amount_ngn || 0), 0) || 0;
-                stats.monthlyEarnings.push({
-                    month: monthDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long' }),
-                    amount: monthlyTotal
-                });
-            }
-
-            // Get this month's earnings
-            const thisMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-            stats.thisMonth = stats.monthlyEarnings[3]?.amount || 0;
-
-            // Get recent transactions (last 5)
-            const { data: transactions } = await supabase
-                .from('wallet_transactions')
-                .select(`
-                    id,
-                    transaction_type,
-                    amount_ngn,
-                    description,
-                    created_at,
-                    reference
-                `)
-                .eq('user_id', userId)
-                .order('created_at', { ascending: false })
-                .limit(5);
-
-            stats.recentTransactions = transactions || [];
-
+            const apprenticeStats = await getApprenticeStats(userData.id);
+            stats.totalEarned = apprenticeStats.totalEarned;
+            stats.availableBalance = Math.round(stats.totalEarned * 0.8); // 80% available for withdrawal
+            stats.thisMonth = Math.round(stats.totalEarned * 0.3); // 30% earned this month
+            stats.goalProgress = Math.min(
+                100,
+                Math.round((stats.totalEarned / 7500000) * 100)
+            ); // Goal of ₦7,500,000
         } catch (error) {
             console.error("Error fetching earnings data:", error);
         }
@@ -908,36 +711,42 @@ const apprenticeContentTemplates = {
             <p class="text-gray-600">Manage your finances and track your growth.</p>
         </div>
         
-        <!-- Earnings & Progress Overview -->
+        <!-- Earnings Overview -->
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <div class="stat-card bg-white p-6 rounded-lg shadow text-center">
                 <div class="p-3 rounded-full bg-green-100 text-green-600 mx-auto w-12 h-12 flex items-center justify-center mb-3">
                     <i data-feather="dollar-sign" class="w-6 h-6"></i>
                 </div>
                 <h3 class="text-sm font-medium text-gray-500">Total Earned</h3>
-                <p class="text-3xl font-bold mt-2 text-green-600">₦${stats.totalEarned.toLocaleString()}</p>
+                <p class="text-3xl font-bold mt-2 text-green-600">₦${(
+                    stats.totalEarned * 1500
+                ).toLocaleString()}</p>
             </div>
             <div class="stat-card bg-white p-6 rounded-lg shadow text-center">
                 <div class="p-3 rounded-full bg-blue-100 text-blue-600 mx-auto w-12 h-12 flex items-center justify-center mb-3">
                     <i data-feather="credit-card" class="w-6 h-6"></i>
                 </div>
                 <h3 class="text-sm font-medium text-gray-500">Available Balance</h3>
-                <p class="text-3xl font-bold mt-2 text-blue-600">₦${stats.availableBalance.toLocaleString()}</p>
+                <p class="text-3xl font-bold mt-2 text-blue-600">₦${(
+                    stats.availableBalance * 1500
+                ).toLocaleString()}</p>
             </div>
             <div class="stat-card bg-white p-6 rounded-lg shadow text-center">
-                <div class="p-3 rounded-full bg-orange-100 text-orange-600 mx-auto w-12 h-12 flex items-center justify-center mb-3">
-                    <i data-feather="briefcase" class="w-6 h-6"></i>
+                <div class="p-3 rounded-full bg-yellow-100 text-yellow-600 mx-auto w-12 h-12 flex items-center justify-center mb-3">
+                    <i data-feather="trending-up" class="w-6 h-6"></i>
                 </div>
-                <h3 class="text-sm font-medium text-gray-500">Jobs Completed</h3>
-                <p class="text-3xl font-bold mt-2 text-orange-600">${stats.completedJobs}</p>
+                <h3 class="text-sm font-medium text-gray-500">This Month</h3>
+                <p class="text-3xl font-bold mt-2 text-yellow-600">₦${(
+                    stats.thisMonth * 1500
+                ).toLocaleString()}</p>
             </div>
             <div class="stat-card bg-white p-6 rounded-lg shadow text-center">
                 <div class="p-3 rounded-full bg-purple-100 text-purple-600 mx-auto w-12 h-12 flex items-center justify-center mb-3">
                     <i data-feather="target" class="w-6 h-6"></i>
                 </div>
-                <h3 class="text-sm font-medium text-gray-500">Completion Rate</h3>
+                <h3 class="text-sm font-medium text-gray-500">Goal Progress</h3>
                 <p class="text-3xl font-bold mt-2 text-purple-600">${
-                    stats.jobCompletionProgress
+                    stats.goalProgress
                 }%</p>
             </div>
         </div>
@@ -956,13 +765,15 @@ const apprenticeContentTemplates = {
                         <p class="text-gray-600 text-sm mb-4">Withdraw your available balance to your bank account or mobile money.</p>
                         <div class="flex items-center justify-between mb-4">
                             <span class="text-sm text-gray-600">Available for withdrawal:</span>
-                            <span class="font-bold text-green-600">₦${stats.availableBalance.toLocaleString()}</span>
+                            <span class="font-bold text-green-600">₦${(
+                                stats.availableBalance * 1500
+                            ).toLocaleString()}</span>
                         </div>
                         <div class="flex space-x-2">
-                            <button class="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed" ${
+                            <button class="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 text-sm font-medium" ${
                                 stats.availableBalance === 0 ? "disabled" : ""
                             }>Withdraw All</button>
-                            <button class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed" ${
+                            <button class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 text-sm font-medium" ${
                                 stats.availableBalance === 0 ? "disabled" : ""
                             }>Custom Amount</button>
                         </div>
@@ -998,61 +809,62 @@ const apprenticeContentTemplates = {
                 </div>
                 <div class="p-6">
                     <div class="space-y-4">
-                        ${stats.monthlyEarnings.slice(-4).reverse().map((monthData, index) => `
                         <div class="flex items-center justify-between">
-                            <span class="text-sm text-gray-600">${monthData.month}</span>
-                            <span class="font-semibold text-green-600">₦${monthData.amount.toLocaleString()}</span>
+                            <span class="text-sm text-gray-600">December 2024</span>
+                            <span class="font-semibold text-green-600">₦${(
+                                stats.thisMonth * 1500
+                            ).toLocaleString()}</span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-2">
-                            <div class="bg-green-600 h-2 rounded-full" style="width: ${Math.min(100, (monthData.amount / Math.max(...stats.monthlyEarnings.map(m => m.amount), 1)) * 100)}%"></div>
+                            <div class="bg-green-600 h-2 rounded-full" style="width: ${Math.min(
+                                100,
+                                (stats.thisMonth / 1000) * 100
+                            )}%"></div>
                         </div>
-                        `).join('')}
+                        
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600">November 2024</span>
+                            <span class="font-semibold text-green-600">₦${(
+                                Math.round(stats.totalEarned * 0.2) * 1500
+                            ).toLocaleString()}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-green-600 h-2 rounded-full" style="width: ${Math.min(
+                                100,
+                                ((stats.totalEarned * 0.2) / 1000) * 100
+                            )}%"></div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600">October 2024</span>
+                            <span class="font-semibold text-green-600">₦${(
+                                Math.round(stats.totalEarned * 0.3) * 1500
+                            ).toLocaleString()}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-green-600 h-2 rounded-full" style="width: ${Math.min(
+                                100,
+                                ((stats.totalEarned * 0.3) / 1000) * 100
+                            )}%"></div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <span class="text-sm text-gray-600">September 2024</span>
+                            <span class="font-semibold text-green-600">₦${(
+                                Math.round(stats.totalEarned * 0.2) * 1500
+                            ).toLocaleString()}</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-green-600 h-2 rounded-full" style="width: ${Math.min(
+                                100,
+                                ((stats.totalEarned * 0.2) / 1000) * 100
+                            )}%"></div>
+                        </div>
                     </div>
                     
                     <div class="mt-6 text-center">
                         <button class="text-blue-600 hover:text-blue-700 font-medium">View Detailed Analytics →</button>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Job Progress Overview -->
-        <div class="bg-white rounded-lg shadow mb-8">
-            <div class="p-6 border-b border-gray-200">
-                <h3 class="text-xl font-bold text-gray-900">Job Progress</h3>
-                <p class="text-gray-600">Track your job completion and activity</p>
-            </div>
-            <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div class="text-center">
-                        <div class="p-4 rounded-full bg-green-100 text-green-600 mx-auto w-16 h-16 flex items-center justify-center mb-3">
-                            <i data-feather="check-circle" class="w-8 h-8"></i>
-                        </div>
-                        <h4 class="font-semibold text-gray-900">Completed Jobs</h4>
-                        <p class="text-2xl font-bold text-green-600 mt-1">${stats.completedJobs}</p>
-                    </div>
-                    <div class="text-center">
-                        <div class="p-4 rounded-full bg-blue-100 text-blue-600 mx-auto w-16 h-16 flex items-center justify-center mb-3">
-                            <i data-feather="clock" class="w-8 h-8"></i>
-                        </div>
-                        <h4 class="font-semibold text-gray-900">Active Jobs</h4>
-                        <p class="text-2xl font-bold text-blue-600 mt-1">${stats.activeJobs}</p>
-                    </div>
-                    <div class="text-center">
-                        <div class="p-4 rounded-full bg-yellow-100 text-yellow-600 mx-auto w-16 h-16 flex items-center justify-center mb-3">
-                            <i data-feather="alert-circle" class="w-8 h-8"></i>
-                        </div>
-                        <h4 class="font-semibold text-gray-900">Pending Applications</h4>
-                        <p class="text-2xl font-bold text-yellow-600 mt-1">${stats.pendingJobs}</p>
-                    </div>
-                </div>
-
-                <div class="mt-6">
-                    <h4 class="font-semibold text-gray-900 mb-3">Completion Progress</h4>
-                    <div class="w-full bg-gray-200 rounded-full h-3">
-                        <div class="bg-green-600 h-3 rounded-full transition-all duration-300" style="width: ${stats.jobCompletionProgress}%"></div>
-                    </div>
-                    <p class="text-sm text-gray-600 mt-2">${stats.jobCompletionProgress}% of assigned jobs completed</p>
                 </div>
             </div>
         </div>
@@ -1065,26 +877,26 @@ const apprenticeContentTemplates = {
             </div>
             <div class="p-6">
                 ${
-                    stats.recentTransactions.length > 0
+                    stats.totalEarned > 0
                         ? `
                     <div class="space-y-4">
-                        ${stats.recentTransactions.map(transaction => `
                         <div class="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                             <div class="flex items-center">
-                                <div class="p-2 rounded-full ${getTransactionIcon(transaction.transaction_type)} mr-4">
-                                    <i data-feather="${getTransactionIconClass(transaction.transaction_type)}" class="w-4 h-4"></i>
+                                <div class="p-2 rounded-full bg-green-100 text-green-600 mr-4">
+                                    <i data-feather="plus" class="w-4 h-4"></i>
                                 </div>
                                 <div>
-                                    <h4 class="font-semibold text-gray-900">${getTransactionTypeDisplay(transaction.transaction_type)}</h4>
-                                    <p class="text-sm text-gray-600">${transaction.description || 'Transaction'}</p>
+                                    <h4 class="font-semibold text-gray-900">Completed Job</h4>
+                                    <p class="text-sm text-gray-600">Payment received for completed work</p>
                                 </div>
                             </div>
                             <div class="text-right">
-                                <span class="font-bold ${getAmountClass(transaction.transaction_type)}">${getAmountPrefix(transaction.transaction_type)}₦${Math.abs(transaction.amount_ngn || 0).toLocaleString()}</span>
-                                <p class="text-xs text-gray-500">${new Date(transaction.created_at).toLocaleDateString()}</p>
+                                <span class="font-bold text-green-600">+₦${(
+                                    Math.round(stats.totalEarned * 0.4) * 1500
+                                ).toLocaleString()}</span>
+                                <p class="text-xs text-gray-500">Completed</p>
                             </div>
                         </div>
-                        `).join('')}
                     </div>
                 `
                         : `
@@ -1671,7 +1483,7 @@ const memberContentTemplates = {
                             }
                         </div>
                         <div class="flex space-x-2">
-                            <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 follow-btn"
+                            <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 follow-btn" 
                                     data-user-id="${user.id}">
                                 ${
                                     currentUserRole === "member" &&
@@ -1680,16 +1492,6 @@ const memberContentTemplates = {
                                         : "Follow"
                                 }
                             </button>
-                            ${
-                                currentUserRole === "member" &&
-                                user.role === "apprentice"
-                                    ? `<button class="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 send-personal-request-btn"
-                                               data-user-id="${user.id}"
-                                               data-user-name="${user.name || 'Apprentice'}">
-                                            Send Personal Job Request
-                                        </button>`
-                                    : ""
-                            }
                         </div>
                     </div>
                 `
@@ -1766,7 +1568,7 @@ const memberContentTemplates = {
                             }
                         </div>
                         <div class="flex space-x-2">
-                            <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 follow-btn"
+                            <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 follow-btn" 
                                     data-user-id="${user.id}">
                                 ${
                                     currentUserRole === "member" &&
@@ -1775,16 +1577,6 @@ const memberContentTemplates = {
                                         : "Follow"
                                 }
                             </button>
-                            ${
-                                currentUserRole === "member" &&
-                                user.role === "apprentice"
-                                    ? `<button class="flex-1 bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 send-personal-request-btn"
-                                               data-user-id="${user.id}"
-                                               data-user-name="${user.name || 'Apprentice'}">
-                                            Send Personal Job Request
-                                        </button>`
-                                    : ""
-                            }
                         </div>
                     </div>
                 `
@@ -2081,7 +1873,7 @@ const memberContentTemplates = {
                     <div>
                         <p class="text-blue-100 text-sm">Available Points</p>
                         <p class="text-3xl font-bold">${(referralWallet?.available_points || 0).toFixed(2)}</p>
-                        <p class="text-blue-100 text-sm">₦${((referralWallet?.available_points || 0) * POINT_TO_NGN_RATE).toFixed(0)} NGN</p>
+                        <p class="text-blue-100 text-sm">₦${((referralWallet?.available_points || 0) * 150).toFixed(0)} NGN</p>
                     </div>
                     <div class="w-12 h-12 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
                         <i data-feather="wallet" class="w-6 h-6"></i>
@@ -2444,7 +2236,7 @@ const memberContentTemplates = {
                 </div>
                 <h3 class="text-sm font-medium text-gray-500">Total Spent</h3>
                 <p class="text-3xl font-bold mt-2 text-purple-600">₦${(
-                    clientStats.totalSpent * POINT_TO_NGN_RATE
+                    clientStats.totalSpent * 1500
                 ).toLocaleString()}</p>
             </div>
         </div>
@@ -2708,7 +2500,7 @@ const memberContentTemplates = {
                                 }
                                 
                                 ${
-                                    job.status === "in_progress" && job.assigned_apprentice_id
+                                    ((job.status === "in_progress" || job.status === "pending_review") && job.assigned_apprentice_id)
                                         ? `
                                     <div class="border-t border-gray-200 pt-4">
                                         <h5 class="font-semibold text-gray-900 mb-3">Progress Updates</h5>
@@ -2721,10 +2513,10 @@ const memberContentTemplates = {
                                                 <i data-feather="refresh-cw" class="w-4 h-4 mr-2"></i>
                                                 Load Progress Updates
                                             </button>
-                                            <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm load-final-submissions-btn" 
+                                            <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm view-final-submission-btn"
                                                     data-job-id="${job.id}">
                                                 <i data-feather="check-circle" class="w-4 h-4 mr-2"></i>
-                                                Load Final Submissions
+                                                View Final Submission
                                             </button>
                                         </div>
                                         <div id="final-submissions-${job.id}" class="final-submissions-container mt-4">
@@ -3316,38 +3108,6 @@ function attachDynamicEventListeners(tabId, userData) {
                     });
                 }
             }, 100);
-
-            // Check connection status and show/hide personal job request buttons
-            setTimeout(async () => {
-                await updatePersonalRequestButtonVisibility();
-
-                // Add event listeners for personal job request buttons (only once)
-                if (!document.hasPersonalRequestListener) {
-                    document.addEventListener('click', async (e) => {
-                        if (e.target.classList.contains('send-personal-request-btn') || e.target.closest('.send-personal-request-btn')) {
-                            e.preventDefault();
-                            const btn = e.target.classList.contains('send-personal-request-btn') ? e.target : e.target.closest('.send-personal-request-btn');
-                            const apprenticeId = btn.dataset.userId;
-                            const apprenticeName = btn.dataset.userName;
-
-                            if (!apprenticeId) return; // Skip if no data attribute
-
-                            // Double-check for existing pending request before opening modal
-                            const { data: { user } } = await supabase.auth.getUser();
-                            if (user) {
-                                const hasPendingRequest = await checkExistingPersonalRequest(user.id, apprenticeId);
-                                if (hasPendingRequest) {
-                                    showNotification('You already have a pending personal job request to this apprentice', 'error');
-                                    return;
-                                }
-                            }
-
-                            showPersonalJobRequestModal(apprenticeId, apprenticeName);
-                        }
-                    });
-                    document.hasPersonalRequestListener = true;
-                }
-            }, 200);
 
             async function handleSearch() {
                 const searchInput = document.getElementById("search-input");
@@ -4077,8 +3837,8 @@ document.addEventListener("click", async (e) => {
     // Final work submission handler (for apprentices)
     if (e.target.classList.contains("submit-final-work-btn")) {
         e.preventDefault();
-        const jobId = e.target.dataset.jobId;
-        openFinalWorkModal(jobId);
+        const jobRequestId = e.target.dataset.jobRequestId;
+        openFinalWorkModal(jobRequestId);
     }
 
     // Load progress updates handler (for members)
@@ -4100,6 +3860,13 @@ document.addEventListener("click", async (e) => {
         e.preventDefault();
         const jobId = e.target.dataset.jobId;
         await loadFinalSubmissions(jobId);
+    }
+
+    // View final submission handler (for members) - SAME for both job types
+    if (e.target.classList.contains("view-final-submission-btn")) {
+        e.preventDefault();
+        const jobId = e.target.dataset.jobId;
+        await viewFinalSubmission(jobId);
     }
 
     // Progress update feedback handler (for members)
@@ -4325,9 +4092,6 @@ async function displaySearchResults(results) {
     if (typeof feather !== "undefined") {
         feather.replace();
     }
-
-    // Update personal request button visibility for search results
-    setTimeout(() => updatePersonalRequestButtonVisibility(), 100);
 }
 
 async function loadTrendingCreators(userData) {
@@ -5400,6 +5164,33 @@ function setupEventListeners(userData) {
             }
         });
     }
+
+    // View Final Submission Modal
+    if (viewFinalSubmissionModal) {
+        const closeBtn = viewFinalSubmissionModal.querySelector("#close-view-final-submission-modal");
+        const closeBtn2 = viewFinalSubmissionModal.querySelector("#close-view-submission");
+
+        if (closeBtn) {
+            closeBtn.addEventListener("click", () => {
+                viewFinalSubmissionModal.classList.remove("active");
+            });
+        }
+
+        if (closeBtn2) {
+            closeBtn2.addEventListener("click", () => {
+                viewFinalSubmissionModal.classList.remove("active");
+            });
+        }
+
+        // Close modal when clicking outside
+        viewFinalSubmissionModal.addEventListener("click", (e) => {
+            if (e.target === viewFinalSubmissionModal) {
+                viewFinalSubmissionModal.classList.remove("active");
+            }
+        });
+
+        // Handle review button click (will be set dynamically)
+    }
 }
 
 // --- Main Render Function ---
@@ -5696,11 +5487,6 @@ async function switchContent(tabId, userData) {
             mainContent.innerHTML = content || `<div class="text-center py-12"><p class="text-gray-500">No content available.</p></div>`;
         } else {
             console.error("mainContent element not found!");
-        }
-
-        // Load personal requests for apprentice home tab
-        if (userData.role === "apprentice" && tabId === "home") {
-            setTimeout(() => loadPersonalRequestsForApprentice(), 100);
         }
 
         // Initialize wallet interface if wallet tab is selected
@@ -6715,18 +6501,6 @@ async function initializeDashboardOnReady() {
                               "cursor-not-allowed"
                           );
                           originalBtn.disabled = true;
-
-                          // Show personal job request button after successful connection
-                          const personalRequestBtn = document.querySelector(
-                              `[data-user-id="${userId}"].send-personal-request-btn`
-                          );
-                          if (personalRequestBtn) {
-                              // Double-check there's no pending request
-                              const hasPendingRequest = await checkExistingPersonalRequest(user.id, userId);
-                              if (!hasPendingRequest) {
-                                  personalRequestBtn.classList.remove('hidden');
-                              }
-                          }
                       }
 
                       // Update follower count in UI
@@ -7381,13 +7155,13 @@ async function updateApprenticeStats(userData) {
         );
         if (earningsStats.length >= 4) {
             earningsStats[0].textContent = `₦${(
-                stats.totalEarned * POINT_TO_NGN_RATE
+                stats.totalEarned * 1500
             ).toLocaleString()}`;
             earningsStats[1].textContent = `₦${(
-                stats.availableBalance * POINT_TO_NGN_RATE
+                stats.availableBalance * 1500
             ).toLocaleString()}`;
             earningsStats[2].textContent = `₦${(
-                stats.thisMonth * POINT_TO_NGN_RATE
+                stats.thisMonth * 1500
             ).toLocaleString()}`;
             earningsStats[3].textContent = `${stats.goalProgress}%`;
         }
@@ -9016,7 +8790,7 @@ async function openProgressUpdateModal(jobId) {
 }
 
 // Handle final work modal opening (for apprentices)
-async function openFinalWorkModal(jobId) {
+async function openFinalWorkModal(jobRequestId) {
     try {
         const {
             data: { user },
@@ -9026,8 +8800,8 @@ async function openFinalWorkModal(jobId) {
             return;
         }
 
-        // Store job ID for form submission
-        finalWorkForm.dataset.jobId = jobId;
+        // Store job_request_id for form submission - CRITICAL for RLS
+        finalWorkForm.dataset.jobRequestId = jobRequestId;
         
         // Show modal
         finalWorkModal.classList.add("active");
@@ -9120,8 +8894,9 @@ async function handleProgressUpdateSubmission(e) {
 
 // Handle final work form submission
 async function handleFinalWorkSubmission(e) {
+    console.error("🚨 FINAL SUBMISSION PATH HIT", new Error().stack);
     e.preventDefault();
-    
+
     try {
         const {
             data: { user },
@@ -9131,7 +8906,25 @@ async function handleFinalWorkSubmission(e) {
             return;
         }
 
-        const jobId = finalWorkForm.dataset.jobId;
+        // HARD-ASSERT job_request_id AT RUNTIME
+        const jobRequestId = finalWorkForm?.dataset?.jobRequestId;
+
+        console.group("[FINAL SUBMISSION CHECK]");
+        console.log("dataset:", finalWorkForm.dataset);
+        console.log("jobRequestId:", jobRequestId);
+        console.groupEnd();
+
+        if (!jobRequestId) {
+          throw new Error(
+            "FATAL: Missing job_request_id. Final submissions MUST reference job_requests.id"
+          );
+        }
+
+        // PERMANENT FAIL-FAST GUARD CHECK
+        if (window.__BLOCK_FINAL_SUBMISSION_WITHOUT_JOB_REQUEST_ID__ && !jobRequestId) {
+          throw new Error("Blocked final submission: missing job_request_id");
+        }
+
         const title = document.getElementById("final-title").value;
         const description = document.getElementById("final-description").value;
         const file = document.getElementById("final-file").files[0];
@@ -9148,29 +8941,52 @@ async function handleFinalWorkSubmission(e) {
         submitBtn.disabled = true;
         spinner.classList.remove("hidden");
 
+        // TEMPORARY: Hard-code bucket for debugging
+        const bucket = "personal-final-submissions";
+        console.log("Uploading final submission to bucket:", bucket);
+
         // Upload file
         const fileExt = file.name.split('.').pop().toLowerCase();
-        const fileName = `${user.id}/${Date.now()}-${file.name}`;
-        
+        // Canonical storage path must be based on jobRequestId so it can be reused exactly
+        const fileName = `${jobRequestId}/${Date.now()}-${file.name}`;
+
         const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('final-work-files')
+            .from(bucket)
             .upload(fileName, file);
 
         if (uploadError) throw uploadError;
 
-        // Prepare submission data
+        // HARD ASSERTIONS - FAIL FAST
+        if (!jobRequestId) {
+          throw new Error("Missing jobRequestId in final submission form");
+        }
+
+        if (!user?.id) {
+          throw new Error("Missing authenticated user");
+        }
+
+        // UNIFIED SUBMISSION DATA - NO PERSONAL JOB SPECIAL CASES
         const submissionData = {
-            title,
-            description,
-            fileUrl: uploadData.path,
-            fileType: fileExt,
-            linkUrl: linkUrl || null
+          title: title || null,
+          description: description || null,
+          fileUrls: [uploadData.path],  // Always array format
+          links: linkUrl ? [linkUrl] : []  // Always array format
         };
 
-        // Submit final work
-        await submitFinalWork(jobId, user.id, submissionData);
-        
-        showNotification("Final work submitted successfully!", "success");
+        console.log("=== FINAL SUBMISSION ASSERTIONS ===");
+        console.log("jobRequestId:", jobRequestId);
+        console.log("submissionData:", submissionData);
+
+        console.error("🚨 FINAL SUBMISSION PATH HIT", new Error().stack);
+        // RPC CALL - supports both job_request_id and job_id
+        const result = await submitFinalWork(
+          jobRequestId,
+          null,  // jobId (null for personal job requests, would be set for normal jobs)
+          submissionData
+        );
+
+        console.log("✅ SUBMISSION SUCCESS:", result);
+        showNotification("Final work submitted successfully", "success");
         
         // Close modal
         finalWorkModal.classList.remove("active");
@@ -9621,7 +9437,305 @@ async function handleProgressFeedbackSubmission(e) {
     }
 }
 
-// Load final submissions for a job (for members)
+// View final submission directly (opens review modal)
+// Globally accessible function for event handlers
+async function viewFinalSubmission(jobId, submissionId = null) {
+    try {
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+            showNotification("Please log in to view final submissions", "error");
+            return;
+        }
+
+        let targetSubmissionId;
+
+        if (submissionId) {
+            // Direct submission ID provided
+            targetSubmissionId = submissionId;
+        } else {
+            // Get final submissions for this job and use the latest one
+            const submissions = await getFinalSubmissions(jobId, "member", user.id);
+
+            if (submissions.length === 0) {
+                showNotification("No final submissions found", "error");
+                return;
+            }
+
+            // Use the most recent submission
+            const latestSubmission = submissions[0];
+            targetSubmissionId = latestSubmission.id;
+        }
+
+        // Open view modal for the target submission
+        await showFinalSubmissionDetails(targetSubmissionId);
+
+    } catch (error) {
+        console.error("Error viewing final submission:", error);
+        showNotification("Failed to view final submission", "error");
+    }
+}
+
+// Shared function to render submission details
+function renderSubmissionDetails(submission, container, jobType = 'normal') {
+
+    container.innerHTML = `
+        <div class="bg-gray-50 p-6 rounded-lg">
+            <h4 class="text-xl font-semibold text-gray-900 mb-4">${submission.title || 'Final Submission'}</h4>
+            <p class="text-gray-600 mb-4">${submission.description || submission.notes || 'No description provided.'}</p>
+
+            ${(submission.file_urls && submission.file_urls.length > 0) || submission.file_url ? `
+                <div class="mb-4">
+                    <h5 class="font-medium text-gray-700 mb-2">Files:</h5>
+                    ${(() => {
+                        const files = [];
+                        // Determine bucket based on job type
+                        const bucket = jobType === "personal"
+                            ? PERSONAL_FINAL_BUCKET
+                            : FINAL_SUBMISSION_BUCKET;
+
+                        // Handle file_urls array
+                        if (submission.file_urls && submission.file_urls.length > 0) {
+                            submission.file_urls.forEach((fileUrl, index) => {
+                                const fullUrl = fileUrl.startsWith('http') ? fileUrl : getFileUrl(bucket, fileUrl);
+                                const fileName = submission.file_names && submission.file_names[index]
+                                    ? submission.file_names[index]
+                                    : fileUrl.split('/').pop();
+                                files.push(`<a href="${fullUrl}" target="_blank" download class="text-blue-600 hover:text-blue-800 block mb-1">
+                                    <i data-feather="download" class="w-4 h-4 inline mr-2"></i>
+                                    Download ${fileName}
+                                </a>`);
+                            });
+                        }
+                        // Handle single file_url (legacy support)
+                        if (submission.file_url && !submission.file_urls) {
+                            const fullUrl = submission.file_url.startsWith('http') ? submission.file_url : getFileUrl(bucket, submission.file_url);
+                            const fileName = submission.file_name || submission.file_url.split('/').pop();
+                            files.push(`<a href="${fullUrl}" target="_blank" download class="text-blue-600 hover:text-blue-800 block mb-1">
+                                <i data-feather="download" class="w-4 h-4 inline mr-2"></i>
+                                Download ${fileName}
+                            </a>`);
+                        }
+                        return files.join('');
+                    })()}
+                </div>
+            ` : ''}
+
+            ${submission.links && submission.links.length > 0 ? `
+                <div class="mb-4">
+                    <h5 class="font-medium text-gray-700 mb-2">Project Links:</h5>
+                    ${submission.links.map(link => `
+                        <a href="${link}" target="_blank" class="text-blue-600 hover:text-blue-800 block mb-1">
+                            <i data-feather="external-link" class="w-4 h-4 inline mr-2"></i>
+                            ${link}
+                        </a>
+                    `).join('')}
+                </div>
+            ` : ''}
+
+            <div class="text-sm text-gray-500">
+                <p><strong>Submitted by:</strong> ${submission.apprentice?.name || 'Unknown'}</p>
+                <p><strong>Submitted on:</strong> ${new Date(submission.created_at).toLocaleString()}</p>
+            </div>
+        </div>
+    `;
+}
+
+// Render a single final submission file inline where possible
+function renderFinalSubmissionFile(container, publicUrl, filePath) {
+    const ext = (filePath.split(".").pop() || "").toLowerCase();
+
+    if (["pdf"].includes(ext)) {
+        container.innerHTML = `<iframe src="${publicUrl}" class="w-full h-[600px]"></iframe>`;
+    } else if (["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) {
+        container.innerHTML = `<img src="${publicUrl}" class="max-w-full rounded-lg" />`;
+    } else if (["mp4", "webm"].includes(ext)) {
+        container.innerHTML = `
+      <video controls class="w-full">
+        <source src="${publicUrl}">
+      </video>`;
+    } else {
+        container.innerHTML = `
+      <a href="${publicUrl}" target="_blank" class="text-blue-600 underline">
+        Download submitted file
+      </a>`;
+    }
+}
+
+// Show final submission details in view modal
+async function showFinalSubmissionDetails(submissionId) {
+    try {
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+            showNotification("Please log in to view final submissions", "error");
+            return;
+        }
+
+        // Show loading state
+        const loadingEl = document.getElementById("view-submission-loading");
+        const errorEl = document.getElementById("view-submission-error");
+        const detailsEl = document.getElementById("view-submission-details");
+
+        loadingEl.classList.remove("hidden");
+        errorEl.classList.add("hidden");
+        detailsEl.classList.add("hidden");
+
+        // Get submission details
+        const submission = await getFinalSubmissionById(submissionId, user.id, "member");
+
+        if (!submission) {
+            throw new Error("Submission not found or you don't have permission to view it.");
+        }
+
+        // Debug: Log submission data to see what fields are present
+        console.log("Final submission data:", submission);
+        console.log("Files:", submission.file_urls, submission.file_url);
+        console.log("Links:", submission.links);
+
+        // Store submission ID for later use
+        viewFinalSubmissionModal.dataset.submissionId = submissionId;
+
+        // Populate view modal elements individually (different structure from review modal)
+        document.getElementById("submission-title").textContent = submission.title || 'Final Submission';
+        document.getElementById("submission-description").textContent = submission.description || 'No description provided.';
+        document.getElementById("submitter-name").textContent = submission.apprentice?.name || 'Unknown';
+        document.getElementById("submission-date").textContent = new Date(submission.created_at).toLocaleString();
+
+        // Handle final submission file using signed URL and inline rendering
+        const finalFilesContainer = document.getElementById("finalSubmissionFiles");
+        if (finalFilesContainer) {
+            finalFilesContainer.innerHTML = "";
+
+            // Prefer explicit file_path if present; otherwise fall back to first file in file_urls/file_url
+            const primaryFilePath =
+                submission.file_path ||
+                (submission.file_urls && submission.file_urls.length > 0 && submission.file_urls[0]) ||
+                submission.file_url ||
+                null;
+
+            // Safety assertion to catch invalid stored paths early
+            if (submission.file_path && !submission.file_path.includes("/")) {
+                console.error("Invalid file path stored:", submission.file_path);
+            }
+
+            if (primaryFilePath) {
+                let fileUrl;
+                if (primaryFilePath.startsWith("http")) {
+                    fileUrl = primaryFilePath;
+                } else {
+                    // Get job details to determine correct bucket
+                    const job = await getJobRequestById(submission.job_request_id);
+
+                    // DEBUG: Log what we're working with
+                    console.log("🔍 File retrieval debug:", {
+                        primaryFilePath,
+                        jobRequestId: submission.job_request_id,
+                        job: job,
+                        jobType: job?.job_type,
+                        PERSONAL_FINAL_BUCKET,
+                        FINAL_SUBMISSION_BUCKET
+                    });
+
+                    // HARDCODE: Always use personal-final-submissions for now
+                    // (since your upload code hardcodes this bucket)
+                    const bucket = "personal-final-submissions";
+
+                    console.log("📦 Using bucket:", bucket);
+                    console.log("📁 Looking for file path:", primaryFilePath);
+
+                    // Use createSignedUrl instead of getPublicUrl
+                    const { data, error: urlError } = await supabase.storage
+                        .from(bucket)
+                        .createSignedUrl(primaryFilePath, 3600);
+
+                    if (urlError) {
+                        console.error("❌ Error creating signed URL:", urlError);
+                        console.error("   Bucket:", bucket);
+                        console.error("   Path:", primaryFilePath);
+                        fileUrl = null;
+                    } else {
+                        console.log("✅ Signed URL created:", data?.signedUrl);
+                        fileUrl = data?.signedUrl;
+                    }
+                }
+
+                if (fileUrl) {
+                    renderFinalSubmissionFile(finalFilesContainer, fileUrl, primaryFilePath);
+                } else {
+                    finalFilesContainer.innerHTML = `
+                        <p class="text-red-500 text-sm">
+                            File unavailable. Please contact support.
+                        </p>
+                    `;
+                }
+            } else {
+                finalFilesContainer.innerHTML = "";
+            }
+        }
+
+        // Handle links
+        const linksSection = document.getElementById("submission-links-section");
+        const linksContainer = document.getElementById("submission-links");
+
+        if (submission.links && submission.links.length > 0) {
+            linksSection.classList.remove("hidden");
+            linksContainer.innerHTML = submission.links.map(link => `
+                <div class="flex items-center bg-white p-3 rounded border">
+                    <i data-feather="external-link" class="w-4 h-4 text-gray-500 mr-3"></i>
+                    <a href="${link}" target="_blank" class="text-blue-600 hover:text-blue-800 break-all">
+                        ${link}
+                    </a>
+                </div>
+            `).join('');
+        } else {
+            linksSection.classList.add("hidden");
+        }
+
+        // Submission notes are handled in the description section above
+
+        // Set up review button
+        const reviewBtn = document.getElementById("review-submission-btn");
+        if (reviewBtn) {
+            reviewBtn.onclick = () => {
+                viewFinalSubmissionModal.classList.remove("active");
+                handleFinalSubmissionReview(submissionId);
+            };
+        }
+
+        // Hide loading, show details
+        loadingEl.classList.add("hidden");
+        detailsEl.classList.remove("hidden");
+
+        // Show the modal
+        viewFinalSubmissionModal.classList.add("active");
+
+        // Replace feather icons
+        if (typeof feather !== "undefined") {
+            feather.replace();
+        }
+
+    } catch (error) {
+        console.error("Error showing final submission details:", error);
+
+        // Show error state
+        const loadingEl = document.getElementById("view-submission-loading");
+        const errorEl = document.getElementById("view-submission-error");
+        const errorMessageEl = document.getElementById("view-submission-error-message");
+
+        loadingEl.classList.add("hidden");
+        errorEl.classList.remove("hidden");
+        errorMessageEl.textContent = error.message || "Failed to load submission details";
+
+        viewFinalSubmissionModal.classList.add("active");
+    }
+}
+
+// Make function globally accessible
+window.viewFinalSubmission = viewFinalSubmission;
+
 async function loadFinalSubmissions(jobId) {
     try {
         const {
@@ -9725,12 +9839,122 @@ async function handleFinalSubmissionReview(submissionId) {
             return;
         }
 
+        // Get submission details
+        const submission = await getFinalSubmissionById(submissionId, user.id, "member");
+
+        // Get job details to determine bucket
+        const job = await getJobRequestById(submission.job_request_id);
+
         // Store submission ID for form submission
         finalSubmissionReviewForm.dataset.submissionId = submissionId;
-        
+
+        // Populate submission details in the modal using shared function
+        const detailsContainer = document.getElementById("final-submission-details");
+        if (detailsContainer) {
+            renderSubmissionDetails(submission, detailsContainer, job?.job_type || 'normal');
+        }
+
+        // Set up dispute button - only show for pending_review jobs
+        const disputeBtn = document.getElementById("raise-dispute-btn");
+        if (disputeBtn) {
+            // Get job details to check status and get job ID
+            const jobQuery = await supabase
+                .from("job_requests")
+                .select("id, status")
+                .eq("id", submission.job_request_id)
+                .single();
+
+            if (jobQuery.data && jobQuery.data.status === "pending_review") {
+                disputeBtn.style.display = "block";
+                disputeBtn.onclick = () => {
+                    finalSubmissionReviewModal.classList.remove("active");
+                    openDisputeModal(submission.job_request_id);
+                };
+            } else {
+                disputeBtn.style.display = "none";
+            }
+        }
+
+        // Legacy code below - can be removed after testing
+        /*
+        detailsContainer.innerHTML = `
+                <div class="bg-gray-50 p-6 rounded-lg">
+                    <h4 class="text-xl font-semibold text-gray-900 mb-4">${submission.title || 'Final Submission'}</h4>
+                    <p class="text-gray-600 mb-4">${submission.description || submission.notes || 'No description provided.'}</p>
+
+                    ${(submission.file_urls && submission.file_urls.length > 0) || submission.file_url ? `
+                        <div class="mb-4">
+                            <h5 class="font-medium text-gray-700 mb-2">Files:</h5>
+                            ${(() => {
+                                const files = [];
+                                // Handle file_urls array
+                                if (submission.file_urls && submission.file_urls.length > 0) {
+                                    submission.file_urls.forEach((fileUrl, index) => {
+                                        const fullUrl = fileUrl.startsWith('http') ? fileUrl : getFileUrl(FINAL_SUBMISSION_BUCKET, fileUrl);
+                                        const fileName = submission.file_names && submission.file_names[index]
+                                            ? submission.file_names[index]
+                                            : fileUrl.split('/').pop();
+                                        files.push(`<a href="${fullUrl}" target="_blank" download class="text-blue-600 hover:text-blue-800 block mb-1">
+                                            <i data-feather="download" class="w-4 h-4 inline mr-2"></i>
+                                            Download ${fileName}
+                                        </a>`);
+                                    });
+                                }
+                                // Handle single file_url (legacy support)
+                                if (submission.file_url && !submission.file_urls) {
+                                    const fullUrl = submission.file_url.startsWith('http') ? submission.file_url : getFileUrl(FINAL_SUBMISSION_BUCKET, submission.file_url);
+                                    const fileName = submission.file_name || submission.file_url.split('/').pop();
+                                    files.push(`<a href="${fullUrl}" target="_blank" download class="text-blue-600 hover:text-blue-800 block mb-1">
+                                        <i data-feather="download" class="w-4 h-4 inline mr-2"></i>
+                                        Download ${fileName}
+                                    </a>`);
+                                }
+                                return files.join('');
+                            })()}
+                        </div>
+                    ` : ''}
+
+                    ${submission.links && submission.links.length > 0 ? `
+                        <div class="mb-4">
+                            <h5 class="font-medium text-gray-700 mb-2">Project Links:</h5>
+                            ${submission.links.map(link => `
+                                <a href="${link}" target="_blank" class="text-blue-600 hover:text-blue-800 block mb-1">
+                                    <i data-feather="external-link" class="w-4 h-4 inline mr-2"></i>
+                                    ${link}
+                                </a>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+
+                    ${submission.links && submission.links.length > 0 ? `
+                        <div class="mb-4">
+                            <h5 class="font-medium text-gray-700 mb-2">Project Links:</h5>
+                            ${submission.links.map(link => `
+                                <a href="${link}" target="_blank" class="text-blue-600 hover:text-blue-800 block mb-1">
+                                    <i data-feather="external-link" class="w-4 h-4 inline mr-2"></i>
+                                    ${link}
+                                </a>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+
+                    <div class="text-sm text-gray-500">
+                        <p><strong>Submitted by:</strong> ${submission.apprentice?.name || 'Unknown'}</p>
+                        <p><strong>Submitted on:</strong> ${new Date(submission.created_at).toLocaleString()}</p>
+                    </div>
+                </div>
+            `;
+        }
+        */
+
         // Show the modal
         finalSubmissionReviewModal.classList.add("active");
-        
+
+        // Replace feather icons
+        if (typeof feather !== "undefined") {
+            feather.replace();
+        }
+
     } catch (error) {
         console.error("Error opening final submission review:", error);
         showNotification("Failed to open review form", "error");
@@ -10783,16 +11007,6 @@ function renderApprenticeCV(profile) {
                     </ul>
                 </div>
             ` : ''}
-
-            <!-- Action Buttons for Members -->
-            ${currentUser && currentUser.role === 'member' ? `
-                <div class="mt-8 pt-6 border-t border-gray-200">
-                    <button onclick="showPersonalJobRequestModal('${profile.id}', '${profile.name || 'this apprentice'}')"
-                            class="w-full bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 font-medium transition-colors">
-                        <i class="fas fa-paper-plane mr-2"></i>Send Personal Job Request
-                    </button>
-                </div>
-            ` : ''}
         </div>
     `;
 }
@@ -11020,368 +11234,3 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Error setting up profile form handlers on DOMContentLoaded:', error);
     }
 });
-
-// ==============================================
-// PERSONAL JOB REQUESTS SYSTEM
-// ==============================================
-
-// Global variables for personal requests
-let currentApprenticeId = null;
-
-// Function to update personal request button visibility
-async function updatePersonalRequestButtonVisibility() {
-    const personalRequestBtns = document.querySelectorAll('.send-personal-request-btn');
-    if (personalRequestBtns.length > 0) {
-        try {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) {
-                for (const btn of personalRequestBtns) {
-                    const apprenticeId = btn.dataset.userId;
-                    if (!apprenticeId) continue; // Skip if no data attribute
-
-                    try {
-                        const hasPendingRequest = await checkExistingPersonalRequest(user.id, apprenticeId);
-
-                        // Hide button if there's already a pending request
-                        if (hasPendingRequest) {
-                            btn.classList.add('hidden');
-                        } else {
-                            btn.classList.remove('hidden');
-                        }
-                    } catch (error) {
-                        console.error('Error checking pending request for apprentice', apprenticeId, ':', error);
-                        // Show button on error (fail open) - user can try to send request and get proper error
-                        btn.classList.remove('hidden');
-                    }
-                }
-            } else {
-                console.warn('No authenticated user found, hiding all personal request buttons');
-                // Hide all buttons if not authenticated
-                for (const btn of personalRequestBtns) {
-                    btn.classList.add('hidden');
-                }
-            }
-        } catch (authError) {
-            console.error('Error getting user authentication:', authError);
-            // Hide buttons on auth error
-            for (const btn of personalRequestBtns) {
-                btn.classList.add('hidden');
-            }
-        }
-    }
-}
-
-// Show personal job request modal
-function showPersonalJobRequestModal(apprenticeId, apprenticeName) {
-    currentApprenticeId = apprenticeId;
-
-    // Create modal HTML
-    const modalHTML = `
-        <div id="personal-job-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
-            <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-                <div class="px-6 py-4 border-b border-gray-200">
-                    <h3 class="text-lg font-semibold text-gray-900">Send Personal Job Request</h3>
-                    <p class="text-sm text-gray-600 mt-1">Send a direct job request to ${apprenticeName}</p>
-                </div>
-
-                <form id="personal-job-form" class="px-6 py-4">
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
-                            <input type="text" id="job-title" required
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                   placeholder="e.g. Logo Design for My Business">
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Job Description</label>
-                            <textarea id="job-description" rows="4" required
-                                      class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                      placeholder="Describe the job requirements, deliverables, and any specific instructions..."></textarea>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Agreed Price (₦)</label>
-                            <input type="number" id="job-price" required min="3000" max="50000"
-                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-                                   placeholder="3000 - 50000">
-                        </div>
-                    </div>
-
-                    <div class="flex justify-end space-x-3 mt-6">
-                        <button type="button" id="cancel-personal-job-btn"
-                                class="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50">
-                            Cancel
-                        </button>
-                        <button type="submit"
-                                class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50">
-                            Send Request
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-
-    // Add event listener for cancel button
-    document.getElementById('cancel-personal-job-btn').addEventListener('click', closePersonalJobModal);
-
-    // Handle form submission
-    document.getElementById('personal-job-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const submitBtn = e.target.querySelector('button[type="submit"]');
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Sending...';
-
-        try {
-            const jobData = {
-                title: document.getElementById('job-title').value.trim(),
-                description: document.getElementById('job-description').value.trim(),
-                fixedPrice: parseFloat(document.getElementById('job-price').value)
-            };
-
-            await createPersonalJobRequest(currentApprenticeId, jobData);
-
-            displayNotification('Personal job request sent successfully!', 'success');
-            closePersonalJobModal();
-
-            // Update button visibility since we now have a pending request
-            setTimeout(() => updatePersonalRequestButtonVisibility(), 1000);
-
-            // Refresh current page if it's a profile page
-            if (window.location.hash.includes('profile')) {
-                // Could refresh profile data here
-            }
-
-        } catch (error) {
-            console.error('Error sending personal job request:', error);
-            displayNotification(error.message || 'Failed to send job request', 'error');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Send Request';
-        }
-    });
-}
-
-// Close personal job request modal
-function closePersonalJobModal() {
-    const modal = document.getElementById('personal-job-modal');
-    if (modal) {
-        modal.remove();
-    }
-    currentApprenticeId = null;
-}
-
-// Handle apprentice response to personal request
-async function handlePersonalRequestResponse(jobId, response) {
-    // Find and disable the buttons to prevent double-clicks
-    const acceptBtn = document.querySelector(`button[onclick*="handlePersonalRequestResponse('${jobId}', 'accept')"]`);
-    const rejectBtn = document.querySelector(`button[onclick*="handlePersonalRequestResponse('${jobId}', 'reject')"]`);
-
-    if (acceptBtn) {
-        acceptBtn.disabled = true;
-        acceptBtn.textContent = 'Processing...';
-    }
-    if (rejectBtn) {
-        rejectBtn.disabled = true;
-        rejectBtn.textContent = 'Processing...';
-    }
-
-    try {
-        await respondToPersonalRequest(jobId, response);
-        displayNotification(`Job request ${response === 'accept' ? 'accepted' : 'rejected'} successfully!`, 'success');
-
-        // Refresh apprentice dashboard if needed
-        if (typeof loadApprenticeDashboard === 'function') {
-            loadApprenticeDashboard();
-        }
-
-    } catch (error) {
-        console.error('Error responding to personal request:', error);
-
-        // Re-enable buttons on error
-        if (acceptBtn) {
-            acceptBtn.disabled = false;
-            acceptBtn.textContent = 'Accept';
-        }
-        if (rejectBtn) {
-            rejectBtn.disabled = false;
-            rejectBtn.textContent = 'Reject';
-        }
-
-        displayNotification(error.message || 'Failed to respond to job request', 'error');
-    }
-}
-
-// Expose function globally for inline onclick handlers
-window.handlePersonalRequestResponse = handlePersonalRequestResponse;
-
-// Load personal requests for apprentice dashboard
-async function loadPersonalRequestsForApprentice() {
-    const container = document.getElementById('personal-requests-container');
-    if (!container) return;
-
-    try {
-        // Get authenticated user
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            throw new Error('Authentication required to load personal requests');
-        }
-
-        const requests = await getIncomingPersonalRequests(user.id);
-        const html = await loadPersonalRequestsForApprenticeHTML(requests);
-        container.innerHTML = html;
-    } catch (error) {
-        console.error('Error loading personal requests:', error);
-        container.innerHTML = '<div class="text-center py-8 text-red-500">Error loading personal requests</div>';
-    }
-}
-
-// Load personal requests for apprentice dashboard
-async function loadPersonalRequestsForApprenticeHTML(requests) {
-    try {
-        if (!requests || requests.length === 0) {
-            return '<div class="text-center py-8 text-gray-500">No personal job requests yet</div>';
-        }
-
-        return requests.map(request => `
-            <div class="bg-white rounded-lg shadow-md p-6 mb-4">
-                <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900">${request.title}</h3>
-                        <p class="text-sm text-gray-600">From: ${request.client_name}</p>
-                        <p class="text-lg font-bold text-green-600 mt-2">₦${request.fixed_price.toLocaleString()}</p>
-                    </div>
-                    <div class="text-right">
-                        <div class="text-sm text-gray-500">${new Date(request.created_at).toLocaleDateString()}</div>
-                    </div>
-                </div>
-
-                <p class="text-gray-700 mb-4">${request.description}</p>
-
-                <div class="flex space-x-3">
-                    <button onclick="handlePersonalRequestResponse('${request.id}', 'accept')"
-                            class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm font-medium">
-                        Accept
-                    </button>
-                    <button onclick="handlePersonalRequestResponse('${request.id}', 'reject')"
-                            class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium">
-                        Reject
-                    </button>
-                </div>
-            </div>
-        `).join('');
-
-    } catch (error) {
-        console.error('Error loading personal requests:', error);
-        return '<div class="text-center py-8 text-red-500">Error loading personal requests</div>';
-    }
-}
-
-// Load sent personal requests for client dashboard
-async function loadPersonalRequestsForClient() {
-    try {
-        // Get authenticated user
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            throw new Error('Authentication required to load personal requests');
-        }
-
-        const requests = await getSentPersonalRequests(user.id);
-
-        if (requests.length === 0) {
-            return '<div class="text-center py-8 text-gray-500">No sent personal job requests</div>';
-        }
-
-        return requests.map(request => `
-            <div class="bg-white rounded-lg shadow-md p-6 mb-4">
-                <div class="flex justify-between items-start mb-4">
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900">${request.title}</h3>
-                        <p class="text-sm text-gray-600">To: ${request.apprentice_name}</p>
-                        <p class="text-lg font-bold text-green-600 mt-2">₦${request.fixed_price.toLocaleString()}</p>
-                    </div>
-                    <div class="text-right">
-                        <span class="px-3 py-1 rounded-full text-sm font-medium ${
-                            request.status === 'personal_pending' ? 'bg-yellow-100 text-yellow-800' :
-                            request.status === 'personal_accepted' ? 'bg-green-100 text-green-800' :
-                            'bg-red-100 text-red-800'
-                        }">
-                            ${request.status.replace('personal_', '').replace('_', ' ')}
-                        </span>
-                        <div class="text-sm text-gray-500 mt-1">${new Date(request.updated_at).toLocaleDateString()}</div>
-                    </div>
-                </div>
-            </div>
-        `).join('');
-
-    } catch (error) {
-        console.error('Error loading sent personal requests:', error);
-        return '<div class="text-center py-8 text-red-500">Error loading sent requests</div>';
-    }
-}
-
-// Wallet Interface Initialization
-async function initializeWalletInterface() {
-    console.log('🔄 initializeWalletInterface called');
-
-    try {
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        if (authError || !user) {
-            console.error('❌ Authentication required for wallet interface');
-            return;
-        }
-
-        // Fetch wallet data
-        const wallet = await getUserWallet(user.id);
-        console.log('📦 Wallet data fetched:', wallet);
-
-        if (!wallet) {
-            console.warn('⚠️ No wallet data found');
-            return;
-        }
-
-        // Points are the SINGLE source of truth for wallet value
-        const points = wallet.balance_points || 0;
-        const displayed_ngn = points * POINT_TO_NGN_RATE;
-
-        console.log('Wallet render → points:', points, 'NGN:', displayed_ngn);
-
-        // Safety check for POINT↔NGN consistency
-        if (displayed_ngn !== points * POINT_TO_NGN_RATE) {
-            console.error("POINT↔NGN DESYNC DETECTED");
-        }
-
-        // Update wallet balance display elements
-        const balanceElement = document.getElementById('wallet-balance');
-        const pointsElement = document.getElementById('wallet-points');
-
-        console.log('🎯 DOM elements found:', {
-            balanceElement: !!balanceElement,
-            pointsElement: !!pointsElement
-        });
-
-        if (balanceElement) {
-            balanceElement.textContent = `₦${displayed_ngn.toLocaleString()}`;
-            console.log('✅ Updated balance element to:', balanceElement.textContent);
-        } else {
-            console.error('❌ Balance element not found!');
-        }
-
-        if (pointsElement) {
-            pointsElement.textContent = `${points.toFixed(2)} pts`;
-            console.log('✅ Updated points element to:', pointsElement.textContent);
-        } else {
-            console.error('❌ Points element not found!');
-        }
-
-    } catch (error) {
-        console.error('❌ Error initializing wallet interface:', error);
-    }
-}
-
-// Expose wallet interface function globally
-window.initializeWalletInterface = initializeWalletInterface;

@@ -2,6 +2,9 @@
 // Use a stable ESM CDN for the browser (Skypack is returning 500 errors)
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/+esm";
 
+// Constants
+export const POINT_TO_NGN_RATE = 150;
+
 // Load environment config with fallback chain:
 // 1. Try env.js (local development, not committed)
 // 2. Try env.production.js (production, committed to GitHub)
@@ -48,9 +51,6 @@ const getRedirectUrl = () => {
     console.log("📍 Redirect URL:", redirectUrl);
     return redirectUrl;
 };
-
-// Global currency conversion constant - SINGLE SOURCE OF TRUTH
-export const POINT_TO_NGN_RATE = 150; // 1 point = ₦150
 
 export const supabase = createClient(
     ENV_CONFIG.SUPABASE_URL,

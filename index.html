@@ -31,7 +31,7 @@
 
             @media (max-width: 767px) {
                 body {
-                    padding-top: 88px;
+                    padding-top: 104px;
                 }
             }
 
@@ -42,21 +42,22 @@
             }
         </style>
     </head>
-    <body class="bg-white text-gray-800">
+    <body class="bg-white text-gray-800 home-page">
         <!-- Header -->
         <header
-            class="bg-white/80 backdrop-blur-md fixed top-0 left-0 right-0 z-50 border-b border-gray-200"
+            class="home-header bg-white/80 backdrop-blur-md fixed top-0 left-0 right-0 z-50 border-b border-gray-200"
         >
             <div
-                class="container mx-auto px-4 sm:px-6 py-1 sm:py-4 flex justify-between items-center"
+                class="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center"
             >
                 <a href="index.html" class="flex items-center">
-                    <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 300.000000 300.000000"
-                        preserveAspectRatio="xMidYMid meet" class="h-20 sm:h-24 md:h-36 w-auto"
-                        fill="currentColor"
-                        style="color: #1d4ed8;"
-                    >
+                    <div class="home-logo">
+                        <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 300.000000 300.000000"
+                            preserveAspectRatio="xMidYMid meet"
+                            fill="currentColor"
+                            style="color: #1d4ed8;"
+                        >
                         <g transform="translate(0.000000,300.000000) scale(0.100000,-0.100000)"
                         fill="currentColor" stroke="none">
                         <path d="M539 1931 c-153 -50 -269 -212 -269 -375 0 -67 24 -156 55 -211 36
@@ -122,6 +123,7 @@
                         -23 -42 -23 -50 0 -51 1 -35 31 15 29 73 23 77 -8z"/>
                         </g>
                     </svg>
+                    </div>
                 </a>
                 <nav class="hidden md:flex items-center space-x-6 desktop-nav">
                     <a
