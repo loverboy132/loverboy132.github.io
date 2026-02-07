@@ -43,6 +43,7 @@ import {
     getAllJobRequests,
     getClientJobRequests,
     getApprenticeJobApplications,
+    getApprenticeActiveJobs,
     applyForJob,
     updateApplicationStatus,
     updateJobProgress,
@@ -91,6 +92,10 @@ import {
     PERSONAL_FINAL_BUCKET,
     getFinalSubmissionPublicUrl,
     getJobRequestById,
+    createPersonalJobRequest,
+    getIncomingPersonalRequests,
+    getSentPersonalRequests,
+    respondToPersonalRequest,
 } from "./supabase-auth.js";
 import { uploadCV, getCVSignedUrl, getUserWallet, createFundingRequest, getCraftnetBankAccounts, uploadProofOfPayment } from "./manual-payment-system.js";
 import {
@@ -371,6 +376,8 @@ const apprenticeContentTemplates = {
         // Get available job requests for apprentices to apply to
         let availableJobs = [];
         let myApplications = [];
+        let personalRequests = [];
+        let activeJobs = [];
         let apprenticeStats = {
             pendingApplications: 0,
             activeJobs: 0,
@@ -379,8 +386,10 @@ const apprenticeContentTemplates = {
         };
 
         try {
-            availableJobs = await getAllJobRequests();
+            availableJobs = await getAllJobRequests({}, userData.id);
             myApplications = await getApprenticeJobApplications(userData.id);
+            personalRequests = await getIncomingPersonalRequests();
+            activeJobs = await getApprenticeActiveJobs(userData.id);
             apprenticeStats = await getApprenticeStats(userData.id);
         } catch (error) {
             console.error("Error fetching job data:", error);
@@ -458,18 +467,30 @@ const apprenticeContentTemplates = {
                             <div class="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
                                 <div class="flex justify-between items-start mb-4">
                                     <div class="flex-1">
-                                        <h4 class="text-xl font-semibold text-gray-900">${
-                                            job.title
-                                        }</h4>
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <h4 class="text-xl font-semibold text-gray-900">${
+                                                job.title
+                                            }</h4>
+                                            ${
+                                                job.job_type === 'personal' || job.assigned_apprentice_id
+                                                    ? `<span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full font-medium">Personal Request</span>`
+                                                    : ''
+                                            }
+                                        </div>
                                         <p class="text-gray-600 mt-1">${
                                             job.description
                                         }</p>
+                                        ${
+                                            job.job_type === 'personal' && job.assigned_apprentice_id === userData.id
+                                                ? `<p class="text-sm text-purple-600 font-medium mt-1">📍 Sent directly to you</p>`
+                                                : ''
+                                        }
                                         <div class="flex items-center mt-2">
                                             <img src="https://placehold.co/32x32/EBF4FF/3B82F6?text=${
                                                 job.client?.name?.charAt(0) ||
                                                 "C"
-                                            }" 
-                                                 alt="${job.client?.name}" 
+                                            }"
+                                                 alt="${job.client?.name}"
                                                  class="w-8 h-8 rounded-full mr-2">
                                             <span class="text-sm text-gray-600">${
                                                 job.client?.name ||
@@ -538,6 +559,196 @@ const apprenticeContentTemplates = {
             </div>
         </div>
 
+        <!-- Personal Job Requests -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-gray-900">Personal Job Requests</h3>
+                <p class="text-gray-600">Direct job offers from members</p>
+            </div>
+            <div class="p-6">
+                ${
+                    personalRequests.length > 0
+                        ? `
+                    <div class="space-y-6 personal-request-list">
+                        ${personalRequests
+                            .map(
+                                (request) => `
+                            <div class="border border-green-200 rounded-lg p-6 bg-green-50">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="flex-1">
+                                        <h4 class="text-xl font-semibold text-gray-900">${
+                                            request.title
+                                        }</h4>
+                                        <p class="text-gray-600 mt-1">${
+                                            request.description
+                                        }</p>
+                                        <div class="flex items-center mt-2">
+                                            <img src="https://placehold.co/32x32/EBF4FF/3B82F6?text=${
+                                                request.client_name?.charAt(0) || "M"
+                                            }"
+                                                 alt="${request.client_name}"
+                                                 class="w-8 h-8 rounded-full mr-2">
+                                            <span class="text-sm text-gray-600">${
+                                                request.client_name || "Member"
+                                            }</span>
+                                        </div>
+                                    </div>
+                                    <span class="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full">
+                                        Personal Request
+                                    </span>
+                                </div>
+
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
+                                    <div>
+                                        <span class="text-gray-500">Fixed Price:</span>
+                                        <span class="font-medium">₦${request.fixed_price?.toLocaleString() || '0'}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-500">Deadline:</span>
+                                        <span class="font-medium">${new Date(request.deadline).toLocaleDateString()}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-500">Location:</span>
+                                        <span class="font-medium">${request.location || 'Remote'}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-500">Skills:</span>
+                                        <span class="font-medium">${request.skills_required?.join(', ') || 'Not specified'}</span>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end space-x-3">
+                                    <button class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 text-sm reject-personal-request-btn"
+                                            data-request-id="${request.id}">
+                                        <i data-feather="x" class="w-4 h-4 mr-2"></i>
+                                        Reject
+                                    </button>
+                                    <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm accept-personal-request-btn"
+                                            data-request-id="${request.id}">
+                                        <i data-feather="check" class="w-4 h-4 mr-2"></i>
+                                        Accept
+                                    </button>
+                                </div>
+                            </div>`
+                            )
+                            .join("")}
+                    </div>`
+                        : `
+                    <div class="text-center py-12">
+                        <i data-feather="inbox" class="w-16 h-16 text-gray-300 mx-auto mb-4"></i>
+                        <h3 class="text-xl font-semibold text-gray-700 mb-2">No Personal Requests</h3>
+                        <p class="text-gray-500">You don't have any direct job offers from members yet.</p>
+                    </div>`
+                }
+            </div>
+        </div>
+
+        <!-- Active Jobs -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-xl font-bold text-gray-900">Active Jobs</h3>
+                <p class="text-gray-600">Jobs you're currently working on</p>
+            </div>
+            <div class="p-6">
+                ${
+                    activeJobs.length > 0
+                        ? `
+                    <div class="space-y-6 active-jobs-list">
+                        ${activeJobs
+                            .map(
+                                (job) => `
+                            <div class="border border-green-200 rounded-lg p-6 bg-green-50">
+                                <div class="flex justify-between items-start mb-4">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <h4 class="text-xl font-semibold text-gray-900">${
+                                                job.title
+                                            }</h4>
+                                            ${
+                                                job.job_type === 'personal'
+                                                    ? `<span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full font-medium">Personal Request</span>`
+                                                    : ''
+                                            }
+                                        </div>
+                                        <p class="text-gray-600 mt-1">${
+                                            job.description
+                                        }</p>
+                                        <div class="flex items-center mt-2">
+                                            <img src="https://placehold.co/32x32/EBF4FF/3B82F6?text=${
+                                                job.client?.name?.charAt(0) || "C"
+                                            }"
+                                                 alt="${job.client?.name}"
+                                                 class="w-8 h-8 rounded-full mr-2">
+                                            <span class="text-sm text-gray-600">${
+                                                job.client?.name || "Client"
+                                            }</span>
+                                        </div>
+                                    </div>
+                                    <span class="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full">
+                                        In Progress
+                                    </span>
+                                </div>
+
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4 text-sm">
+                                    <div>
+                                        <span class="text-gray-500">Fixed Price:</span>
+                                        <span class="font-medium">₦${job.fixed_price?.toLocaleString() || '0'}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-500">Deadline:</span>
+                                        <span class="font-medium">${new Date(job.deadline).toLocaleDateString()}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-500">Location:</span>
+                                        <span class="font-medium">${job.location || 'Remote'}</span>
+                                    </div>
+                                    <div>
+                                        <span class="text-gray-500">Skills:</span>
+                                        <span class="font-medium">${job.skills_required?.join(', ') || 'Not specified'}</span>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end space-x-3">
+                                    <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm submit-progress-update-btn"
+                                            data-job-id="${job.id}">
+                                        <i data-feather="upload" class="w-4 h-4 mr-2"></i>
+                                        Submit Progress Update
+                                    </button>
+                                    <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm submit-final-work-btn"
+                                            data-job-request-id="${job.id}">
+                                        <i data-feather="check-circle" class="w-4 h-4 mr-2"></i>
+                                        Submit Final Work
+                                    </button>
+                                    <button class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 text-sm load-apprentice-progress-updates-btn"
+                                            data-job-id="${job.id}">
+                                        <i data-feather="eye" class="w-4 h-4 mr-2"></i>
+                                        View Progress & Feedback
+                                    </button>
+                                </div>
+                                <div id="progress-updates-${job.id}" class="progress-updates-container mt-4">
+                                    <!-- Progress updates will be loaded here -->
+                                </div>
+                                <div class="mt-2">
+                                    <button class="text-sm text-gray-500 hover:text-gray-700 load-apprentice-progress-updates-btn"
+                                            data-job-id="${job.id}">
+                                        <i data-feather="refresh-cw" class="w-4 h-4 inline mr-1"></i>
+                                        Refresh Progress Updates
+                                    </button>
+                                </div>
+                            </div>`
+                            )
+                            .join("")}
+                    </div>`
+                        : `
+                    <div class="text-center py-12">
+                        <i data-feather="play" class="w-16 h-16 text-gray-300 mx-auto mb-4"></i>
+                        <h3 class="text-xl font-semibold text-gray-700 mb-2">No Active Jobs</h3>
+                        <p class="text-gray-500">You don't have any active jobs at the moment.</p>
+                    </div>`
+                }
+            </div>
+        </div>
+
         <!-- My Applications -->
         <div class="bg-white rounded-lg shadow">
             <div class="p-6 border-b border-gray-200">
@@ -555,9 +766,16 @@ const apprenticeContentTemplates = {
                             <div class="border border-gray-200 rounded-lg p-6">
                                 <div class="flex justify-between items-start mb-4">
                                     <div>
-                                        <h4 class="text-xl font-semibold text-gray-900">${
-                                            app.job_request.title
-                                        }</h4>
+                                        <div class="flex items-center gap-2">
+                                            <h4 class="text-xl font-semibold text-gray-900">${
+                                                app.job_request.title
+                                            }</h4>
+                                            ${
+                                                app.job_request.job_type === 'personal'
+                                                    ? `<span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full font-medium">Personal Request</span>`
+                                                    : ''
+                                            }
+                                        </div>
                                         <p class="text-gray-600 mt-1">${
                                             app.job_request.description
                                         }</p>
@@ -1483,7 +1701,7 @@ const memberContentTemplates = {
                             }
                         </div>
                         <div class="flex space-x-2">
-                            <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 follow-btn" 
+                            <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 follow-btn"
                                     data-user-id="${user.id}">
                                 ${
                                     currentUserRole === "member" &&
@@ -1492,6 +1710,16 @@ const memberContentTemplates = {
                                         : "Follow"
                                 }
                             </button>
+                            ${
+                                currentUserRole === "member" &&
+                                user.role === "apprentice"
+                                    ? `<button class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 personal-job-request-btn"
+                                               data-apprentice-id="${user.id}"
+                                               data-apprentice-name="${user.name || user.email}">
+                                            Send Personal Job Request
+                                        </button>`
+                                    : ""
+                            }
                         </div>
                     </div>
                 `
@@ -1568,7 +1796,7 @@ const memberContentTemplates = {
                             }
                         </div>
                         <div class="flex space-x-2">
-                            <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 follow-btn" 
+                            <button class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 follow-btn"
                                     data-user-id="${user.id}">
                                 ${
                                     currentUserRole === "member" &&
@@ -1577,6 +1805,16 @@ const memberContentTemplates = {
                                         : "Follow"
                                 }
                             </button>
+                            ${
+                                currentUserRole === "member" &&
+                                user.role === "apprentice"
+                                    ? `<button class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 personal-job-request-btn"
+                                               data-apprentice-id="${user.id}"
+                                               data-apprentice-name="${user.name || user.email}">
+                                            Send Personal Job Request
+                                        </button>`
+                                    : ""
+                            }
                         </div>
                     </div>
                 `
@@ -2353,9 +2591,16 @@ const memberContentTemplates = {
                             <div class="border border-gray-200 rounded-lg p-6 job-request-card" data-job-id="${job.id}">
                                 <div class="flex justify-between items-start mb-4">
                                     <div>
-                                        <h4 class="text-xl font-semibold text-gray-900">${
-                                            job.title
-                                        }</h4>
+                                        <div class="flex items-center gap-2 mb-2">
+                                            <h4 class="text-xl font-semibold text-gray-900">${
+                                                job.title
+                                            }</h4>
+                                            ${
+                                                job.job_type === 'personal'
+                                                    ? `<span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full font-medium">Personal Request</span>`
+                                                    : ''
+                                            }
+                                        </div>
                                         <p class="text-gray-600 mt-1">${
                                             job.description
                                         }</p>
@@ -3459,6 +3704,36 @@ document.addEventListener("click", async (e) => {
         await showUserProfileModal(targetUserId, targetUserName);
     }
 
+    // Personal job request button handler
+    if (e.target.classList.contains("personal-job-request-btn")) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const apprenticeId = e.target.dataset.apprenticeId;
+        const apprenticeName = e.target.dataset.apprenticeName || "Apprentice";
+
+        // Open personal job request modal
+        openPersonalJobRequestModal(apprenticeId, apprenticeName);
+    }
+
+    // Accept personal request button handler
+    if (e.target.classList.contains("accept-personal-request-btn")) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const requestId = e.target.dataset.requestId;
+        await handlePersonalRequestResponse(requestId, 'accept');
+    }
+
+    // Reject personal request button handler
+    if (e.target.classList.contains("reject-personal-request-btn")) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const requestId = e.target.dataset.requestId;
+        await handlePersonalRequestResponse(requestId, 'reject');
+    }
+
     // Like button handler
     if (e.target.closest(".like-post-btn")) {
         e.preventDefault();
@@ -3835,9 +4110,10 @@ document.addEventListener("click", async (e) => {
     }
 
     // Final work submission handler (for apprentices)
-    if (e.target.classList.contains("submit-final-work-btn")) {
+    const finalWorkBtn = e.target.closest(".submit-final-work-btn");
+    if (finalWorkBtn) {
         e.preventDefault();
-        const jobRequestId = e.target.dataset.jobRequestId;
+        const jobRequestId = finalWorkBtn.dataset.jobRequestId;
         openFinalWorkModal(jobRequestId);
     }
 
@@ -6377,6 +6653,18 @@ async function showUserProfileModal(userId, userName) {
         );
         const connectBtn = document.getElementById("modal-connect-btn");
         const galleryBtn = document.getElementById("modal-view-gallery-btn");
+        const personalJobBtn = document.getElementById("modal-personal-job-request-btn");
+
+        // Get current user profile to determine button visibility
+        let currentUserProfile = null;
+        try {
+            const { data: { user: currentUser } } = await supabase.auth.getUser();
+            if (currentUser) {
+                currentUserProfile = await getUserProfile(currentUser.id);
+            }
+        } catch (error) {
+            console.error("Error getting current user profile:", error);
+        }
 
         // Set user info
         const initials = (userProfile.name || "U").charAt(0).toUpperCase();
@@ -6394,11 +6682,20 @@ async function showUserProfileModal(userId, userName) {
             descriptionContent.innerHTML = `<p class="text-gray-500 text-sm italic">No description available.</p>`;
         }
 
-        // Set button data attributes
+        // Set button data attributes and visibility
         connectBtn.dataset.userId = userId;
         connectBtn.dataset.userName = userProfile.name;
         galleryBtn.dataset.userId = userId;
         galleryBtn.dataset.userName = userProfile.name;
+
+        // Show personal job request button only for members viewing apprentices
+        if (currentUserProfile && currentUserProfile.role === "member" && userProfile.role === "apprentice") {
+            personalJobBtn.classList.remove("hidden");
+            personalJobBtn.dataset.apprenticeId = userId;
+            personalJobBtn.dataset.apprenticeName = userProfile.name;
+        } else {
+            personalJobBtn.classList.add("hidden");
+        }
 
         // Show modal
         modal.classList.add("active");
@@ -7507,6 +7804,258 @@ async function handleJobCreation() {
     }
 }
 
+// Handle personal job request creation
+async function openPersonalJobRequestModal(apprenticeId, apprenticeName) {
+    // Remove existing modal if any
+    const existingModal = document.getElementById("personal-job-modal");
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    const modal = document.createElement("div");
+    modal.id = "personal-job-modal";
+    modal.className = "fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center";
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="p-6 border-b border-gray-200">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-xl font-bold text-gray-900">Send Personal Job Request</h3>
+                    <button id="close-personal-job-modal" class="text-gray-400 hover:text-gray-600">
+                        <i data-feather="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                <p class="text-gray-600 mt-2">Send a direct job request to ${apprenticeName}</p>
+            </div>
+            <form id="personal-job-form" class="p-6 space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="personal-job-title" class="block text-sm font-medium text-gray-700 mb-2">
+                            Job Title <span class="text-red-500">*</span>
+                        </label>
+                        <input type="text" id="personal-job-title" name="title" required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                            placeholder="e.g., Website Design for Restaurant">
+                    </div>
+                    <div>
+                        <label for="personal-job-location" class="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                        <input type="text" id="personal-job-location" name="location"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                            placeholder="e.g., Lagos, Nigeria or Remote">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="personal-job-description" class="block text-sm font-medium text-gray-700 mb-2">
+                        Job Description <span class="text-red-500">*</span>
+                    </label>
+                    <textarea id="personal-job-description" name="description" rows="4" required
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                        placeholder="Describe the job requirements, deliverables, and any specific details..."></textarea>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="personal-job-fixed-price" class="block text-sm font-medium text-gray-700 mb-2">
+                            Fixed Price (₦) <span class="text-red-500">*</span>
+                        </label>
+                        <input type="number" id="personal-job-fixed-price" name="fixedPrice" required min="3000" max="50000"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                            placeholder="25000">
+                        <p class="text-xs text-gray-500 mt-1">Range: ₦3,000 - ₦50,000</p>
+                    </div>
+                    <div>
+                        <label for="personal-job-deadline" class="block text-sm font-medium text-gray-700 mb-2">
+                            Deadline <span class="text-red-500">*</span>
+                        </label>
+                        <input type="date" id="personal-job-deadline" name="deadline" required
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="personal-job-skills" class="block text-sm font-medium text-gray-700 mb-2">Required Skills</label>
+                    <select id="personal-job-skills" name="skillsRequired" multiple
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                        <option value="photography">Photography</option>
+                        <option value="design">Design</option>
+                        <option value="programming">Programming</option>
+                        <option value="writing">Writing</option>
+                        <option value="art">Art & Craft</option>
+                        <option value="video">Video Editing</option>
+                        <option value="marketing">Digital Marketing</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Hold Ctrl/Cmd to select multiple skills</p>
+                </div>
+
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div class="flex">
+                        <i data-feather="alert-circle" class="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0"></i>
+                        <div>
+                            <p class="text-sm text-yellow-800">
+                                <strong>Important:</strong> This will deduct ₦<span id="personal-escrow-amount">0</span> from your wallet as escrow.
+                                Funds will be held until the job is completed or you cancel the request.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-4 pt-4 border-t border-gray-200">
+                    <button
+                        type="button"
+                        id="cancel-personal-job"
+                        class="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        id="submit-personal-job"
+                        class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center">
+                        <i data-feather="send" class="w-4 h-4 mr-2"></i>
+                        Send Personal Job Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    if (window.feather) window.feather.replace();
+
+    // Add event listeners
+    const form = modal.querySelector("#personal-job-form");
+    const closeBtn = modal.querySelector("#close-personal-job-modal");
+    const cancelBtn = modal.querySelector("#cancel-personal-job");
+
+    // Update escrow amount display when price changes
+    const priceInput = modal.querySelector("#personal-job-fixed-price");
+    const escrowDisplay = modal.querySelector("#personal-escrow-amount");
+    priceInput.addEventListener("input", () => {
+        const price = parseFloat(priceInput.value) || 0;
+        escrowDisplay.textContent = price.toLocaleString();
+    });
+
+    // Close modal handlers
+    const closeModal = () => modal.remove();
+    closeBtn.addEventListener("click", closeModal);
+    cancelBtn.addEventListener("click", closeModal);
+    modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+    });
+
+    // Form submission
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await handlePersonalJobCreation(apprenticeId, apprenticeName);
+    });
+}
+
+// Handle personal job creation
+async function handlePersonalJobCreation(apprenticeId, apprenticeName) {
+    try {
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+            showNotification("Please log in to send job requests", "error");
+            return;
+        }
+
+        const form = document.getElementById("personal-job-form");
+        const formData = new FormData(form);
+
+        const fixedPrice = parseInt(formData.get("fixedPrice"));
+
+        const jobData = {
+            apprenticeId,
+            title: formData.get("title"),
+            description: formData.get("description"),
+            fixedPrice: fixedPrice,
+            location: formData.get("location") || "Remote",
+            deadline: formData.get("deadline"),
+            skillsRequired: Array.from(
+                form.querySelector("#personal-job-skills").selectedOptions
+            ).map((option) => option.value),
+        };
+
+        // Validate form data
+        if (
+            !jobData.title ||
+            !jobData.description ||
+            !jobData.fixedPrice ||
+            !jobData.deadline
+        ) {
+            showNotification("Please fill in all required fields", "error");
+            return;
+        }
+
+        // Validate fixed price range
+        if (jobData.fixedPrice < 3000) {
+            showNotification(
+                "Fixed price must be at least ₦3,000",
+                "error"
+            );
+            return;
+        }
+
+        if (jobData.fixedPrice > 50000) {
+            showNotification(
+                "Fixed price cannot exceed ₦50,000",
+                "error"
+            );
+            return;
+        }
+
+        const submitBtn = form.querySelector("#submit-personal-job");
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i data-feather="loader" class="w-4 h-4 mr-2 animate-spin"></i> Sending...';
+        if (window.feather) window.feather.replace();
+
+        try {
+            await createPersonalJobRequest(jobData);
+            showNotification(`Personal job request sent to ${apprenticeName}!`, "success");
+
+            // Refresh wallet balance if wallet interface is available
+            if (window.initializeWalletInterface) {
+                try {
+                    await window.initializeWalletInterface();
+                } catch (walletError) {
+                    console.warn("Failed to refresh wallet balance:", walletError);
+                }
+            }
+
+            // Close modal
+            const modal = document.getElementById("personal-job-modal");
+            if (modal) modal.remove();
+
+        } catch (error) {
+            // Check if error is due to insufficient funds
+            if (error.message && error.message.includes("Insufficient wallet balance")) {
+                // Show modal to fund job via Flutterwave
+                showPersonalJobFundingModal(jobData, apprenticeName, error.message);
+            } else {
+                throw error; // Re-throw other errors
+            }
+        }
+    } catch (error) {
+        console.error("Error creating personal job request:", error);
+        showNotification(
+            error.message || "Failed to send personal job request",
+            "error"
+        );
+    } finally {
+        // Re-enable submit button
+        const form = document.getElementById("personal-job-form");
+        if (form) {
+            const submitBtn = form.querySelector("#submit-personal-job");
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i data-feather="send" class="w-4 h-4 mr-2"></i> Send Personal Job Request';
+                if (window.feather) window.feather.replace();
+            }
+        }
+    }
+}
+
 // Show job funding modal when wallet balance is insufficient
 async function showJobFundingModal(jobData, errorMessage) {
     const modal = document.createElement('div');
@@ -7652,6 +8201,262 @@ async function showJobFundingModal(jobData, errorMessage) {
     if (window.feather) window.feather.replace();
 }
 
+// Show personal job funding modal when wallet balance is insufficient
+async function showPersonalJobFundingModal(jobData, apprenticeName, errorMessage) {
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto';
+    modal.id = 'personal-job-funding-modal';
+
+    const escrowAmount = jobData.fixedPrice;
+
+    // Get current wallet balance
+    const { data: { user } } = await supabase.auth.getUser();
+    let currentBalance = 0;
+    if (user) {
+        const wallet = await getUserWallet(user.id);
+        currentBalance = wallet?.balance_ngn || 0;
+    }
+    const shortfall = escrowAmount - currentBalance;
+
+    // Get bank accounts for manual transfer
+    let bankAccounts = [];
+    try {
+        bankAccounts = await getCraftnetBankAccounts();
+    } catch (error) {
+        console.error('Error loading bank accounts:', error);
+    }
+
+    modal.innerHTML = `
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 my-8 p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-gray-900">Insufficient Wallet Balance</h3>
+                <button id="close-personal-job-funding-modal" class="text-gray-400 hover:text-gray-600">
+                    <i data-feather="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <div class="mb-6">
+                <p class="text-gray-600 mb-4">${errorMessage}</p>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                    <p class="text-sm text-green-800 mb-2"><strong>Personal Job Request Details:</strong></p>
+                    <p class="text-sm text-green-900"><strong>Title:</strong> ${jobData.title}</p>
+                    <p class="text-sm text-green-900"><strong>Apprentice:</strong> ${apprenticeName}</p>
+                    <p class="text-sm text-green-900"><strong>Required Amount:</strong> ₦${escrowAmount.toLocaleString()}</p>
+                    <p class="text-sm text-green-900"><strong>Current Balance:</strong> ₦${currentBalance.toLocaleString()}</p>
+                    <p class="text-sm text-green-900"><strong>Shortfall:</strong> ₦${shortfall.toLocaleString()}</p>
+                </div>
+                <p class="text-sm text-gray-600 mb-4">
+                    Fund your wallet via manual bank transfer to pay for this personal job request. After your payment is verified and credited, you can retry sending the job request using your wallet balance.
+                </p>
+            </div>
+
+            <form id="personal-job-funding-form" class="space-y-4">
+                <div>
+                    <label for="personal-funding-amount" class="block text-sm font-medium text-gray-700 mb-2">
+                        Amount to Fund (₦)
+                    </label>
+                    <input type="number" id="personal-funding-amount" name="amount"
+                           value="${escrowAmount}" min="1000" step="100" required
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <p class="text-xs text-gray-500 mt-1">Minimum: ₦1,000</p>
+                </div>
+
+                <div>
+                    <label for="personal-account-details" class="block text-sm font-medium text-gray-700 mb-2">
+                        Account Details Used to Pay
+                    </label>
+                    <input type="text" id="personal-account-details" name="accountDetails" required
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                           placeholder="e.g., GTBank - Account Name - 0123456789">
+                </div>
+
+                <div>
+                    <label for="personal-proof-of-payment" class="block text-sm font-medium text-gray-700 mb-2">
+                        Proof of Payment
+                    </label>
+                    <input type="file" id="personal-proof-of-payment" name="proofOfPayment" accept="image/*,.pdf" required
+                           class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500">
+                    <p class="text-xs text-gray-500 mt-1">Upload screenshot or PDF of your bank transfer</p>
+                </div>
+
+                ${bankAccounts.length > 0 ? `
+                <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h4 class="font-medium text-gray-900 mb-2">Bank Transfer Details</h4>
+                    <div class="space-y-2">
+                        ${bankAccounts.map(account => `
+                            <div class="text-sm">
+                                <p class="font-medium text-gray-900">${account.bank_name}</p>
+                                <p class="text-gray-600">Account Name: ${account.account_name}</p>
+                                <p class="text-gray-600">Account Number: ${account.account_number}</p>
+                            </div>
+                        `).join('<hr class="my-2">')}
+                    </div>
+                </div>
+                ` : ''}
+
+                <div class="flex space-x-3 pt-4">
+                    <button type="button" id="cancel-personal-job-funding-btn"
+                            class="flex-1 bg-gray-200 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-300 font-semibold">
+                        Cancel
+                    </button>
+                    <button type="submit" id="submit-personal-funding-btn"
+                            class="flex-1 bg-green-600 text-white px-4 py-3 rounded-lg hover:bg-green-700 font-semibold flex items-center justify-center">
+                        <i data-feather="send" class="w-4 h-4 mr-2"></i>
+                        Submit Funding Request
+                    </button>
+                </div>
+            </form>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Add event listeners
+    const closeBtn = modal.querySelector('#close-personal-job-funding-modal');
+    const cancelBtn = modal.querySelector('#cancel-personal-job-funding-btn');
+    const form = modal.querySelector('#personal-job-funding-form');
+
+    closeBtn.addEventListener('click', () => modal.remove());
+    cancelBtn.addEventListener('click', () => modal.remove());
+
+    // Store jobData and apprenticeName in sessionStorage for retry after funding
+    const pendingData = { jobData, apprenticeName };
+    sessionStorage.setItem('pendingPersonalJobData', JSON.stringify(pendingData));
+    sessionStorage.setItem('pendingPersonalJobAction', 'create_personal');
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await handlePersonalJobFundingRequest(jobData, apprenticeName, modal);
+    });
+
+    // Close on outside click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+
+    if (window.feather) window.feather.replace();
+}
+
+// Handle personal job request response (accept/reject)
+async function handlePersonalRequestResponse(requestId, action) {
+    try {
+        const {
+            data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+            showNotification("Please log in to respond to job requests", "error");
+            return;
+        }
+
+        // Show loading state on buttons
+        const buttons = document.querySelectorAll(`[data-request-id="${requestId}"]`);
+        buttons.forEach(btn => {
+            btn.disabled = true;
+            btn.innerHTML = '<i data-feather="loader" class="w-4 h-4 mr-2 animate-spin"></i> Processing...';
+        });
+        if (window.feather) window.feather.replace();
+
+        console.log(`Processing ${action} for personal request:`, requestId);
+        const result = await respondToPersonalRequest(requestId, action);
+        console.log(`${action} result:`, result);
+
+        if (result.success) {
+            const message = action === 'accept'
+                ? 'Personal job request accepted! It has been added to your active jobs.'
+                : 'Personal job request rejected. The member has been refunded.';
+            showNotification(message, action === 'accept' ? 'success' : 'info');
+
+            console.log('Refreshing jobs tab after personal request response');
+            // Refresh the jobs tab to show updated state
+            const jobsTab = document.querySelector('[data-tab="jobs"]');
+            if (jobsTab) {
+                jobsTab.click();
+            } else {
+                console.warn('Jobs tab not found for refresh');
+            }
+        } else {
+            throw new Error(result.message || 'Failed to process request');
+        }
+    } catch (error) {
+        console.error('Error responding to personal job request:', error);
+        showNotification(
+            error.message || 'Failed to respond to personal job request',
+            "error"
+        );
+
+        // Reset button states
+        const buttons = document.querySelectorAll(`[data-request-id="${requestId}"]`);
+        buttons.forEach(btn => {
+            btn.disabled = false;
+            if (btn.classList.contains('accept-personal-request-btn')) {
+                btn.innerHTML = '<i data-feather="check" class="w-4 h-4 mr-2"></i> Accept';
+            } else if (btn.classList.contains('reject-personal-request-btn')) {
+                btn.innerHTML = '<i data-feather="x" class="w-4 h-4 mr-2"></i> Reject';
+            }
+        });
+        if (window.feather) window.feather.replace();
+    }
+}
+
+// Handle personal job funding request submission
+async function handlePersonalJobFundingRequest(jobData, apprenticeName, modal) {
+    try {
+        const form = modal.querySelector('#personal-job-funding-form');
+        const formData = new FormData(form);
+        const amount = parseFloat(formData.get('amount'));
+        const accountDetails = formData.get('accountDetails');
+        const proofOfPaymentFile = formData.get('proofOfPayment');
+
+        const submitBtn = modal.querySelector('#submit-personal-funding-btn');
+        const originalText = submitBtn.innerHTML;
+
+        // Validate amount
+        if (amount < 1000) {
+            showNotification('Minimum funding amount is ₦1,000', 'error');
+            return;
+        }
+
+        // Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i data-feather="loader" class="w-4 h-4 mr-2 animate-spin"></i> Submitting...';
+        if (window.feather) window.feather.replace();
+
+        // Create funding request
+        const fundingData = {
+            amount: amount,
+            accountDetails: accountDetails,
+            purpose: 'personal_job_request',
+            description: `Funding for personal job request: ${jobData.title} to ${apprenticeName}`
+        };
+
+        await createFundingRequest(fundingData);
+
+        // Upload proof of payment if provided
+        if (proofOfPaymentFile && proofOfPaymentFile.size > 0) {
+            await uploadProofOfPayment(proofOfPaymentFile);
+        }
+
+        showNotification('Funding request submitted successfully! Your payment will be verified within 24 hours.', 'success');
+
+        // Close modal
+        modal.remove();
+
+        // Clear stored data
+        sessionStorage.removeItem('pendingPersonalJobData');
+        sessionStorage.removeItem('pendingPersonalJobAction');
+
+    } catch (error) {
+        console.error('Error submitting personal job funding request:', error);
+        showNotification(error.message || 'Failed to submit funding request', 'error');
+
+        // Reset button
+        const submitBtn = modal.querySelector('#submit-personal-funding-btn');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        if (window.feather) window.feather.replace();
+    }
+}
+
 // Handle job funding request submission
 async function handleJobFundingRequest(jobData, modal) {
     try {
@@ -7774,6 +8579,70 @@ async function checkPendingJobCreation() {
                     const shortfall = requiredAmount - currentBalance;
                     showNotification(
                         `Your funding request is pending approval. Current balance: ₦${currentBalance.toLocaleString()}, Required: ₦${requiredAmount.toLocaleString()}. Once your funding is approved, you can create the job.`,
+                        "info"
+                    );
+                }
+            }
+        }
+
+        // Handle personal job creation
+        if (pendingJobData && pendingJobAction === 'create_personal') {
+            const pendingData = JSON.parse(pendingJobData);
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (user && pendingData.jobData && pendingData.apprenticeName) {
+                const { jobData, apprenticeName } = pendingData;
+
+                // Check wallet balance
+                const wallet = await getUserWallet(user.id);
+                const currentBalance = wallet?.balance_ngn || 0;
+                const requiredAmount = jobData.fixedPrice;
+
+                if (currentBalance >= requiredAmount) {
+                    // Clear pending job data
+                    sessionStorage.removeItem('pendingJobData');
+                    sessionStorage.removeItem('pendingJobAction');
+
+                    // Show notification and retry personal job creation
+                    showNotification("Wallet balance sufficient! Sending personal job request...", "success");
+
+                    // Small delay to ensure wallet balance is updated
+                    setTimeout(async () => {
+                        try {
+                            await createPersonalJobRequest(jobData);
+                            showNotification(`Personal job request sent to ${apprenticeName}!`, "success");
+
+                            // Refresh wallet balance if wallet interface is available
+                            if (window.initializeWalletInterface) {
+                                try {
+                                    await window.initializeWalletInterface();
+                                } catch (walletError) {
+                                    console.warn("Failed to refresh wallet balance:", walletError);
+                                }
+                            }
+
+                            // Close any open personal job modal
+                            const modal = document.getElementById("personal-job-modal");
+                            if (modal) modal.remove();
+
+                            // Refresh the jobs tab
+                            const jobsTab = document.querySelector('[data-tab="jobs"]');
+                            if (jobsTab) {
+                                jobsTab.click();
+                            }
+                        } catch (error) {
+                            console.error("Error creating personal job after funding:", error);
+                            showNotification(
+                                error.message || "Failed to send personal job request. Please try again.",
+                                "error"
+                            );
+                        }
+                    }, 1000);
+                } else {
+                    // Still insufficient funds - funding request may still be pending approval
+                    const shortfall = requiredAmount - currentBalance;
+                    showNotification(
+                        `Your funding request is pending approval. Current balance: ₦${currentBalance.toLocaleString()}, Required: ₦${requiredAmount.toLocaleString()}. Once your funding is approved, you can send the personal job request.`,
                         "info"
                     );
                 }
@@ -8792,6 +9661,16 @@ async function openProgressUpdateModal(jobId) {
 // Handle final work modal opening (for apprentices)
 async function openFinalWorkModal(jobRequestId) {
     try {
+        // Validate jobRequestId is a valid UUID
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (!jobRequestId || !uuidRegex.test(jobRequestId)) {
+            console.error("Invalid jobRequestId:", jobRequestId);
+            showNotification("Invalid job request ID", "error");
+            return;
+        }
+
+        console.log("Opening final work modal for job_request_id:", jobRequestId);
+
         const {
             data: { user },
         } = await supabase.auth.getUser();
@@ -8802,10 +9681,10 @@ async function openFinalWorkModal(jobRequestId) {
 
         // Store job_request_id for form submission - CRITICAL for RLS
         finalWorkForm.dataset.jobRequestId = jobRequestId;
-        
+
         // Show modal
         finalWorkModal.classList.add("active");
-        
+
         // Reset form
         finalWorkForm.reset();
     } catch (error) {
@@ -8914,10 +9793,14 @@ async function handleFinalWorkSubmission(e) {
         console.log("jobRequestId:", jobRequestId);
         console.groupEnd();
 
-        if (!jobRequestId) {
-          throw new Error(
-            "FATAL: Missing job_request_id. Final submissions MUST reference job_requests.id"
-          );
+        const normalizedJobRequestId =
+          (jobRequestId && jobRequestId !== "undefined" && jobRequestId !== "null") ? jobRequestId : null;
+
+        const isUuid = (v) => typeof v === "string" &&
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+
+        if (!normalizedJobRequestId || !isUuid(normalizedJobRequestId)) {
+          throw new Error("FATAL: Missing/invalid job_request_id. Cannot submit final work.");
         }
 
         // PERMANENT FAIL-FAST GUARD CHECK
@@ -8948,7 +9831,7 @@ async function handleFinalWorkSubmission(e) {
         // Upload file
         const fileExt = file.name.split('.').pop().toLowerCase();
         // Canonical storage path must be based on jobRequestId so it can be reused exactly
-        const fileName = `${jobRequestId}/${Date.now()}-${file.name}`;
+        const fileName = `${normalizedJobRequestId}/${Date.now()}-${file.name}`;
 
         const { data: uploadData, error: uploadError } = await supabase.storage
             .from(bucket)
@@ -8980,7 +9863,7 @@ async function handleFinalWorkSubmission(e) {
         console.error("🚨 FINAL SUBMISSION PATH HIT", new Error().stack);
         // RPC CALL - supports both job_request_id and job_id
         const result = await submitFinalWork(
-          jobRequestId,
+          normalizedJobRequestId,
           null,  // jobId (null for personal job requests, would be set for normal jobs)
           submissionData
         );

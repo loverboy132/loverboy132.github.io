@@ -1507,9 +1507,21 @@ async function broadcastJobAlertsForRequest(jobRecord) {
 }
 
 // Get all job requests (for apprentices to browse)
-export async function getAllJobRequests(filters = {}) {
+export async function getAllJobRequests(filters = {}, currentUserId = null) {
+    // Safe ENV getter for browser compatibility
+    const ENV = (typeof window !== "undefined" && window.ENV) ? window.ENV : {};
+    const NODE_ENV =
+        (typeof window !== "undefined" && window.ENV && window.ENV.NODE_ENV) ? window.ENV.NODE_ENV : "production";
+
+    // Defensive guard for Supabase configuration
+    if (!ENV.SUPABASE_URL || !ENV.SUPABASE_ANON_KEY) {
+        console.error("Supabase ENV missing. Ensure env.js is loaded before supabase-auth.js");
+        throw new Error("Supabase configuration missing");
+    }
+
     try {
-        let query = supabase
+        // Query A: Get all open non-personal (public) jobs
+        let publicJobsQuery = supabase
             .from("job_requests")
             .select(
                 `
@@ -1524,26 +1536,93 @@ export async function getAllJobRequests(filters = {}) {
             `
             )
             .eq("status", "open")
-            .order("created_at", { ascending: false });
+            .neq("job_type", "personal");
 
-        // Apply filters
+        // Query B: Get open personal jobs only where current user is the assigned apprentice
+        let personalJobsQuery = null;
+        if (currentUserId) {
+            personalJobsQuery = supabase
+                .from("job_requests")
+                .select(
+                    `
+                    *,
+                    client:profiles!job_requests_client_id_fkey(
+                        id,
+                        name,
+                        email,
+                        creative_type,
+                        location
+                    )
+                `
+                )
+                .eq("status", "open")
+                .eq("job_type", "personal")
+                .eq("assigned_apprentice_id", currentUserId);
+        }
+
+        // Execute queries in parallel
+        const [publicJobsResult, personalJobsResult] = await Promise.all([
+            publicJobsQuery,
+            personalJobsQuery || Promise.resolve({ data: [], error: null })
+        ]);
+
+        if (publicJobsResult.error) throw publicJobsResult.error;
+        if (personalJobsResult.error) throw personalJobsResult.error;
+
+        // Merge results
+        let allJobs = [...publicJobsResult.data];
+
+        if (personalJobsResult.data && personalJobsResult.data.length > 0) {
+            allJobs = [...allJobs, ...personalJobsResult.data];
+        }
+
+        // Remove duplicates by id (shouldn't happen but safety check)
+        const uniqueJobs = allJobs.filter((job, index, self) =>
+            index === self.findIndex(j => j.id === job.id)
+        );
+
+        // Sort by created_at desc
+        uniqueJobs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+        // Apply filters to merged results
+        let filteredJobs = uniqueJobs;
+
         if (filters.skillsRequired) {
-            query = query.contains("skills_required", [filters.skillsRequired]);
+            filteredJobs = filteredJobs.filter(job =>
+                job.skills_required && job.skills_required.includes(filters.skillsRequired)
+            );
         }
         if (filters.location) {
-            query = query.ilike("location", `%${filters.location}%`);
+            filteredJobs = filteredJobs.filter(job =>
+                job.location && job.location.toLowerCase().includes(filters.location.toLowerCase())
+            );
         }
         // Filter by fixed price range (for backward compatibility, also check budget_max)
         if (filters.budgetMin) {
-            query = query.or(`fixed_price.gte.${filters.budgetMin},budget_max.gte.${filters.budgetMin}`);
+            filteredJobs = filteredJobs.filter(job => {
+                const price = job.fixed_price || job.budget_max || 0;
+                return price >= filters.budgetMin;
+            });
         }
         if (filters.budgetMax) {
-            query = query.or(`fixed_price.lte.${filters.budgetMax},budget_max.lte.${filters.budgetMax}`);
+            filteredJobs = filteredJobs.filter(job => {
+                const price = job.fixed_price || job.budget_max || 0;
+                return price <= filters.budgetMax;
+            });
         }
 
-        const { data, error } = await query;
-        if (error) throw error;
-        return data;
+        // Debug logging (only in development)
+        if (NODE_ENV === 'development' || (typeof window !== "undefined" && window.location.hostname === 'localhost')) {
+            console.log('[JOB REQUESTS DEBUG]', {
+                totalJobs: filteredJobs.length,
+                publicJobsCount: publicJobsResult.data.length,
+                personalJobsCount: personalJobsResult.data ? personalJobsResult.data.length : 0,
+                personalJobsForUser: personalJobsResult.data ? personalJobsResult.data.filter(job => job.assigned_apprentice_id === currentUserId).length : 0,
+                currentUserId
+            });
+        }
+
+        return filteredJobs;
     } catch (error) {
         console.error("Error fetching job requests:", error);
         throw error;
@@ -2423,10 +2502,19 @@ export async function submitJobFeedback(jobUpdateId, memberId, feedbackData) {
 
 // Submit final work for a job - RPC ONLY
 export async function submitFinalWork(jobRequestId, jobId, submissionData) {
-    // Validate at least one ID provided
-    if (!jobRequestId && !jobId) {
-        throw new Error("Missing jobRequestId or jobId - at least one must be provided");
-    }
+    const normalizeUuid = (v) => {
+      if (v === undefined || v === null) return null;
+      if (typeof v !== "string") return null;
+      const t = v.trim();
+      if (!t || t === "undefined" || t === "null") return null;
+      const ok = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(t);
+      return ok ? t : null;
+    };
+
+    const jrId = normalizeUuid(jobRequestId);
+    const jId  = normalizeUuid(jobId);
+
+    if (!jrId && !jId) throw new Error("Missing/invalid jobRequestId or jobId");
 
     console.log("[RPC SUBMIT] submitFinalWork called", {
         jobRequestId,
@@ -2437,8 +2525,8 @@ export async function submitFinalWork(jobRequestId, jobId, submissionData) {
     const { data, error } = await supabase.rpc(
         "submit_final_work_v2",  // ← CHANGED: New function name
         {
-            p_job_request_id: jobRequestId ?? null,
-            p_job_id: jobId ?? null,  // ← ADDED: Support for normal jobs
+            p_job_request_id: jrId,
+            p_job_id: jId,  // ← ADDED: Support for normal jobs
             p_title: submissionData.title ?? null,
             p_description: submissionData.description ?? null,
             p_file_urls: submissionData.fileUrls ?? [],
@@ -5176,6 +5264,130 @@ export async function getFinalSubmissionById(finalSubmissionId, userId, userRole
 
     if (error) throw error;
     return data;
+}
+
+// --- Personal Job Request Functions ---
+
+// Create personal job request
+export async function createPersonalJobRequest(jobData) {
+    try {
+        const {
+            apprenticeId,
+            title,
+            description,
+            fixedPrice,
+            deadline,
+            location,
+            skillsRequired
+        } = jobData;
+
+        // Validate required fields
+        if (!title || !description || !fixedPrice) {
+            throw new Error("Title, description, and fixed price are required");
+        }
+
+        // Normalize skills to array
+        let skillsArray = [];
+        if (Array.isArray(skillsRequired)) {
+            skillsArray = skillsRequired;
+        } else if (typeof skillsRequired === 'string') {
+            skillsArray = skillsRequired.split(',').map(s => s.trim()).filter(s => s);
+        }
+
+        // Call the RPC function
+        const { data, error } = await supabase.rpc('create_personal_job_request', {
+            p_apprentice_id: apprenticeId,
+            p_title: title,
+            p_description: description,
+            p_fixed_price: parseFloat(fixedPrice),
+            p_skills_required: skillsArray,
+            p_location: location || null,
+            p_deadline: deadline ? new Date(deadline).toISOString().split('T')[0] : null
+        });
+
+        if (error) {
+            // Handle insufficient funds error
+            if (error.message && error.message.includes('Insufficient funds')) {
+                throw new Error("Insufficient wallet balance");
+            }
+            throw error;
+        }
+
+        return data;
+    } catch (error) {
+        console.error('Error creating personal job request:', error);
+        throw error;
+    }
+}
+
+// Get incoming personal requests for apprentice
+export async function getIncomingPersonalRequests() {
+    try {
+        const { data, error } = await supabase.rpc('get_incoming_personal_requests');
+
+        if (error) throw error;
+        return data || [];
+    } catch (error) {
+        console.error('Error getting incoming personal requests:', error);
+        throw error;
+    }
+}
+
+// Get sent personal requests for member
+export async function getSentPersonalRequests() {
+    try {
+        const { data, error } = await supabase.rpc('get_sent_personal_requests');
+
+        if (error) throw error;
+        return data || [];
+    } catch (error) {
+        console.error('Error getting sent personal requests:', error);
+        throw error;
+    }
+}
+
+// Respond to personal job request (accept/reject)
+export async function respondToPersonalRequest(jobRequestId, decision) {
+    try {
+        if (!['accept', 'reject'].includes(decision)) {
+            throw new Error("Decision must be 'accept' or 'reject'");
+        }
+
+        const { data, error } = await supabase.rpc('respond_to_personal_request', {
+            p_job_request_id: jobRequestId,
+            p_response: decision
+        });
+
+        if (error) throw error;
+        return data;
+    } catch (error) {
+        console.error('Error responding to personal job request:', error);
+        throw error;
+    }
+}
+
+// Get apprentice active jobs from job_requests table (source of truth)
+export async function getApprenticeActiveJobs(apprenticeId) {
+    try {
+        console.log("Fetching active jobs for apprentice:", apprenticeId);
+        const { data, error } = await supabase
+            .from("job_requests")
+            .select(`
+                *,
+                client:profiles!job_requests_client_id_fkey(id, name, email, location),
+                assigned_apprentice:profiles!job_requests_assigned_apprentice_id_fkey(id, name, email)
+            `)
+            .eq("assigned_apprentice_id", apprenticeId)
+            .eq("status", "in_progress")
+            .order("updated_at", { ascending: false });
+
+        if (error) throw error;
+        console.log("Found active jobs:", data?.length || 0);
+        return data;
+    } catch (error) {
+        console.error("Error fetching apprentice active jobs:", error);
+        throw error;
+    }
 }
 
 

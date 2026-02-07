@@ -22,9 +22,18 @@ export const ENV_CONFIG = {
     EMAIL_FUNCTION_NAME: "send-notification-email",
 
     // Production Settings
+    NODE_ENV: "production", // Set to 'production' for production builds
     DEBUG_MODE: false, // Set to false for production
     LOG_LEVEL: "info", // 'info', 'warn', 'error' for production
 };
+
+// Set window.ENV for browser compatibility (used by supabase-auth.js)
+if (typeof window !== "undefined") {
+    window.ENV = ENV_CONFIG;
+}
+
+// Also set window.ENV immediately when this script loads (for direct script loading)
+window.ENV = ENV_CONFIG;
 
 // Note: Secret keys (FLUTTERWAVE_SECRET_KEY, FLUTTERWAVE_SECRET_HASH, etc.)
 // are stored in Supabase Edge Functions environment variables, not here.

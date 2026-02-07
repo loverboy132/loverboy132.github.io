@@ -26,10 +26,19 @@ export const ENV_CONFIG = {
     ENABLE_EMAIL_NOTIFICATIONS: false,
     EMAIL_FUNCTION_NAME: "send-notification-email",
 
-    // Developments
+    // Development
+    NODE_ENV: "development", // Set to 'production' for production builds
     DEBUG_MODE: true, // Set to false for production
     LOG_LEVEL: "debug", // 'debug', 'info', 'warn', 'error'
 };
+
+// Set window.ENV for browser compatibility (used by supabase-auth.js)
+if (typeof window !== "undefined") {
+    window.ENV = ENV_CONFIG;
+}
+
+// Also set window.ENV immediately when this script loads (for direct script loading)
+window.ENV = ENV_CONFIG;
 
 
 
