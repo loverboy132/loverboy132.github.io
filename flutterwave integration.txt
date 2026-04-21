@@ -1,0 +1,211 @@
+
+CRAFTNET PAYMENT & WALLET INTEGRATION DOCUMENT
+(Flutterwave Payment Links + Virtual Account + Webhook Integration)
+1. OVERVIEW
+Craftnet will accept payments without full Flutterwave API integration.
+We will rely on:
+Flutterwave Payment Links
+Flutterwave Virtual Account
+Flutterwave Webhook Notifications
+The webhook is the single source of truth for all payments.
+2. PAYMENT METHODS BEING USED
+A. PAYMENT LINKS (Already Created)
+1. Wallet / Account Funding
+Copy code
+
+https://flutterwave.com/pay/sekpbjlklesx
+2. Subscription (Creative Plan – ₦1500)
+Copy code
+
+https://flutterwave.com/pay/nhkdimjaewpj
+These links are used for:
+Wallet funding
+Subscription payment
+Job funding (by adjusting amount where applicable)
+B. VIRTUAL ACCOUNT (BANK TRANSFER)
+Bank: Sterling Bank
+Account Number: 8817564174
+This account is linked to the Flutterwave merchant account.
+Users can:
+Transfer money directly from their bank app
+Fund wallet or jobs using this account
+⚠️ Flutterwave will still send a webhook for every successful transfer.
+3. IMPORTANT CONCEPTS (MUST UNDERSTAND)
+Payment Link
+A hosted Flutterwave checkout page where users pay.
+Virtual Account
+A bank account number that receives transfers directly.
+Webhook
+An automatic message Flutterwave sends to Craftnet’s backend after a payment is successful.
+👉 Webhook does NOT move money
+👉 Webhook only confirms payment
+4. WHAT THE WEBHOOK DOES IN CRAFTNET
+When Flutterwave sends a webhook:
+Craftnet verifies the payment
+Craftnet updates the database
+Craftnet credits wallet OR activates subscription OR funds job escrow
+Craftnet sends confirmation notification/email
+Money remains in Flutterwave balance until manually withdrawn.
+5. PAYMENT TYPES IN CRAFTNET
+There are three (3) types of payments:
+Wallet Funding
+Job Funding (Escrow)
+Subscription Payment
+Each payment must be identified using metadata.
+6. METADATA STRUCTURE (VERY IMPORTANT)
+Every payment must include metadata so Craftnet knows what the payment is for.
+Metadata Format
+Copy code
+
+meta: {
+  type: "wallet_funding" | "job_funding" | "subscription",
+  user_id: "USER_ID",
+  job_id: "JOB_ID" (only for job funding)
+}
+If metadata is missing:
+Mark payment as pending
+Admin will manually assign it
+7. BACKEND IMPLEMENTATION (STEP BY STEP)
+STEP 1: CREATE WEBHOOK ENDPOINT
+Create a public endpoint:
+Copy code
+
+POST /api/flutterwave/webhook
+This endpoint must:
+Accept JSON
+Be accessible publicly
+Return HTTP 200 after processing
+STEP 2: VERIFY FLUTTERWAVE SIGNATURE
+Flutterwave sends a header called:
+Copy code
+
+verif-hash
+Compare it with your Flutterwave secret hash.
+❌ If hash does not match → ignore request
+✅ If hash matches → continue
+STEP 3: VERIFY PAYMENT DATA
+Before processing:
+status === "successful"
+tx_ref has not been used before
+amount > 0
+currency === "NGN"
+Reject duplicates.
+8. PAYMENT LOGIC (CORE PART)
+A. WALLET FUNDING
+Triggered by:
+Payment link
+Virtual account transfer
+Condition:
+Copy code
+
+meta.type === "wallet_funding"
+Actions:
+Save transaction record
+Credit user wallet balance
+Mark transaction as completed
+Send notification + email:
+“Wallet funded successfully”
+B. SUBSCRIPTION PAYMENT
+Triggered by:
+Copy code
+
+https://flutterwave.com/pay/nhkdimjaewpj
+Condition:
+Copy code
+
+meta.type === "subscription"
+Actions:
+Activate Creative Plan (₦1500)
+Unlock all premium features
+Set subscription status = ACTIVE
+Save payment record
+No wallet involved.
+C. JOB FUNDING (ESCROW)
+Condition:
+Copy code
+
+meta.type === "job_funding"
+Actions:
+Save transaction
+Mark job as FUNDED
+Lock job from other applicants
+Store funded amount
+Set escrow status = ACTIVE
+⚠️ Money is NOT sent to apprentice yet.
+9. AUTOMATED USER MESSAGE
+Immediately after payment:
+“Payment processing… funds will be issued within 24 hours.”
+Final confirmation comes from webhook.
+10. COMMISSION RULE
+Craftnet commission = 10%
+Applied only when money is released to apprentice
+Not applied on:
+Wallet funding
+Job funding
+Subscription
+11. WITHDRAWALS (MANUAL ONLY)
+For now:
+Apprentice requests withdrawal
+Admin sends money manually from Flutterwave dashboard
+Craftnet records transaction internally
+❌ No automated payout
+❌ No API transfer
+12. EDGE CASES
+Virtual Account Payment Without Metadata
+Mark payment as pending
+Admin manually assigns it to wallet or job
+Duplicate Webhook
+Ignore if tx_ref already exists
+13. REQUIRED DATABASE TABLES
+Transactions
+id
+tx_ref
+user_id
+type
+amount
+source (payment_link / virtual_account)
+status
+created_at
+Wallet
+user_id
+balance
+updated_at
+Subscriptions
+user_id
+plan
+status
+expiry_date
+Jobs
+id
+funded_amount
+escrow_status
+locked
+14. SECURITY RULES
+Never trust frontend success page
+Always rely on webhook
+Log every webhook request
+Prevent duplicate transactions
+15. TESTING CHECKLIST
+Developer must test:
+Wallet funding via payment link
+Wallet funding via virtual account
+Subscription payment
+Job funding
+Duplicate webhook
+Missing metadata
+Admin manual withdrawal
+16. WHY THIS APPROACH IS USED
+Works with unregistered business account
+No CAC required
+Simple and safe for MVP
+Full control over funds
+Easy to upgrade later to API automation
+17. ONE-LINE SUMMARY FOR DEVELOPER
+“Flutterwave webhook confirms payments and updates Craftnet’s wallet, jobs, or subscription — it does not move money.”
+18. FINAL NOTE
+This system is intentional and correct for now.
+Once Craftnet is registered, we can add:
+Automated payouts
+API transfers
+Full escrow automation
+

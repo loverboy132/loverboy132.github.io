@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+        <title>Help Center - Craftnet</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+            rel="stylesheet"
+        />
+        <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+        <link rel="stylesheet" href="dark-mode.css">
+        <link rel="stylesheet" href="mobile-responsive.css">
+        <style>
+            body {
+                font-family: "Inter", sans-serif;
+            }
+            .faq-item {
+                transition: all 0.3s ease;
+            }
+            .faq-item.active .faq-content {
+                max-height: 1000px;
+                opacity: 1;
+            }
+            .faq-content {
+                max-height: 0;
+                opacity: 0;
+                overflow: hidden;
+                transition: max-height 0.3s ease, opacity 0.3s ease;
+            }
+            .search-input:focus {
+                outline: none;
+                ring: 2px;
+                ring-color: #1d4ed8;
+            }
+        </style>
+    </head>
+    <body class="bg-white text-gray-800">
+        <!-- Header -->
+        <header
+            class="bg-white/80 backdrop-blur-md fixed top-0 left-0 right-0 z-50 border-b border-gray-200"
+        >
+            <div
+                class="container mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center"
+            >
+                <a href="index.html" class="flex items-center">
+                    <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+                        width="96" height="96" viewBox="0 0 300.000000 300.000000"
+                        preserveAspectRatio="xMidYMid meet" class="h-12 sm:h-16 md:h-24 w-auto"
+                        fill="currentColor"
+                        style="color: #1d4ed8;"
+                    >
+                        <g transform="translate(0.000000,300.000000) scale(0.100000,-0.100000)"
+                        fill="currentColor" stroke="none">
+                        <path d="M539 1931 c-153 -50 -269 -212 -269 -375 0 -67 24 -156 55 -211 36
+                        -60 116 -132 183 -163 50 -24 69 -27 162 -27 99 0 110 2 171 32 196 97 281
+                        340 189 537 -35 74 -112 151 -187 188 -57 28 -78 33 -157 35 -68 2 -105 -2
+                        -147 -16z m241 -57 c142 -46 241 -199 227 -352 -12 -124 -83 -229 -193 -283
+                        -55 -28 -76 -32 -137 -32 -136 1 -250 71 -313 193 -26 49 -29 65 -29 150 0 89
+                        2 99 34 158 84 155 244 220 411 166z"/>
+                        <path d="M627 1822 c-22 -24 -21 -57 3 -109 33 -73 75 -47 97 58 11 54 -64 91
+                        -100 51z m63 -27 c12 -15 6 -49 -13 -73 -8 -11 -13 -9 -23 10 -17 30 -17 65
+                        -1 71 20 9 24 8 37 -8z"/>
+                        <path d="M449 1726 c-14 -29 -2 -51 34 -62 12 -3 34 -18 49 -32 23 -21 30 -23
+                        43 -12 14 12 13 16 -14 44 -16 17 -31 42 -33 56 -2 20 -9 26 -35 28 -27 3 -35
+                        -1 -44 -22z"/>
+                        <path d="M812 1738 c-6 -6 -12 -19 -12 -28 0 -9 -11 -27 -25 -40 -14 -13 -25
+                        -29 -25 -36 0 -25 22 -26 46 -3 14 13 39 28 57 34 28 9 32 14 32 45 0 32 -3
+                        35 -30 38 -17 2 -36 -3 -43 -10z"/>
+                        <path d="M618 1616 c-24 -18 -39 -63 -32 -92 8 -33 50 -64 86 -64 69 0 106
+                        100 55 148 -26 25 -82 29 -109 8z m80 -38 c21 -21 14 -57 -14 -70 -23 -11 -29
+                        -10 -45 10 -15 19 -16 28 -7 48 12 26 46 32 66 12z"/>
+                        <path d="M388 1565 c-9 -21 -8 -28 7 -45 21 -24 48 -26 65 -5 7 9 29 15 51 15
+                        32 0 39 3 39 20 0 17 -7 20 -44 20 -25 0 -48 5 -51 10 -13 20 -55 11 -67 -15z"/>
+                        <path d="M875 1581 c-6 -5 -28 -11 -50 -13 -57 -4 -55 -32 2 -36 23 -2 47 -10
+                        53 -18 31 -36 93 12 70 55 -11 22 -58 29 -75 12z"/>
+                        <path d="M536 1451 c-16 -17 -40 -31 -55 -33 -21 -2 -27 -9 -29 -35 -3 -27 1
+                        -35 22 -45 22 -9 29 -8 46 7 11 10 20 25 20 34 0 8 12 27 26 42 16 17 24 34
+                        21 43 -9 23 -20 20 -51 -13z"/>
+                        <path d="M753 1464 c-3 -9 5 -26 21 -43 14 -15 26 -37 26 -49 0 -14 9 -27 25
+                        -34 21 -9 28 -8 45 7 32 29 20 75 -20 75 -9 0 -29 14 -45 30 -32 34 -43 37
+                        -52 14z"/>
+                        <path d="M650 1392 c0 -23 -6 -45 -15 -52 -24 -20 -19 -59 11 -72 45 -21 79
+                        19 55 66 -6 11 -12 37 -13 56 -2 24 -9 36 -20 38 -15 3 -18 -4 -18 -36z"/>
+                        <path d="M1840 1728 c-29 -11 -40 -25 -40 -55 0 -14 -6 -23 -15 -23 -9 0 -15
+                        -10 -15 -26 0 -19 4 -25 15 -20 13 4 15 -9 15 -84 l0 -90 30 0 30 0 0 90 0 90
+                        25 -6 c22 -5 25 -3 25 20 0 21 -5 26 -25 26 -19 0 -25 5 -25 21 0 16 5 20 28
+                        17 22 -2 28 1 30 20 2 13 -2 22 -10 23 -7 0 -20 2 -28 3 -8 2 -26 -1 -40 -6z"/>
+                        <path d="M1223 1715 c-48 -21 -73 -68 -73 -140 0 -102 63 -166 147 -150 40 7
+                        99 56 89 73 -11 19 -50 14 -69 -8 -22 -26 -50 -25 -81 3 -39 34 -39 124 -1
+                        162 31 31 49 31 81 0 20 -20 29 -23 49 -15 14 5 25 13 25 18 0 14 -43 50 -73
+                        61 -37 14 -55 13 -94 -4z"/>
+                        <path d="M1954 1695 c-4 -8 -4 -21 -1 -29 3 -8 -2 -16 -15 -19 -23 -6 -22 -42
+                        2 -42 11 0 13 -13 11 -55 -3 -68 11 -107 43 -121 36 -17 76 -4 76 24 0 18 -5
+                        23 -27 22 -28 0 -28 1 -31 67 l-3 68 31 -6 c27 -6 30 -4 30 20 0 22 -4 26 -30
+                        26 -27 0 -30 3 -30 30 0 25 -4 30 -25 30 -14 0 -28 -7 -31 -15z"/>
+                        <path d="M2590 1681 c0 -21 -5 -31 -15 -31 -9 0 -15 -10 -15 -26 0 -19 4 -25
+                        15 -20 13 4 15 -8 15 -74 0 -70 2 -81 22 -94 28 -20 62 -20 82 -1 21 22 11 41
+                        -22 40 -26 0 -27 1 -30 67 l-3 68 31 -6 c27 -6 30 -4 30 20 0 22 -4 26 -31 26
+                        -27 0 -30 3 -27 28 3 23 -1 27 -24 30 -25 3 -28 0 -28 -27z m36 -67 c-5 -13
+                        -10 -14 -18 -6 -6 6 -8 18 -4 28 5 13 10 14 18 6 6 -6 8 -18 4 -28z"/>
+                        <path d="M1420 1540 l0 -110 31 0 32 0 -6 48 c-9 74 1 102 39 118 23 9 34 21
+                        34 34 0 28 -44 27 -64 -2 l-16 -22 0 22 c0 17 -6 22 -25 22 l-25 0 0 -110z"/>
+                        <path d="M1592 1634 c-12 -8 -22 -21 -22 -28 0 -22 31 -28 51 -10 26 23 69 11
+                        69 -19 0 -19 -6 -22 -47 -25 -53 -3 -83 -24 -83 -59 0 -60 57 -90 107 -57 19
+                        12 28 13 31 6 2 -7 15 -12 28 -12 24 0 24 2 24 85 0 78 -2 88 -25 110 -29 30
+                        -97 34 -133 9z m82 -161 c-27 -20 -49 -12 -49 17 0 20 6 26 30 30 24 4 31 2
+                        33 -14 2 -11 -4 -26 -14 -33z"/>
+                        <path d="M2110 1540 l0 -110 25 0 c24 0 25 2 25 66 0 80 11 104 49 104 36 0
+                        41 -13 41 -101 0 -67 1 -69 25 -69 25 0 25 1 25 90 0 77 -3 93 -20 110 -24 24
+                        -82 27 -104 4 -15 -14 -16 -14 -16 0 0 10 -9 16 -25 16 l-25 0 0 -110z"/>
+                        <path d="M2366 1624 c-22 -23 -26 -36 -26 -83 0 -33 6 -65 15 -77 33 -48 122
+                        -55 160 -14 28 31 6 48 -36 27 -35 -16 -57 -13 -76 11 -29 35 -16 43 59 41 47
+                        -2 73 2 76 9 7 21 -19 82 -41 97 -36 25 -100 19 -131 -11z m112 -41 c3 -21 -1
+                        -23 -42 -23 -50 0 -51 1 -35 31 15 29 73 23 77 -8z"/>
+                        </g>
+                    </svg>
+                </a>
+                <nav class="hidden md:flex items-center space-x-6 desktop-nav">
+                    <a href="index.html" class="text-gray-600 hover:text-gray-900">Home</a>
+                    <a href="help-center.html" class="text-gray-600 hover:text-gray-900 font-semibold">Help Center</a>
+                    <a href="contact-form.html" class="text-gray-600 hover:text-gray-900">Contact Us</a>
+                </nav>
+                <div class="hidden md:flex items-center space-x-4">
+                    <a
+                        href="login-supabase.html"
+                        class="text-gray-600 hover:text-gray-900 font-medium"
+                        >Log In</a
+                    >
+                    <a
+                        href="signup-member-supabase.html"
+                        class="bg-gray-900 text-white px-5 py-2 rounded-lg font-semibold text-sm shadow-md hover:bg-gray-800 btn"
+                        >Sign Up</a
+                    >
+                </div>
+                <button id="mobile-menu-toggle" class="md:hidden mobile-menu-toggle" aria-label="Toggle menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+        
+        <!-- Mobile Menu Overlay -->
+        <div id="mobile-nav-overlay" class="mobile-nav-overlay"></div>
+        
+        <!-- Mobile Menu Drawer -->
+        <div id="mobile-nav-drawer" class="mobile-nav-drawer">
+            <div class="mobile-nav-header">
+                <span class="font-bold text-lg">Menu</span>
+                <button id="mobile-nav-close" class="mobile-nav-close" aria-label="Close menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <nav class="mobile-nav-menu">
+                <a href="index.html" class="mobile-nav-item">Home</a>
+                <a href="help-center.html" class="mobile-nav-item">Help Center</a>
+                <a href="contact-form.html" class="mobile-nav-item">Contact Us</a>
+                <a href="login-supabase.html" class="mobile-nav-item">Log In</a>
+                <a href="signup-member-supabase.html" class="mobile-nav-item">Sign Up</a>
+            </nav>
+        </div>
+
+        <!-- Hero Section -->
+        <main class="pt-24 sm:pt-32 pb-16 sm:pb-20 bg-gray-50">
+            <div class="container mx-auto px-4 sm:px-6">
+                <div class="max-w-4xl mx-auto text-center mb-12">
+                    <h1 class="text-3xl sm:text-4xl md:text-5xl font-extrabold text-gray-900 leading-tight mb-4">
+                        How can we help you?
+                    </h1>
+                    <p class="text-lg text-gray-600 mb-8">
+                        Find answers to common questions or contact our support team
+                    </p>
+                    
+                    <!-- Search Bar -->
+                    <div class="max-w-2xl mx-auto mb-8">
+                        <div class="relative">
+                            <input
+                                type="text"
+                                id="search-input"
+                                placeholder="Search for help..."
+                                class="w-full px-6 py-4 pl-12 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base search-input"
+                            />
+                            <i data-feather="search" class="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"></i>
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div class="flex flex-col sm:flex-row justify-center items-center gap-4">
+                        <a
+                            href="contact-form.html"
+                            class="bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold shadow-lg hover:bg-blue-700 transition-colors"
+                        >
+                            Contact Support
+                        </a>
+                        <a
+                            href="#faq"
+                            class="bg-white text-blue-600 border-2 border-blue-600 px-8 py-3 rounded-lg font-semibold shadow-lg hover:bg-blue-50 transition-colors"
+                        >
+                            Browse FAQ
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- FAQ Categories Section -->
+        <section id="faq" class="py-12 sm:py-16 md:py-20 bg-white">
+            <div class="container mx-auto px-4 sm:px-6 max-w-4xl">
+                <h2 class="text-2xl sm:text-3xl font-bold text-center text-gray-900 mb-8 sm:mb-12">
+                    Frequently Asked Questions
+                </h2>
+
+                <!-- Getting Started -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i data-feather="play-circle" class="w-6 h-6 mr-2 text-blue-600"></i>
+                        Getting Started
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="faq-item bg-gray-50 rounded-lg p-6 cursor-pointer" data-category="getting-started">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-semibold text-lg">How do I create an account?</h4>
+                                <i data-feather="chevron-down" class="w-5 h-5 text-gray-600 faq-icon"></i>
+                            </div>
+                            <div class="faq-content mt-4 text-gray-600">
+                                <p>Click on "Sign Up" in the top navigation. Choose whether you want to sign up as a Member (client) or Apprentice (worker). Fill in your details and verify your email address to complete registration.</p>
+                            </div>
+                        </div>
+                        <div class="faq-item bg-gray-50 rounded-lg p-6 cursor-pointer" data-category="getting-started">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-semibold text-lg">What's the difference between Members and Apprentices?</h4>
+                                <i data-feather="chevron-down" class="w-5 h-5 text-gray-600 faq-icon"></i>
+                            </div>
+                            <div class="faq-content mt-4 text-gray-600">
+                                <p>Members are clients who post jobs and hire apprentices. Apprentices are creative professionals who apply for jobs and showcase their work. You can be both a Member and an Apprentice on the platform!</p>
+                            </div>
+                        </div>
+                        <div class="faq-item bg-gray-50 rounded-lg p-6 cursor-pointer" data-category="getting-started">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-semibold text-lg">Is it free to use?</h4>
+                                <i data-feather="chevron-down" class="w-5 h-5 text-gray-600 faq-icon"></i>
+                            </div>
+                            <div class="faq-content mt-4 text-gray-600">
+                                <p>Yes! Basic use is free. You can showcase your work, apply for jobs, and earn through referrals at no cost. Some advanced features may require a subscription.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Payments -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i data-feather="credit-card" class="w-6 h-6 mr-2 text-blue-600"></i>
+                        Payments & Billing
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="faq-item bg-gray-50 rounded-lg p-6 cursor-pointer" data-category="payments">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-semibold text-lg">How do payments work?</h4>
+                                <i data-feather="chevron-down" class="w-5 h-5 text-gray-600 faq-icon"></i>
+                            </div>
+                            <div class="faq-content mt-4 text-gray-600">
+                                <p>All payments are processed securely through Paystack. Members pay upfront for jobs, and apprentices receive payment upon job completion and approval. Funds are held in escrow until the job is completed.</p>
+                            </div>
+                        </div>
+                        <div class="faq-item bg-gray-50 rounded-lg p-6 cursor-pointer" data-category="payments">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-semibold text-lg">How do I fund my wallet?</h4>
+                                <i data-feather="chevron-down" class="w-5 h-5 text-gray-600 faq-icon"></i>
+                            </div>
+                            <div class="faq-content mt-4 text-gray-600">
+                                <p>Go to your dashboard and click on "Wallet". Select "Fund Wallet" and enter the amount you want to add. You'll be redirected to Paystack to complete the payment securely.</p>
+                            </div>
+                        </div>
+                        <div class="faq-item bg-gray-50 rounded-lg p-6 cursor-pointer" data-category="payments">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-semibold text-lg">How do I request a refund?</h4>
+                                <i data-feather="chevron-down" class="w-5 h-5 text-gray-600 faq-icon"></i>
+                            </div>
+                            <div class="faq-content mt-4 text-gray-600">
+                                <p>If you need to request a refund, please use our <a href="contact-form.html" class="text-blue-600 hover:underline">Contact Form</a> and select "Refund Request" as the issue category. Our team will review your request within 72 hours.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Jobs -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i data-feather="briefcase" class="w-6 h-6 mr-2 text-blue-600"></i>
+                        Jobs & Applications
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="faq-item bg-gray-50 rounded-lg p-6 cursor-pointer" data-category="jobs">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-semibold text-lg">How do I post a job?</h4>
+                                <i data-feather="chevron-down" class="w-5 h-5 text-gray-600 faq-icon"></i>
+                            </div>
+                            <div class="faq-content mt-4 text-gray-600">
+                                <p>As a Member, go to your dashboard and click on "Post Job". Fill in the job details, set your budget, and submit. Make sure your wallet is funded to cover the job payment.</p>
+                            </div>
+                        </div>
+                        <div class="faq-item bg-gray-50 rounded-lg p-6 cursor-pointer" data-category="jobs">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-semibold text-lg">How do I apply for a job?</h4>
+                                <i data-feather="chevron-down" class="w-5 h-5 text-gray-600 faq-icon"></i>
+                            </div>
+                            <div class="faq-content mt-4 text-gray-600">
+                                <p>Browse available jobs in your dashboard. Click on a job to view details, then click "Apply" to submit your application. Make sure your profile and portfolio are up to date!</p>
+                            </div>
+                        </div>
+                        <div class="faq-item bg-gray-50 rounded-lg p-6 cursor-pointer" data-category="jobs">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-semibold text-lg">What happens if there's a dispute?</h4>
+                                <i data-feather="chevron-down" class="w-5 h-5 text-gray-600 faq-icon"></i>
+                            </div>
+                            <div class="faq-content mt-4 text-gray-600">
+                                <p>If you encounter a dispute with a job, use our <a href="contact-form.html" class="text-blue-600 hover:underline">Contact Form</a> and select "Dispute" as the issue category. Our support team will investigate and help resolve the issue.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Account & Profile -->
+                <div class="mb-8">
+                    <h3 class="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                        <i data-feather="user" class="w-6 h-6 mr-2 text-blue-600"></i>
+                        Account & Profile
+                    </h3>
+                    <div class="space-y-4">
+                        <div class="faq-item bg-gray-50 rounded-lg p-6 cursor-pointer" data-category="account">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-semibold text-lg">How do I update my profile?</h4>
+                                <i data-feather="chevron-down" class="w-5 h-5 text-gray-600 faq-icon"></i>
+                            </div>
+                            <div class="faq-content mt-4 text-gray-600">
+                                <p>Go to your dashboard and click on "Profile" or "Settings". You can update your personal information, portfolio, skills, and preferences from there.</p>
+                            </div>
+                        </div>
+                        <div class="faq-item bg-gray-50 rounded-lg p-6 cursor-pointer" data-category="account">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-semibold text-lg">I forgot my password. How do I reset it?</h4>
+                                <i data-feather="chevron-down" class="w-5 h-5 text-gray-600 faq-icon"></i>
+                            </div>
+                            <div class="faq-content mt-4 text-gray-600">
+                                <p>On the login page, click "Forgot Password" and enter your email address. You'll receive a password reset link via email.</p>
+                            </div>
+                        </div>
+                        <div class="faq-item bg-gray-50 rounded-lg p-6 cursor-pointer" data-category="account">
+                            <div class="flex justify-between items-center">
+                                <h4 class="font-semibold text-lg">How do referrals work?</h4>
+                                <i data-feather="chevron-down" class="w-5 h-5 text-gray-600 faq-icon"></i>
+                            </div>
+                            <div class="faq-content mt-4 text-gray-600">
+                                <p>Share your unique referral link with friends. When they sign up and complete their first job or post their first job, you both earn ₦100! You can find your referral link in your dashboard.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Still Need Help -->
+                <div class="mt-12 bg-blue-50 rounded-lg p-8 text-center">
+                    <h3 class="text-2xl font-bold text-gray-900 mb-4">Still need help?</h3>
+                    <p class="text-gray-600 mb-6">Can't find what you're looking for? Our support team is here to help.</p>
+                    <a
+                        href="contact-form.html"
+                        class="inline-block bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold shadow-lg hover:bg-blue-700 transition-colors"
+                    >
+                        Contact Support
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="bg-gray-900 text-gray-400">
+            <div class="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+                    <div>
+                        <h3 class="text-white font-semibold mb-4">Craftiva</h3>
+                        <p class="text-sm">
+                            Connecting Africa's creative talent with
+                            opportunities to earn, grow, and showcase their
+                            work.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-white font-semibold mb-4">Platform</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li>
+                                <a href="index.html#features" class="hover:text-white"
+                                    >Features</a
+                                >
+                            </li>
+                            <li>
+                                <a href="index.html#faq" class="hover:text-white">FAQ</a>
+                            </li>
+                            <li>
+                                <a href="help-center.html" class="hover:text-white">Help Center</a>
+                            </li>
+                            <li>
+                                <a href="contact-form.html" class="hover:text-white">Contact Us</a>
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-white font-semibold mb-4">Legal</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li>
+                                <a
+                                    href="terms-of-service.html"
+                                    class="hover:text-white"
+                                    >Terms of Service</a
+                                >
+                            </li>
+                            <li>
+                                <a
+                                    href="privacy-policy.html"
+                                    class="hover:text-white"
+                                    >Privacy Policy</a
+                                >
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-white font-semibold mb-4">Contact</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li>support@craftiva.com</li>
+                            <li>+234 (0) 800 000 0000</li>
+                            <li>Lagos, Nigeria</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="border-t border-gray-800 mt-8 pt-8 text-center">
+                    <p>&copy; 2025 Craftiva. All Rights Reserved.</p>
+                </div>
+            </div>
+        </footer>
+
+        <script>
+            feather.replace();
+
+            // FAQ Accordion
+            document.querySelectorAll('.faq-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const isActive = item.classList.contains('active');
+                    // Close all items
+                    document.querySelectorAll('.faq-item').forEach(i => {
+                        i.classList.remove('active');
+                        const icon = i.querySelector('.faq-icon');
+                        if (icon) {
+                            icon.setAttribute('data-feather', 'chevron-down');
+                        }
+                    });
+                    // Open clicked item if it wasn't active
+                    if (!isActive) {
+                        item.classList.add('active');
+                        const icon = item.querySelector('.faq-icon');
+                        if (icon) {
+                            icon.setAttribute('data-feather', 'chevron-up');
+                        }
+                    }
+                    feather.replace();
+                });
+            });
+
+            // Search Functionality
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    const searchTerm = e.target.value.toLowerCase();
+                    document.querySelectorAll('.faq-item').forEach(item => {
+                        const text = item.textContent.toLowerCase();
+                        if (text.includes(searchTerm) || searchTerm === '') {
+                            item.style.display = '';
+                        } else {
+                            item.style.display = 'none';
+                        }
+                    });
+                });
+            }
+
+            // Mobile menu toggle
+            const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+            const mobileNavDrawer = document.getElementById('mobile-nav-drawer');
+            const mobileNavOverlay = document.getElementById('mobile-nav-overlay');
+            const mobileNavClose = document.getElementById('mobile-nav-close');
+            
+            function openMobileMenu() {
+                mobileNavDrawer.classList.add('active');
+                mobileNavOverlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+            
+            function closeMobileMenu() {
+                mobileNavDrawer.classList.remove('active');
+                mobileNavOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+            
+            if (mobileMenuToggle) {
+                mobileMenuToggle.addEventListener('click', openMobileMenu);
+            }
+            
+            if (mobileNavClose) {
+                mobileNavClose.addEventListener('click', closeMobileMenu);
+            }
+            
+            if (mobileNavOverlay) {
+                mobileNavOverlay.addEventListener('click', closeMobileMenu);
+            }
+            
+            const mobileNavItems = document.querySelectorAll('.mobile-nav-item');
+            mobileNavItems.forEach(item => {
+                item.addEventListener('click', closeMobileMenu);
+            });
+        </script>
+        <script src="dark-mode.js"></script>
+    </body>
+</html>
+

@@ -1,0 +1,56 @@
+1. Immediately entering the site, there is no pic or cool stuff just a bunch of text....bad UI 
+ 
+2. after using reducing the size of my screen to Ipad size,  there is a scroll bar on the menu icon....too much padding and margin..bad UI. 
+ 
+3. Text do not gracefully use the themetoggler to go from white to dark, there is a bit of lag and some text are bigger on white than on dark... 
+ 
+4. The themetoggler icons is too tiny on the container it stays in.. 
+ 
+5. The faq is not making things better.. just a bunch of text...and there should atleast be a chevron down at the end of each questions so it is display on click to reduce text congestions 
+ 
+6. Terms of services is also a bunch of text, and why is this there...Email: support@craftiva.com 
+Address: [Your Business Address] 
+Phone: [Your Contact Number] 
+ 
+7. Craftnet Logo is not showing on the terms of service page...bad UI 
+ 
+ 
+8. I just noticed your themetoggler is just floating inside the secondary div it should at least be with the hamburger menu in the nav bar. 
+ 
+9. what is this on the privacy policy....Craftiva ("we," "our," or "us") is committed to protecting 
+ 
+10. this is also appearing on your privacy policy...Email: privacy@craftiva.com 
+Address: [Your Business Address] 
+Phone: [Your Contact Number] 
+ 
+11. No icons, no animations...nothing cool for someone to comback next time and see...bad UI 
+ 
+12. On opening the menu, The word Menu is fighting with the spacing, the cancel icon is hanging in the middle of the menu slide nav. 
+ 
+13. You did not disable scrolling when menu slide is open...bad UI 
+ 
+14.  On sign up, the field to select your creative type is part of the options..bad UI 
+ 
+15. Using a Bento style for your form field on sign up is more modern 
+ 
+16. this smtp is child's play.... 
+Craftnet <noreply@craftnet.com.ng> Unsubscribe 
+6:31 PM (1 minute ago) 
+to me 
+ 
+Hi baronlonewolf999@gmail.com, Welcome to Craftnet! One last step: please confirm your email so we can activate your account and keep your dashboard secure. Confirm your email: https://xmffdlciwrvuycnsgezb.supabase.co/auth/v1/verify?token=fa64d7b37688770ab9c87b1b4e1592617602f405e0ec6295b0d4b0ba&type=signup&redirect_to=https://craftnet.com.ng If you didn’t create this account, feel free to ignore this message. Thanks for joining the Craftnet community, The Craftnet Team 
+Confirm your mail..... 
+ 
+17. showing me your project ID is very bad, i cna phish out info with it. 
+ 
+18. On login there is no place to check my password if its correct...(the eye)  
+ 
+19. Complete you business profile is light grey,  then the bg is white making it almost invincible 
+ 
+20. after signing up and logging in there  is a white stuff on the menu onHover 
+ 
+21.   there are two scrollbar thats hillarious 
+ 
+22. why does the wallet have so much margin arround it and centered when everyone is at the left end 
+ 
+23. there are more but Ill have to stop here for nowv

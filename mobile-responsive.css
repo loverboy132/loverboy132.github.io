@@ -1,0 +1,1671 @@
+/* ==============================================
+   MOBILE RESPONSIVE GLOBAL STYLES
+   ============================================== */
+
+/* Box sizing fix */
+* {
+    box-sizing: border-box;
+}
+
+/* Prevent horizontal overflow */
+html, body {
+    overflow-x: hidden;
+    max-width: 100vw;
+    position: relative;
+    width: 100%;
+}
+
+/* Ensure all root elements respect viewport */
+* {
+    box-sizing: border-box;
+}
+
+/* Prevent any element from exceeding viewport width */
+@media (max-width: 768px) {
+    html, body {
+        overflow-x: hidden !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+    }
+    
+    body > * {
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+}
+
+/* Responsive images */
+img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Responsive videos and iframes */
+video, iframe {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Mobile-friendly tap targets */
+button, 
+a, 
+input[type="button"], 
+input[type="submit"],
+input[type="checkbox"],
+input[type="radio"],
+label {
+    min-height: 44px;
+    min-width: 44px;
+}
+
+/* Smaller tap targets for icons only */
+button.icon-only,
+a.icon-only {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Readable text - minimum 16px to prevent zoom on iOS */
+body {
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Mobile utility classes */
+@media (max-width: 767px) {
+    .hide-mobile { 
+        display: none !important; 
+    }
+    
+    .show-mobile { 
+        display: block !important; 
+    }
+    
+    .full-width-mobile { 
+        width: 100% !important; 
+    }
+    
+    .no-padding-mobile { 
+        padding: 0 !important; 
+    }
+    
+    .stack-mobile { 
+        flex-direction: column !important; 
+    }
+    
+    .text-center-mobile {
+        text-align: center !important;
+    }
+}
+
+/* ==============================================
+   MOBILE NAVIGATION STYLES
+   ============================================== */
+
+/* Hamburger menu button */
+.mobile-menu-toggle {
+    display: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 8px;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+}
+
+@media (max-width: 767px) {
+    .mobile-menu-toggle {
+        display: flex;
+    }
+    
+    .desktop-nav {
+        display: none !important;
+    }
+    
+    .mobile-nav {
+        display: block !important;
+    }
+}
+
+/* Mobile menu overlay */
+.mobile-nav-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 9998;
+}
+
+.mobile-nav-overlay.active {
+    display: block;
+}
+
+/* Mobile menu drawer */
+.mobile-nav-drawer {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 280px;
+    max-width: 85vw;
+    height: 100vh;
+    background: white;
+    z-index: 9999;
+    transition: left 0.3s ease;
+    overflow-y: auto;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.mobile-nav-drawer.active {
+    left: 0;
+}
+
+.mobile-nav-header {
+    padding: 20px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.mobile-nav-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 24px;
+    color: #374151;
+    padding: 8px;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-nav-menu {
+    padding: 20px 0;
+}
+
+.mobile-nav-item {
+    display: block;
+    padding: 16px 20px;
+    color: #374151;
+    text-decoration: none;
+    border-bottom: 1px solid #f3f4f6;
+    font-size: 16px;
+}
+
+.mobile-nav-item:hover,
+.mobile-nav-item.active {
+    background: #f9fafb;
+    color: #1d4ed8;
+}
+
+/* ==============================================
+   MOBILE TYPOGRAPHY
+   ============================================== */
+
+@media (max-width: 767px) {
+    body {
+        font-size: 16px;
+        line-height: 1.6;
+    }
+    
+    h1 { 
+        font-size: 28px !important;
+        line-height: 1.2;
+    }
+    
+    h2 { 
+        font-size: 24px !important;
+        line-height: 1.3;
+    }
+    
+    h3 { 
+        font-size: 20px !important;
+        line-height: 1.4;
+    }
+    
+    h4 {
+        font-size: 18px !important;
+    }
+    
+    p {
+        max-width: 100%;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    
+    /* Prevent text from overflowing */
+    * {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+}
+
+/* ==============================================
+   MOBILE FORMS & BUTTONS
+   ============================================== */
+
+@media (max-width: 767px) {
+    button, 
+    .btn,
+    input[type="button"], 
+    input[type="submit"] {
+        width: 100%;
+        min-height: 48px;
+        padding: 12px 20px;
+        font-size: 16px;
+        margin-bottom: 12px;
+    }
+    
+    .btn-group button {
+        margin-bottom: 12px;
+    }
+    
+    input, 
+    select, 
+    textarea {
+        width: 100%;
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: 12px;
+        min-height: 48px;
+    }
+    
+    .button-group {
+        flex-direction: column;
+    }
+    
+    .button-group button {
+        width: 100%;
+        margin-right: 0;
+    }
+    
+    /* Form spacing */
+    form {
+        padding: 0 4px;
+    }
+    
+    .form-group,
+    .mb-4,
+    .mb-6 {
+        margin-bottom: 16px !important;
+    }
+}
+
+/* ==============================================
+   MOBILE CONTAINERS & LAYOUTS
+   ============================================== */
+
+@media (max-width: 767px) {
+    .container {
+        width: 100%;
+        max-width: 100%;
+        padding: 0 16px;
+    }
+    
+    .container-mx-auto {
+        padding-left: 16px;
+        padding-right: 16px;
+    }
+    
+    /* Grid layouts - stack on mobile */
+    .grid {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+    
+    .grid-cols-2,
+    .grid-cols-3,
+    .grid-cols-4,
+    .md\:grid-cols-2,
+    .md\:grid-cols-3,
+    .lg\:grid-cols-3,
+    .lg\:grid-cols-4 {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Flex layouts - stack on mobile */
+    .flex-row,
+    .sm\:flex-row {
+        flex-direction: column !important;
+    }
+    
+    /* Cards */
+    .card {
+        width: 100%;
+        padding: 16px;
+        margin-bottom: 16px;
+    }
+    
+    /* Sections */
+    section {
+        padding: 24px 16px !important;
+    }
+    
+    /* Remove side padding from specific containers */
+    .px-6,
+    .px-8 {
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+    }
+    
+    .py-20,
+    .py-12 {
+        padding-top: 32px !important;
+        padding-bottom: 32px !important;
+    }
+}
+
+/* ==============================================
+   MOBILE TABLES
+   ============================================== */
+
+@media (max-width: 767px) {
+    table {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Option: Convert table to card layout */
+    .table-mobile-cards {
+        display: block;
+    }
+    
+    .table-mobile-cards thead {
+        display: none;
+    }
+    
+    .table-mobile-cards tbody,
+    .table-mobile-cards tr {
+        display: block;
+        width: 100%;
+    }
+    
+    .table-mobile-cards td {
+        display: block;
+        text-align: right;
+        padding: 8px 12px;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .table-mobile-cards td:before {
+        content: attr(data-label) ": ";
+        float: left;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 12px;
+        color: #6b7280;
+    }
+}
+
+/* ==============================================
+   MOBILE MODALS
+   ============================================== */
+
+@media (max-width: 767px) {
+    .modal {
+        padding: 16px !important;
+        align-items: flex-end !important;
+    }
+    
+    .modal-content,
+    .modal .bg-white {
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: 90vh;
+        border-radius: 16px 16px 0 0;
+        margin: 0;
+        padding: 20px !important;
+    }
+    
+    .modal-header {
+        padding: 16px 20px !important;
+    }
+    
+    .modal-body {
+        padding: 16px 20px !important;
+        max-height: calc(90vh - 120px);
+        overflow-y: auto;
+    }
+    
+    .modal-close {
+        min-width: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* Fix all button groups in modals */
+    .modal .flex.justify-end.space-x-4,
+    .modal .flex.justify-end.space-x-3 {
+        flex-direction: column !important;
+    }
+    
+    .modal .flex.justify-end.space-x-4 > *,
+    .modal .flex.justify-end.space-x-3 > * {
+        margin-left: 0 !important;
+        margin-top: 12px;
+        width: 100% !important;
+    }
+    
+    .modal .flex.justify-end.space-x-4 > *:first-child,
+    .modal .flex.justify-end.space-x-3 > *:first-child {
+        margin-top: 0;
+    }
+    
+    .modal h3 {
+        font-size: 20px !important;
+    }
+    
+    .modal input,
+    .modal textarea,
+    .modal select {
+        font-size: 16px !important;
+        min-height: 48px;
+        padding: 12px !important;
+    }
+    
+    .modal button {
+        min-height: 48px;
+        font-size: 16px;
+        padding: 12px 20px !important;
+    }
+}
+
+/* ==============================================
+   MOBILE SPACING ADJUSTMENTS
+   ============================================== */
+
+@media (max-width: 767px) {
+    /* Reduce large spacing */
+    .space-x-6 > * + *,
+    .space-x-8 > * + * {
+        margin-left: 0 !important;
+        margin-top: 12px;
+    }
+    
+    .space-y-6 > * + * {
+        margin-top: 16px !important;
+    }
+    
+    .gap-10,
+    .gap-8 {
+        gap: 16px !important;
+    }
+    
+    /* Margin adjustments */
+    .mb-10,
+    .mb-12 {
+        margin-bottom: 24px !important;
+    }
+    
+    .mt-8,
+    .mt-6 {
+        margin-top: 24px !important;
+    }
+}
+
+/* ==============================================
+   MOBILE HEADER FIXES
+   ============================================== */
+
+@media (max-width: 767px) {
+    :root { --mobile-header-h: 44px; }
+
+    /* FIX OVERLAP: page content starts below fixed header using body padding */
+    body { padding-top: var(--mobile-header-h) !important; }
+
+    /* Ensure hero content starts after header with small breathing space */
+    body.home-page main.hero-bg {
+        padding-top: calc(var(--mobile-header-h) + 8px) !important;
+    }
+    header {
+        height: var(--mobile-header-h) !important;
+        min-height: var(--mobile-header-h) !important;
+        padding: 0 12px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    /* Ensure header items do NOT increase bar height */
+    header > * {
+        margin: 0 !important;
+    }
+
+    header button, header a, header .icon, header svg, header img {
+        max-height: 24px !important;
+    }
+
+    /* Logo sizing */
+    header img,
+    header svg {
+        max-height: 22px !important;
+        width: auto !important;
+        display: block !important;
+    }
+    
+    /* Header buttons - ensure they fit within header height */
+    header button,
+    header a.btn {
+        padding: 6px 12px !important;
+        font-size: 14px !important;
+        height: auto !important;
+        min-height: auto !important;
+    }
+    
+    /* Fixed headers */
+    header.fixed,
+    header.sticky,
+    header[class*="fixed"],
+    header[class*="sticky"] {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 50;
+    }
+    
+    /* Calculate header height - now compact 40-44px on mobile */
+    /* Header height calculation: py-3 (4px) + logo (22px) + py-3 (4px) = ~44px */
+    /* Add padding-top to main content to prevent overlap with fixed header */
+    
+    /* Remove conflicting padding since we use body padding-top */
+    header[class*="fixed"] + main,
+    header[class*="sticky"] + main,
+    header.fixed + main,
+    header.sticky + main {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+    
+    /* Remove conflicting padding since we use body padding-top */
+    main.pt-24,
+    main[class*="pt-24"],
+    main.pt-32,
+    main[class*="pt-32"] {
+        padding-top: 0 !important;
+    }
+    
+    /* Remove conflicting padding since we use body padding-top */
+    body > main:not([class*="pt-"]):not([class*="mt-"]) {
+        padding-top: 0 !important;
+    }
+    
+    /* Remove conflicting padding since we use body padding-top */
+    header[class*="fixed"] ~ section:first-of-type,
+    header[class*="sticky"] ~ section:first-of-type,
+    header.fixed ~ section:first-of-type,
+    header.sticky ~ section:first-of-type {
+        padding-top: 0 !important;
+    }
+    
+    /* Ensure body padding when header is fixed */
+    body.has-fixed-header {
+        padding-top: var(--mobile-header-h) !important;
+    }
+    
+    /* Ensure content inside main doesn't get cut off */
+    main > *:first-child {
+        margin-top: 0;
+    }
+    
+    /* Dashboard-specific fixes - header is sticky with h-14 (56px) on mobile */
+    /* The nav is inside the header, so total header height is ~104px on mobile */
+    
+    /* Dashboard header container includes nav, so total is ~104px */
+    #dashboard-layout header.sticky {
+        /* Header height is already set by h-14 (56px) + nav (~48px) = ~104px total */
+    }
+    
+    /* Dashboard main content - header is sticky so no padding needed on main */
+    /* The sticky header naturally creates space */
+    #dashboard-layout #main-content {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+    }
+    
+    /* Ensure dashboard content starts below sticky header */
+    #dashboard-layout header.sticky ~ main {
+        margin-top: 0;
+    }
+    
+    /* Login and signup pages - ensure forms don't get cut off */
+    body.flex.items-center.justify-center {
+        padding-top: var(--mobile-header-h) !important;
+        padding-bottom: 20px !important;
+    }
+    
+    /* Pages with min-h-screen that might overlap */
+    main.min-h-screen,
+    body.min-h-screen {
+        padding-top: var(--mobile-header-h) !important;
+    }
+
+    /* ===== FORCE COMPACT FIXED HEADER (MOBILE) ===== */
+    :root { --mobile-header-h: 56px; }
+
+    /* Make the fixed bar itself compact */
+    header.home-header {
+        height: var(--mobile-header-h) !important;
+        min-height: var(--mobile-header-h) !important;
+        padding: 0 16px !important;
+        display: flex !important;
+        align-items: center !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Ensure header children cannot increase bar height */
+    header.home-header * {
+        margin-top: 0 !important;
+        margin-bottom: 0 !important;
+    }
+
+    header.home-header img,
+    header.home-header svg,
+    header.home-header button,
+    header.home-header a {
+        max-height: 24px !important;
+    }
+
+    /* PUSH PAGE CONTENT DOWN so it starts after the fixed header */
+    body.home-page {
+        padding-top: var(--mobile-header-h) !important;
+    }
+
+    /* IMPORTANT: remove any other "reserved space" padding rules that cause conflicts */
+    main:first-of-type,
+    section:first-of-type,
+    header + main,
+    header ~ main,
+    header ~ section:first-of-type,
+    body.has-fixed-header {
+        padding-top: 0 !important;
+    }
+
+    /* Extra safety: hero must not start under header even if other rules set padding */
+    main.hero-bg {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+    }
+}
+
+/* ==============================================
+   MOBILE FOOTER FIXES
+   ============================================== */
+
+@media (max-width: 767px) {
+    footer {
+        padding: 32px 16px !important;
+    }
+    
+    footer .grid {
+        grid-template-columns: 1fr !important;
+        gap: 24px !important;
+    }
+    
+    footer .text-center {
+        text-align: center !important;
+        margin-top: 24px;
+    }
+
+    /* Dashboard layout offset for fixed header on mobile */
+    #dashboard-layout {
+        padding-top: 64px !important;
+    }
+}
+
+/* ==============================================
+   MOBILE SPECIFIC FIXES
+   ============================================== */
+
+/* Prevent text size adjustment on iOS */
+@media screen and (max-width: 767px) {
+    input[type="color"],
+    input[type="date"],
+    input[type="datetime"],
+    input[type="datetime-local"],
+    input[type="email"],
+    input[type="month"],
+    input[type="number"],
+    input[type="password"],
+    input[type="search"],
+    input[type="tel"],
+    input[type="text"],
+    input[type="time"],
+    input[type="url"],
+    input[type="week"],
+    select:focus,
+    textarea {
+        font-size: 16px !important;
+    }
+}
+
+/* ==============================================
+   ADMIN DASHBOARD MOBILE FIXES
+   ============================================== */
+
+@media (max-width: 768px) {
+    /* Hide sidebar on mobile */
+    .sidebar {
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        position: fixed;
+        z-index: 1000;
+    }
+    
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+    
+    /* Add mobile menu toggle for admin sidebar */
+    .sidebar-toggle {
+        display: block !important;
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 1001;
+        background: #667eea;
+        color: white;
+        border: none;
+        padding: 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        min-width: 44px;
+        min-height: 44px;
+    }
+    
+    /* Adjust main content when sidebar is hidden */
+    .main-content {
+        margin-left: 0 !important;
+        width: 100% !important;
+    }
+    
+    /* Stack admin stats grid */
+    .stats-grid,
+    .quick-actions {
+        grid-template-columns: 1fr !important;
+    }
+    
+    /* Full width admin cards */
+    .action-card,
+    .stat-card {
+        width: 100% !important;
+        margin-bottom: 16px;
+    }
+    
+    /* Stack filter rows */
+    .filters-row {
+        flex-direction: column !important;
+    }
+    
+    .filter-group {
+        width: 100% !important;
+    }
+    
+    .filter-input {
+        width: 100% !important;
+        min-width: auto !important;
+    }
+}
+
+/* ==============================================
+   ENHANCED OVERFLOW PREVENTION
+   ============================================== */
+
+@media (max-width: 768px) {
+    /* Ensure all containers respect viewport width */
+    * {
+        max-width: 100%;
+    }
+    
+    /* Prevent any element from causing horizontal scroll */
+    body > * {
+        overflow-x: hidden;
+    }
+    
+    /* Fix for elements with fixed widths */
+    [style*="width"] {
+        max-width: 100vw !important;
+    }
+    
+    /* Ensure tables don't overflow */
+    table {
+        width: 100% !important;
+        table-layout: auto;
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Fix for any flex containers that might overflow */
+    .flex {
+        flex-wrap: wrap;
+    }
+    
+    /* Ensure images and media don't overflow */
+    img, video, iframe, embed, object {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+    
+    /* Fix for SVG elements */
+    svg {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+}
+
+/* ==============================================
+   ENHANCED MODAL FIXES
+   ============================================== */
+
+@media (max-width: 768px) {
+    /* All modals should be full-width bottom sheets */
+    .modal {
+        padding: 0 !important;
+        align-items: flex-end !important;
+        justify-content: center !important;
+    }
+    
+    .modal > div,
+    .modal-content,
+    .modal .bg-white,
+    .modal .bg-white.rounded-lg {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        border-radius: 16px 16px 0 0 !important;
+        max-height: 90vh !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Modal headers */
+    .modal-header,
+    .modal h3 {
+        padding: 16px 20px !important;
+        font-size: 20px !important;
+        position: sticky;
+        top: 0;
+        background: white;
+        z-index: 10;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    /* Modal body */
+    .modal-body {
+        padding: 20px !important;
+        max-height: calc(90vh - 80px);
+        overflow-y: auto;
+    }
+    
+    /* Modal buttons - stack vertically */
+    .modal .flex.justify-end,
+    .modal .flex.justify-between,
+    .modal .flex.space-x-4,
+    .modal .flex.space-x-3 {
+        flex-direction: column !important;
+        gap: 12px !important;
+    }
+    
+    .modal .flex.justify-end > *,
+    .modal .flex.justify-between > *,
+    .modal .flex.space-x-4 > *,
+    .modal .flex.space-x-3 > * {
+        width: 100% !important;
+        margin: 0 !important;
+    }
+    
+    /* Modal close button */
+    .modal-close,
+    button[aria-label*="close" i],
+    button[aria-label*="Close" i] {
+        min-width: 44px !important;
+        min-height: 44px !important;
+        padding: 12px !important;
+    }
+}
+
+/* ==============================================
+   ENHANCED FORM FIXES
+   ============================================== */
+
+@media (max-width: 768px) {
+    /* All form elements should be full width */
+    form {
+        width: 100%;
+        padding: 0;
+    }
+    
+    form input,
+    form select,
+    form textarea,
+    form button:not(#toggle-password) {
+        width: 100% !important;
+        box-sizing: border-box;
+    }
+    
+    /* Form groups stack properly */
+    .form-group,
+    .mb-4,
+    .mb-6 {
+        width: 100% !important;
+        margin-bottom: 16px !important;
+    }
+    
+    /* File inputs */
+    input[type="file"] {
+        width: 100% !important;
+        font-size: 14px !important;
+    }
+    
+    /* Select dropdowns */
+    select {
+        width: 100% !important;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        padding-right: 40px !important;
+    }
+}
+
+/* ==============================================
+   ENHANCED BUTTON FIXES
+   ============================================== */
+
+@media (max-width: 768px) {
+    /* All buttons should be touch-friendly */
+    button:not(#toggle-password),
+    .btn,
+    a.btn,
+    input[type="button"],
+    input[type="submit"] {
+        min-height: 48px !important;
+        min-width: 48px !important;
+        padding: 12px 20px !important;
+        font-size: 16px !important;
+        touch-action: manipulation;
+    }
+    
+    /* Button groups stack */
+    .button-group,
+    .btn-group,
+    .flex.space-x-4,
+    .flex.space-x-3,
+    .flex.gap-4,
+    .flex.gap-3 {
+        flex-direction: column !important;
+        width: 100% !important;
+    }
+    
+    .button-group > *,
+    .btn-group > *,
+    .flex.space-x-4 > *,
+    .flex.space-x-3 > *,
+    .flex.gap-4 > *,
+    .flex.gap-3 > * {
+        width: 100% !important;
+        margin: 0 !important;
+        margin-bottom: 12px !important;
+    }
+    
+    .button-group > *:last-child,
+    .btn-group > *:last-child,
+    .flex.space-x-4 > *:last-child,
+    .flex.space-x-3 > *:last-child,
+    .flex.gap-4 > *:last-child,
+    .flex.gap-3 > *:last-child {
+        margin-bottom: 0 !important;
+    }
+}
+
+/* ==============================================
+   ENHANCED GRID AND FLEX FIXES
+   ============================================== */
+
+@media (max-width: 768px) {
+    /* All grids become single column */
+    .grid,
+    [class*="grid-cols"] {
+        grid-template-columns: 1fr !important;
+        gap: 16px !important;
+    }
+    
+    /* Flex rows become columns */
+    .flex-row,
+    [class*="flex-row"],
+    .sm\:flex-row {
+        flex-direction: column !important;
+    }
+    
+    /* Space-x utilities become space-y on mobile */
+    .space-x-2 > * + *,
+    .space-x-3 > * + *,
+    .space-x-4 > * + *,
+    .space-x-6 > * + *,
+    .space-x-8 > * + * {
+        margin-left: 0 !important;
+        margin-top: 12px !important;
+    }
+    
+    /* Gap utilities work properly */
+    .gap-2,
+    .gap-3,
+    .gap-4,
+    .gap-6,
+    .gap-8 {
+        gap: 16px !important;
+    }
+}
+
+/* ==============================================
+   ENHANCED TEXT AND TYPOGRAPHY
+   ============================================== */
+
+@media (max-width: 768px) {
+    /* Ensure all text is readable */
+    body,
+    p,
+    span,
+    div,
+    label {
+        font-size: 16px !important;
+        line-height: 1.6 !important;
+    }
+    
+    /* Headings scale appropriately */
+    h1 {
+        font-size: 24px !important;
+        line-height: 1.2 !important;
+    }
+    
+    h2 {
+        font-size: 20px !important;
+        line-height: 1.3 !important;
+    }
+    
+    h3 {
+        font-size: 18px !important;
+        line-height: 1.4 !important;
+    }
+    
+    h4 {
+        font-size: 16px !important;
+        line-height: 1.4 !important;
+    }
+    
+    /* Small text should still be readable */
+    .text-sm,
+    small {
+        font-size: 14px !important;
+    }
+    
+    .text-xs {
+        font-size: 12px !important;
+    }
+    
+    /* Prevent text overflow */
+    * {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+    }
+    
+    /* Long URLs and text break properly */
+    a,
+    p,
+    span {
+        word-break: break-word;
+    }
+}
+
+/* ==============================================
+   ENHANCED CONTAINER AND SPACING
+   ============================================== */
+
+@media (max-width: 768px) {
+    /* All containers should respect viewport */
+    .container,
+    .container-fluid,
+    [class*="container"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+        box-sizing: border-box;
+    }
+    
+    /* Reduce large padding */
+    .p-8,
+    .px-8,
+    .py-8 {
+        padding: 16px !important;
+    }
+    
+    .p-6,
+    .px-6,
+    .py-6 {
+        padding: 16px !important;
+    }
+    
+    /* Section padding */
+    section {
+        padding: 24px 16px !important;
+    }
+    
+    /* Card padding */
+    .card,
+    [class*="card"] {
+        padding: 16px !important;
+        margin-bottom: 16px;
+    }
+    
+    /* Remove excessive margins */
+    .mb-8,
+    .mb-10,
+    .mb-12 {
+        margin-bottom: 24px !important;
+    }
+    
+    .mt-8,
+    .mt-10,
+    .mt-12 {
+        margin-top: 24px !important;
+    }
+}
+
+/* Touch-friendly scrollbars */
+@media (max-width: 767px) {
+    ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 4px;
+    }
+}
+
+/* ==============================================
+   DASHBOARD HEADER ALIGNMENT FIX
+   ============================================== */
+
+/* Fix dashboard header alignment on mobile - ensure logo and action buttons align properly */
+@media (max-width: 767px) {
+    /* Dashboard header container - ensure proper height and alignment */
+    #dashboard-layout header .flex.items-center.justify-between.h-8 {
+        min-height: 56px !important;
+        height: auto !important;
+        align-items: center !important;
+        padding: 8px 0 !important;
+    }
+
+    /* Right-side action buttons container - ensure proper spacing and alignment */
+    #dashboard-layout header .flex.items-center.space-x-2 > * {
+        flex-shrink: 0 !important;
+    }
+
+    /* User avatar and logout button - ensure consistent sizing */
+    #dashboard-layout header #user-avatar,
+    #dashboard-layout header #logout-button {
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+    }
+
+    /* Notification bell button - match sizing */
+    #dashboard-layout header #notification-bell {
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+    }
+}
+
+/* ==============================================
+   LOGO SIZE INCREASE ONLY (NO HEADER CHANGES)
+   ============================================== */
+
+/* CRITICAL: Ensure header doesn't grow with logo */
+/* REMOVED: Conflicting with compact header override
+header,
+.header {
+    min-height: auto !important;
+    height: auto !important;
+}
+*/
+
+/* ==============================================
+   DASHBOARD HEADER + LOGO FIXES
+   ============================================== */
+
+/* Dashboard header logo size - keep compact */
+#dashboard-layout header svg,
+#dashboard-layout header img {
+    height: 40px !important;
+    width: auto !important;
+}
+
+/* Dashboard header height - ensure it accommodates logo */
+#dashboard-layout header .flex.items-center.justify-between {
+    min-height: 64px !important;
+}
+
+/* Fix sticky header content overlap */
+#dashboard-layout #main-content {
+    padding-top: 64px !important;
+}
+
+@media (min-width: 640px) {
+    #dashboard-layout #main-content {
+        padding-top: 72px !important;
+    }
+}
+
+/* ==============================================
+   ENSURE HEADER STAYS COMPACT (LANDING PAGE)
+   ============================================== */
+
+@media (max-width: 767px) {
+    /* Only apply to landing page headers, not dashboard */
+    /* REMOVED: Conflicting with compact header override
+    body:not(#dashboard-layout) header {
+        padding-top: 1rem !important;
+        padding-bottom: 1rem !important;
+        min-height: auto !important;
+        height: auto !important;
+    }
+    */
+
+    /* Ensure flex items stay aligned */
+    body:not(#dashboard-layout) header .flex {
+        align-items: center !important;
+        gap: 0.5rem !important;
+    }
+}
+
+/* Standard mobile (376px - 768px) - Compact logo */
+@media (min-width: 376px) and (max-width: 768px) {
+    header svg.h-20,
+    header img.h-20,
+    header .logo {
+        height: 22px !important;  /* Compact for mobile */
+        width: auto !important;
+    }
+}
+
+
+
+/* ==============================================
+   HOME PAGE LOGO SIZING
+   ============================================== */
+
+/* Mobile homepage header relaxation */
+/* REMOVED: Conflicting with compact header override
+@media (max-width: 480px) {
+  .home-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    min-height: 56px;
+    padding: 0 16px;
+
+    z-index: 1000;
+    background: inherit;
+  }
+}
+*/
+
+/* Force logo container visibility */
+@media (max-width: 480px) {
+  .home-logo {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    overflow: visible;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1001;
+  }
+}
+
+/* Restore logo rendering */
+@media (max-width: 480px) {
+  .home-logo img,
+  .home-logo svg {
+    width: 110px;
+    height: auto;
+    display: block;
+    visibility: visible;
+    opacity: 1;
+    max-width: none;
+  }
+}
+
+/* Ensure content offset still works */
+@media (max-width: 480px) {
+  .home-page main {
+    padding-top: 0;
+  }
+}
+
+/* Remove hidden clamps */
+@media (max-width: 480px) {
+  .home-header {
+    overflow: visible !important;
+  }
+}
+
+
+/* Ensure header height doesn't change with larger logo */
+/* REMOVED: Conflicting with compact header override
+.home-page header {
+    align-items: center !important;
+    min-height: auto !important;
+    height: auto !important;
+}
+*/
+
+/* Safe area for notched devices */
+@supports (padding: max(0px)) {
+    @media (max-width: 767px) {
+        body {
+            padding-left: max(16px, env(safe-area-inset-left));
+            padding-right: max(16px, env(safe-area-inset-right));
+        }
+
+        header {
+            padding-left: max(16px, env(safe-area-inset-left)) !important;
+            padding-right: max(16px, env(safe-area-inset-right)) !important;
+        }
+    }
+}
+
+/* ==============================================
+   DASHBOARD HEADER MOBILE OPTIMIZATIONS (≤ 480px)
+   ============================================== */
+
+@media (max-width: 480px) {
+  /* Dashboard header height and padding */
+  #dashboard-layout header,
+  .dashboard-header,
+  .top-bar,
+  .header,
+  .nav-header {
+    min-height: 72px !important;
+    height: 72px !important;
+    padding: 12px 16px !important;
+  }
+
+  /* Dashboard header logo size */
+  #dashboard-layout header svg,
+  #dashboard-layout header img {
+    height: 32px !important;
+    width: auto !important;
+    max-width: 120px !important;
+  }
+
+  /* Dashboard header icons - all types */
+  #dashboard-layout header svg:not(.h-12):not(.h-14):not(.h-16):not(.h-20),
+  #dashboard-layout header img:not(.h-12):not(.h-14):not(.h-16):not(.h-20),
+  #dashboard-layout header i,
+  .dashboard-header svg,
+  .dashboard-header img,
+  .dashboard-header i,
+  .header svg,
+  .header img,
+  .header i {
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 18px !important;
+  }
+
+  /* Dashboard header buttons containing icons */
+  #dashboard-layout header button,
+  .dashboard-header button,
+  .header button {
+    padding: 6px !important;
+    min-width: 44px !important;
+    min-height: 36px !important;
+  }
+
+  /* Dashboard header icon spacing */
+  #dashboard-layout header .flex.items-center.space-x-2,
+  #dashboard-layout header .flex.items-center.space-x-4,
+  .dashboard-header .icon-group,
+  .dashboard-header .nav-icons,
+  .header .icon-group,
+  .header .nav-icons {
+    gap: 10px !important;
+  }
+
+  /* Dashboard header avatar/profile icon */
+  #dashboard-layout header .avatar,
+  #dashboard-layout header .profile-icon,
+  #dashboard-layout header img[alt*="profile"],
+  #dashboard-layout header img[alt*="avatar"],
+  .dashboard-header .avatar,
+  .dashboard-header .profile-icon,
+  .header .avatar,
+  .header .profile-icon {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  /* Dashboard header user info text */
+  #dashboard-layout header .text-sm,
+  #dashboard-layout header .text-xs,
+  .dashboard-header .text-sm,
+  .dashboard-header .text-xs {
+    font-size: 11px !important;
+    line-height: 1.2 !important;
+  }
+
+  /* Notification badge positioning */
+  #dashboard-layout header .notification-dot,
+  #dashboard-layout header .notification-badge,
+  .dashboard-header .notification-dot,
+  .dashboard-header .notification-badge {
+    top: -2px !important;
+    right: -2px !important;
+  }
+
+  /* Adjust main content top padding for compact header */
+  #dashboard-layout #main-content {
+    padding-top: 72px !important;
+  }
+}
+
+/* ===== FINAL LANDING PAGE MOBILE HEADER OVERRIDE (DO NOT MOVE) ===== */
+@media (max-width: 767px) {
+  :root { --home-header-h: 70px; }
+
+  /* Force the bar size */
+  header.home-header {
+    height: var(--home-header-h) !important;
+    min-height: var(--home-header-h) !important;
+    padding: 0 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Prevent children from stretching the bar */
+  header.home-header * {
+    margin: 0 !important;
+  }
+
+  header.home-header img,
+  header.home-header svg,
+  header.home-header button,
+  header.home-header a {
+    max-height: 24px !important;
+  }
+
+  /* Prevent overlap: push page content below fixed header */
+  body.home-page {
+    padding-top: calc(var(--home-header-h) + 12px) !important;
+  }
+
+  /* Ensure hero doesn't add its own top padding */
+  body.home-page main.hero-bg {
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+  }
+}
+
+/* ===== Dashboard header layout (all sizes) ===== */
+#dashboard-layout header .dashboard-header-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#dashboard-layout header .dashboard-left,
+#dashboard-layout header .dashboard-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Make logo normal */
+#dashboard-layout header a[href*="index"] img,
+#dashboard-layout header a[href*="home"] img,
+#dashboard-layout header a[href*="index"] svg,
+#dashboard-layout header a[href*="home"] svg,
+#dashboard-layout header .dashboard-left svg {
+  height: 26px !important;
+  width: auto !important;
+  max-height: 26px !important;
+}
+
+/* Make icon buttons tappable + aligned */
+#dashboard-layout #notification-bell,
+#dashboard-layout #logout-button,
+#dashboard-layout #user-avatar {
+  min-width: 40px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ===== Mobile vs Desktop nav behavior ===== */
+@media (max-width: 767px) {
+  #dashboard-layout #main-nav {
+    display: none !important;
+  }
+
+  #dashboard-layout .mobile-menu-toggle,
+  #dashboard-layout .dashboard-mobile-toggle {
+    display: inline-flex !important;
+  }
+}
+
+@media (min-width: 768px) {
+  #dashboard-layout #main-nav {
+    display: flex !important;
+  }
+
+  #dashboard-layout .mobile-menu-toggle,
+  #dashboard-layout .dashboard-mobile-toggle {
+    display: none !important;
+  }
+}
+
+/* ======================================
+   DASHBOARD CONTENT SPACING FIX
+====================================== */
+
+@media (max-width: 767px) {
+
+    /* Reduce artificial spacing below header */
+    #dashboard-layout {
+      padding-top: 48px !important;   /* was 64px */
+    }
+  
+    /* Fine tune content start position */
+    #dashboard-layout #main-content {
+      margin-top: -6px !important;    /* pulls content slightly closer */
+    }
+  
+  }
+
+/* ===== DASHBOARD SPACING OVERRIDE (FINAL) ===== */
+@media (max-width: 767px) {
+  /* Dashboard header is sticky, so do NOT stack extra offsets */
+  #dashboard-layout {
+    padding-top: 0 !important;   /* overrides the 64px rule */
+  }
+
+  /* Remove forced large padding values */
+  #dashboard-layout #main-content {
+    padding-top: 12px !important;  /* small + clean */
+    margin-top: 0 !important;
+  }
+
+  /* Neutralize any global body padding used for fixed headers */
+  body {
+    padding-top: 0 !important;
+  }
+}
+
+/* ===== DASHBOARD DESKTOP NAV PADDING ===== */
+@media (min-width: 768px) {
+  #dashboard-layout header {
+    padding-left: 24px !important;
+    padding-right: 24px !important;
+  }
+
+  /* Give the tab row breathing room too */
+  #dashboard-layout #main-nav {
+    padding-left: 8px !important;
+  }
+}
+
+@media (max-width: 767px) {
+
+  /* Fix apprentice action buttons layout */
+  .apprentice-card-actions,
+  .profile-card-actions,
+  .explore-card-actions {
+      display: flex !important;
+      flex-direction: row !important;
+      gap: 8px;
+  }
+
+  .apprentice-card-actions button,
+  .profile-card-actions button,
+  .explore-card-actions button {
+      width: auto !important;
+      flex: 1 !important;
+      min-height: 40px !important;
+      padding: 10px 12px !important;
+      font-size: 14px !important;
+  }
+
+}

@@ -1,293 +1,482 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>JJK: Cursed Technique</title>
-    <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Courier New', sans-serif; }
-    
-        #ui {
-            position: absolute;
-            top: 10%;
-            width: 100%;
-            text-align: center;
-            color: #fff;
-            pointer-events: none;
-            z-index: 10;
-        }
-        
-        h1 { 
-            font-size: 3rem; margin: 0; letter-spacing: 10px; 
-            font-weight: 900; 
-            text-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-            background: linear-gradient(to bottom, #fff, #888);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        
-        #technique-name { 
-            font-size: 1.2rem; color: #00ffff; margin-top: 15px; 
-            font-weight: bold; letter-spacing: 4px;
-            text-transform: uppercase;
-            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
-        }
-
-        /* Large Centered Camera Hub - Taller for Reel Context */
-        #video-container {
-            position: absolute;
-            bottom: 2%;
-            left: 18%;
-            transform: translateX(-50%) scaleX(-1);
-            width: 85vw;
-            max-width: 450px;
-            height: 42vh; 
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            z-index: 20;
-            background-color: #000; 
-            border-radius: 25px;
-            overflow: hidden;
-            box-shadow: 0 0 40px rgba(0,0,0,0.9);
-        }
-
-        video { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; }
-        #output_canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-
-        #grain {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 5;
-            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.08'/%3E%3C/svg%3E");
-        }
-    </style>
-    
-    <script type="importmap">
-        {
-            "imports": {
-                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+        <title>Craftnet - Discover, Earn, and Showcase Your Work</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+        <link
+            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+            rel="stylesheet"
+        />
+        <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+        <link rel="stylesheet" href="dark-mode.css">
+        <link rel="stylesheet" href="mobile-responsive.css">
+        <style>
+            body {
+                font-family: "Inter", sans-serif;
             }
-        }
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-</head>
-<body>
-
-    <div id="grain"></div>
-
-    <div id="ui">
-        <h1>呪術廻戦</h1>
-        <div id="technique-name">CURSED ENERGY</div>
-    </div>
-
-    <div id="video-container">
-        <video class="input_video"></video>
-        <canvas id="output_canvas"></canvas>
-    </div>
-
-<script type="module">
-    import * as THREE from 'three';
-    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-
-    // --- Scene & Rendering ---
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    camera.position.z = 55;
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    document.body.appendChild(renderer.domElement);
-
-    const composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
-    const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-    composer.addPass(bloomPass);
-
-    const COUNT = 20000;
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(COUNT * 3);
-    const colors = new Float32Array(COUNT * 3);
-    const sizes = new Float32Array(COUNT);
-    
-    const targetPositions = new Float32Array(COUNT * 3);
-    const targetColors = new Float32Array(COUNT * 3);
-    const targetSizes = new Float32Array(COUNT);
-
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-
-    const particles = new THREE.Points(geometry, new THREE.PointsMaterial({ size: 0.3, vertexColors: true, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false }));
-    scene.add(particles);
-
-    // Technique Functions 
-    function getRed(i) {
-        if(i < COUNT * 0.1) {
-            const r = Math.random() * 9;
-            const theta = Math.random() * 6.28; const phi = Math.acos(2 * Math.random() - 1);
-            return { x: r * Math.sin(phi) * Math.cos(theta), y: r * Math.sin(phi) * Math.sin(theta), z: r * Math.cos(phi), r: 3, g: 0.1, b: 0.1, s: 2.5 };
-        } else {
-            const armCount = 3; const t = (i / COUNT); 
-            const angle = t * 15 + ((i % armCount) * (Math.PI * 2 / armCount));
-            const radius = 2 + (t * 40); 
-            return { x: radius * Math.cos(angle), y: radius * Math.sin(angle), z: (Math.random() - 0.5) * (10 * t), r: 0.8, g: 0, b: 0, s: 1.0 };
-        }
-    }
-
-    function getVoid(i) {
-        if (i < COUNT * 0.15) {
-            const angle = Math.random() * Math.PI * 2;
-            return { x: 26 * Math.cos(angle), y: 26 * Math.sin(angle), z: (Math.random()-0.5) * 1, r: 1, g: 1, b: 1, s: 2.5 };
-        } else {
-            const radius = 30 + Math.random() * 90;
-            const theta = Math.random() * Math.PI * 2;
-            const phi = Math.acos(2 * Math.random() - 1);
-            return { x: radius * Math.sin(phi) * Math.cos(theta), y: radius * Math.sin(phi) * Math.sin(theta), z: radius * Math.cos(phi), r: 0.1, g: 0.6, b: 1.0, s: 0.7 };
-        }
-    }
-
-    function getPurple(i) {
-        if (Math.random() > 0.8) return { x: (Math.random() - 0.5) * 100, y: (Math.random() - 0.5) * 100, z: (Math.random() - 0.5) * 100, r: 0.5, g: 0.5, b: 0.7, s: 0.8 };
-        const r = 20; const theta = Math.random() * Math.PI * 2; const phi = Math.acos(2 * Math.random() - 1);
-        return { x: r * Math.sin(phi) * Math.cos(theta), y: r * Math.sin(phi) * Math.sin(theta), z: r * Math.cos(phi), r: 0.6, g: 0.5, b: 1.0, s: 2.5 };
-    }
-
-    function getShrine(i) {
-        const total = COUNT;
-        if (i < total * 0.3) return { x: (Math.random()-0.5)*80, y: -15, z: (Math.random()-0.5)*80, r: 0.4, g: 0, b: 0, s: 0.8 };
-        else if (i < total * 0.4) {
-            const px = ((i%4)<2?1:-1)*12; const pz = ((i%4)%2==0?1:-1)*8;
-            return { x: px+(Math.random()-0.5)*2, y: -15+Math.random()*30, z: pz+(Math.random()-0.5)*2, r: 0.2, g: 0.2, b: 0.2, s: 0.6 };
-        } else if (i < total * 0.6) {
-            const t = Math.random() * Math.PI * 2; const rad = Math.random() * 30;
-            const curve = Math.pow(rad/30, 2) * 10; 
-            return { x: rad*Math.cos(t), y: 15 - curve + (Math.random()*2), z: rad*Math.sin(t)*0.6, r: 0.6, g: 0, b: 0, s: 0.6 };
-        } else return { x: 0, y: 0, z: 0, r: 0, g: 0, b: 0, s: 0 };
-    }
-
-    // Hand Tracking
-    let currentTech = 'neutral';
-    let shakeIntensity = 0;
-    const videoElement = document.querySelector('.input_video');
-    const canvasElement = document.getElementById('output_canvas');
-    const canvasCtx = canvasElement.getContext('2d');
-    let glowColor = '#00ffff';
-
-    const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-    hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7 });
-
-    hands.onResults((results) => {
-        canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-        let detected = 'neutral';
-
-        if (results.multiHandLandmarks) {
-            results.multiHandLandmarks.forEach((lm) => {
-                drawConnectors(canvasCtx, lm, HAND_CONNECTIONS, {color: glowColor, lineWidth: 5});
-                drawLandmarks(canvasCtx, lm, {color: '#fff', lineWidth: 1, radius: 2});
-
-                const isUp = (t, p) => lm[t].y < lm[p].y;
-                const pinch = Math.hypot(lm[8].x - lm[4].x, lm[8].y - lm[4].y);
-                
-                if (pinch < 0.04) detected = 'purple';
-                else if (isUp(8,6) && isUp(12,10) && isUp(16,14) && isUp(20,18)) detected = 'shrine';
-                else if (isUp(8,6) && isUp(12,10) && !isUp(16,14)) detected = 'void';
-                else if (isUp(8,6) && !isUp(12,10)) detected = 'red';
-            });
-        }
-        updateState(detected);
-    });
-
-    function updateState(tech) {
-        if(currentTech === tech) return;
-        currentTech = tech;
-        const nameEl = document.getElementById('technique-name');
-        shakeIntensity = tech !== 'neutral' ? 0.4 : 0;
-
-        if(tech === 'shrine') { glowColor = '#ff0000'; nameEl.innerText = "Domain Expansion: Malevolent Shrine"; bloomPass.strength = 2.5; }
-        else if(tech === 'purple') { glowColor = '#bb00ff'; nameEl.innerText = "Secret Technique: Hollow Purple"; bloomPass.strength = 4.0; }
-        else if(tech === 'void') { glowColor = '#00ffff'; nameEl.innerText = "Domain Expansion: Infinite Void"; bloomPass.strength = 2.0; }
-        else if(tech === 'red') { glowColor = '#ff3333'; nameEl.innerText = "Reverse Cursed Technique: Red"; bloomPass.strength = 2.5; }
-        else { glowColor = '#00ffff'; nameEl.innerText = "Neutral State"; bloomPass.strength = 1.0; }
-
-        for(let i=0; i<COUNT; i++) {
-            let p;
-            if(tech === 'neutral') {
-                if(i < COUNT * 0.05) {
-                    const r = 15 + Math.random()*20; const t = Math.random()*6.28; const ph = Math.random()*3.14;
-                    p = { x: r*Math.sin(ph)*Math.cos(t), y: r*Math.sin(ph)*Math.sin(t), z: r*Math.cos(ph), r: 0.1, g: 0.1, b: 0.2, s: 0.4 };
-                } else p = { x:0, y:0, z:0, r:0, g:0, b:0, s:0 };
+            .hero-bg {
+                background-color: #f8f9fa;
+                background-image: radial-gradient(#e0e0e0 1px, transparent 1px);
+                background-size: 20px 20px;
             }
-            else if(tech === 'red') p = getRed(i);
-            else if(tech === 'void') p = getVoid(i);
-            else if(tech === 'purple') p = getPurple(i);
-            else if(tech === 'shrine') p = getShrine(i);
+            .btn {
+                transition: all 0.3s ease;
+            }
+            .btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            }
+
+            @media (max-width: 767px) {
+                body {
+                    padding-top: 104px;
+                }
+            }
+
+            @media (min-width: 768px) {
+                body {
+                    padding-top: 176px;
+                }
+            }
+        </style>
+    </head>
+    <body class="bg-white text-gray-800 home-page">
+        <!-- Header -->
+        <header
+            class="home-header bg-white/80 backdrop-blur-md fixed top-0 left-0 right-0 z-50 border-b border-gray-200"
+        >
+            <div
+                class="container mx-auto px-4 sm:px-6 py-4 sm:py-5 flex justify-between items-center"
+            >
+                <a href="index.html" class="flex items-center">
+                    <div class="home-logo">
+                        <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 300.000000 300.000000"
+                            preserveAspectRatio="xMidYMid meet"
+                            fill="currentColor"
+                            style="color: #1d4ed8;"
+                        >
+                        <g transform="translate(0.000000,300.000000) scale(0.100000,-0.100000)"
+                        fill="currentColor" stroke="none">
+                        <path d="M539 1931 c-153 -50 -269 -212 -269 -375 0 -67 24 -156 55 -211 36
+                        -60 116 -132 183 -163 50 -24 69 -27 162 -27 99 0 110 2 171 32 196 97 281
+                        340 189 537 -35 74 -112 151 -187 188 -57 28 -78 33 -157 35 -68 2 -105 -2
+                        -147 -16z m241 -57 c142 -46 241 -199 227 -352 -12 -124 -83 -229 -193 -283
+                        -55 -28 -76 -32 -137 -32 -136 1 -250 71 -313 193 -26 49 -29 65 -29 150 0 89
+                        2 99 34 158 84 155 244 220 411 166z"/>
+                        <path d="M627 1822 c-22 -24 -21 -57 3 -109 33 -73 75 -47 97 58 11 54 -64 91
+                        -100 51z m63 -27 c12 -15 6 -49 -13 -73 -8 -11 -13 -9 -23 10 -17 30 -17 65
+                        -1 71 20 9 24 8 37 -8z"/>
+                        <path d="M449 1726 c-14 -29 -2 -51 34 -62 12 -3 34 -18 49 -32 23 -21 30 -23
+                        43 -12 14 12 13 16 -14 44 -16 17 -31 42 -33 56 -2 20 -9 26 -35 28 -27 3 -35
+                        -1 -44 -22z"/>
+                        <path d="M812 1738 c-6 -6 -12 -19 -12 -28 0 -9 -11 -27 -25 -40 -14 -13 -25
+                        -29 -25 -36 0 -25 22 -26 46 -3 14 13 39 28 57 34 28 9 32 14 32 45 0 32 -3
+                        35 -30 38 -17 2 -36 -3 -43 -10z"/>
+                        <path d="M618 1616 c-24 -18 -39 -63 -32 -92 8 -33 50 -64 86 -64 69 0 106
+                        100 55 148 -26 25 -82 29 -109 8z m80 -38 c21 -21 14 -57 -14 -70 -23 -11 -29
+                        -10 -45 10 -15 19 -16 28 -7 48 12 26 46 32 66 12z"/>
+                        <path d="M388 1565 c-9 -21 -8 -28 7 -45 21 -24 48 -26 65 -5 7 9 29 15 51 15
+                        32 0 39 3 39 20 0 17 -7 20 -44 20 -25 0 -48 5 -51 10 -13 20 -55 11 -67 -15z"/>
+                        <path d="M875 1581 c-6 -5 -28 -11 -50 -13 -57 -4 -55 -32 2 -36 23 -2 47 -10
+                        53 -18 31 -36 93 12 70 55 -11 22 -58 29 -75 12z"/>
+                        <path d="M536 1451 c-16 -17 -40 -31 -55 -33 -21 -2 -27 -9 -29 -35 -3 -27 1
+                        -35 22 -45 22 -9 29 -8 46 7 11 10 20 25 20 34 0 8 12 27 26 42 16 17 24 34
+                        21 43 -9 23 -20 20 -51 -13z"/>
+                        <path d="M753 1464 c-3 -9 5 -26 21 -43 14 -15 26 -37 26 -49 0 -14 9 -27 25
+                        -34 21 -9 28 -8 45 7 32 29 20 75 -20 75 -9 0 -29 14 -45 30 -32 34 -43 37
+                        -52 14z"/>
+                        <path d="M650 1392 c0 -23 -6 -45 -15 -52 -24 -20 -19 -59 11 -72 45 -21 79
+                        19 55 66 -6 11 -12 37 -13 56 -2 24 -9 36 -20 38 -15 3 -18 -4 -18 -36z"/>
+                        <path d="M1840 1728 c-29 -11 -40 -25 -40 -55 0 -14 -6 -23 -15 -23 -9 0 -15
+                        -10 -15 -26 0 -19 4 -25 15 -20 13 4 15 -9 15 -84 l0 -90 30 0 30 0 0 90 0 90
+                        25 -6 c22 -5 25 -3 25 20 0 21 -5 26 -25 26 -19 0 -25 5 -25 21 0 16 5 20 28
+                        17 22 -2 28 1 30 20 2 13 -2 22 -10 23 -7 0 -20 2 -28 3 -8 2 -26 -1 -40 -6z"/>
+                        <path d="M1223 1715 c-48 -21 -73 -68 -73 -140 0 -102 63 -166 147 -150 40 7
+                        99 56 89 73 -11 19 -50 14 -69 -8 -22 -26 -50 -25 -81 3 -39 34 -39 124 -1
+                        162 31 31 49 31 81 0 20 -20 29 -23 49 -15 14 5 25 13 25 18 0 14 -43 50 -73
+                        61 -37 14 -55 13 -94 -4z"/>
+                        <path d="M1954 1695 c-4 -8 -4 -21 -1 -29 3 -8 -2 -16 -15 -19 -23 -6 -22 -42
+                        2 -42 11 0 13 -13 11 -55 -3 -68 11 -107 43 -121 36 -17 76 -4 76 24 0 18 -5
+                        23 -27 22 -28 0 -28 1 -31 67 l-3 68 31 -6 c27 -6 30 -4 30 20 0 22 -4 26 -30
+                        26 -27 0 -30 3 -30 30 0 25 -4 30 -25 30 -14 0 -28 -7 -31 -15z"/>
+                        <path d="M2590 1681 c0 -21 -5 -31 -15 -31 -9 0 -15 -10 -15 -26 0 -19 4 -25
+                        15 -20 13 4 15 -8 15 -74 0 -70 2 -81 22 -94 28 -20 62 -20 82 -1 21 22 11 41
+                        -22 40 -26 0 -27 1 -30 67 l-3 68 31 -6 c27 -6 30 -4 30 20 0 22 -4 26 -31 26
+                        -27 0 -30 3 -27 28 3 23 -1 27 -24 30 -25 3 -28 0 -28 -27z m36 -67 c-5 -13
+                        -10 -14 -18 -6 -6 6 -8 18 -4 28 5 13 10 14 18 6 6 -6 8 -18 4 -28z"/>
+                        <path d="M1420 1540 l0 -110 31 0 32 0 -6 48 c-9 74 1 102 39 118 23 9 34 21
+                        34 34 0 28 -44 27 -64 -2 l-16 -22 0 22 c0 17 -6 22 -25 22 l-25 0 0 -110z"/>
+                        <path d="M1592 1634 c-12 -8 -22 -21 -22 -28 0 -22 31 -28 51 -10 26 23 69 11
+                        69 -19 0 -19 -6 -22 -47 -25 -53 -3 -83 -24 -83 -59 0 -60 57 -90 107 -57 19
+                        12 28 13 31 6 2 -7 15 -12 28 -12 24 0 24 2 24 85 0 78 -2 88 -25 110 -29 30
+                        -97 34 -133 9z m82 -161 c-27 -20 -49 -12 -49 17 0 20 6 26 30 30 24 4 31 2
+                        33 -14 2 -11 -4 -26 -14 -33z"/>
+                        <path d="M2110 1540 l0 -110 25 0 c24 0 25 2 25 66 0 80 11 104 49 104 36 0
+                        41 -13 41 -101 0 -67 1 -69 25 -69 25 0 25 1 25 90 0 77 -3 93 -20 110 -24 24
+                        -82 27 -104 4 -15 -14 -16 -14 -16 0 0 10 -9 16 -25 16 l-25 0 0 -110z"/>
+                        <path d="M2366 1624 c-22 -23 -26 -36 -26 -83 0 -33 6 -65 15 -77 33 -48 122
+                        -55 160 -14 28 31 6 48 -36 27 -35 -16 -57 -13 -76 11 -29 35 -16 43 59 41 47
+                        -2 73 2 76 9 7 21 -19 82 -41 97 -36 25 -100 19 -131 -11z m112 -41 c3 -21 -1
+                        -23 -42 -23 -50 0 -51 1 -35 31 15 29 73 23 77 -8z"/>
+                        </g>
+                    </svg>
+                    </div>
+                </a>
+                <nav class="hidden md:flex items-center space-x-6 desktop-nav">
+                    <a
+                        href="#features"
+                        class="text-gray-600 hover:text-gray-900"
+                        >Features</a
+                    >
+                    <a href="#faq" class="text-gray-600 hover:text-gray-900"
+                        >FAQ</a
+                    >
+                </nav>
+                <div class="hidden md:flex items-center space-x-4">
+                    <a
+                        href="login-supabase.html"
+                        class="text-gray-600 hover:text-gray-900 font-medium"
+                        >Log In</a
+                    >
+                    <a
+                        href="signup-member-supabase.html"
+                        id="signup-member-link"
+                        class="bg-gray-900 text-white px-5 py-2 rounded-lg font-semibold text-sm shadow-md hover:bg-gray-800 btn"
+                        >Sign Up</a
+                    >
+                </div>
+                <button id="mobile-menu-toggle" class="md:hidden mobile-menu-toggle" aria-label="Toggle menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+                    </svg>
+                </button>
+            </div>
+        </header>
+        
+        <!-- Mobile Menu Overlay -->
+        <div id="mobile-nav-overlay" class="mobile-nav-overlay"></div>
+        
+        <!-- Mobile Menu Drawer -->
+        <div id="mobile-nav-drawer" class="mobile-nav-drawer">
+            <div class="mobile-nav-header">
+                <span class="font-bold text-lg">Menu</span>
+                <button id="mobile-nav-close" class="mobile-nav-close" aria-label="Close menu">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <nav class="mobile-nav-menu">
+                <a href="#features" class="mobile-nav-item">Features</a>
+                <a href="#faq" class="mobile-nav-item">FAQ</a>
+                <a href="login-supabase.html" class="mobile-nav-item">Log In</a>
+                <a href="signup-member-supabase.html" id="mobile-signup-link" class="mobile-nav-item">Sign Up</a>
+            </nav>
+        </div>
+
+        <!-- Hero Section -->
+        <main class="hero-bg pb-16 sm:pb-20">
+            <div class="container mx-auto px-4 sm:px-6 text-center">
+                <div class="max-w-4xl mx-auto">
+                    <h1
+                        class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 leading-tight mb-3 md:mb-6 px-2"
+                    >
+                        We help Africa's young workforce get discovered, earn
+                        money, and showcase their work.
+                    </h1>
+                    <p class="text-base sm:text-lg md:text-xl text-gray-600 mb-3 md:mb-10 px-2">
+                        For photographers, designers, artisans, students, video
+                        editors, and recent grads. A simple platform to earn,
+                        grow, and get seen — all in one place.
+                    </p>
+                    <div
+                        class="flex flex-col sm:flex-row justify-center items-stretch sm:items-center space-y-3 md:space-y-0 md:space-x-6 px-4"
+                    >
+                        <a
+                            href="signup-member-supabase.html"
+                            id="hero-member-link"
+                            class="w-full sm:w-auto bg-blue-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg shadow-lg hover:bg-blue-700 btn min-h-[48px] flex items-center justify-center"
+                        >
+                            Sign Up as Member
+                        </a>
+                        <a
+                            href="signup-apprentice-supabase.html"
+                            id="hero-apprentice-link"
+                            class="w-full sm:w-auto bg-white text-blue-600 border-2 border-blue-600 px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg shadow-lg hover:bg-blue-50 btn min-h-[48px] flex items-center justify-center"
+                        >
+                            Sign Up as Apprentice
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Features Section -->
+        <section id="features" class="py-12 sm:py-16 md:py-20 bg-gray-50">
+            <div class="container mx-auto px-4 sm:px-6">
+                <h2 class="text-2xl sm:text-3xl font-bold text-center text-gray-900 mb-8 sm:mb-12">
+                    One Platform, Endless Opportunities
+                </h2>
+                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 md:gap-10">
+                    <div class="bg-white p-8 rounded-xl shadow-md">
+                        <h3 class="text-2xl font-bold mb-3">
+                            Showcase Your Work
+                        </h3>
+                        <p class="text-gray-600">
+                            Our free gallery lets you upload your creative
+                            portfolio, get feedback, and be discovered.
+                        </p>
+                    </div>
+                    <div class="bg-white p-8 rounded-xl shadow-md">
+                        <h3 class="text-2xl font-bold mb-3">
+                            Earn Through Your Hustle
+                        </h3>
+                        <p class="text-gray-600">
+                            Monetize your network through referrals, take on
+                            paid jobs as an apprentice, and win prizes.
+                        </p>
+                    </div>
+                    <div class="bg-white p-8 rounded-xl shadow-md">
+                        <h3 class="text-2xl font-bold mb-3">
+                            Grow and Get Seen
+                        </h3>
+                        <p class="text-gray-600">
+                            Climb the leaderboard, access exclusive events, and
+                            connect with mentors.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section id="faq" class="py-12 sm:py-16 md:py-20 bg-white">
+            <div class="container mx-auto px-4 sm:px-6 max-w-4xl">
+                <h2 class="text-2xl sm:text-3xl font-bold text-center text-gray-900 mb-8 sm:mb-12">
+                    Frequently Asked Questions
+                </h2>
+                <div class="space-y-6">
+                    <div class="bg-gray-50 rounded-lg p-6">
+                        <h3 class="font-semibold text-lg mb-2">
+                            Is it free to use?
+                        </h3>
+                        <p class="text-gray-600">
+                            Yes! Basic use is free. Some advanced features
+                            require a subscription. You can showcase your work,
+                            apply for jobs, and earn through referrals at no
+                            cost.
+                        </p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-6">
+                        <h3 class="font-semibold text-lg mb-2">
+                            How do I earn money?
+                        </h3>
+                        <p class="text-gray-600">
+                            Through referrals (₦100 per successful referral),
+                            jobs as an apprentice, and future competitions.
+                            Members can also earn by posting jobs and connecting
+                            with talented apprentices.
+                        </p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-6">
+                        <h3 class="font-semibold text-lg mb-2">
+                            What's the difference between Members and
+                            Apprentices?
+                        </h3>
+                        <p class="text-gray-600">
+                            Members are clients who post jobs and hire
+                            apprentices. Apprentices are creative professionals
+                            who apply for jobs and showcase their work. You can
+                            be both!
+                        </p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-6">
+                        <h3 class="font-semibold text-lg mb-2">
+                            How do payments work?
+                        </h3>
+                        <p class="text-gray-600">
+                            All payments are processed securely through
+                            Paystack. Members pay upfront for jobs, and
+                            apprentices receive payment upon job completion and
+                            approval.
+                        </p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-6">
+                        <h3 class="font-semibold text-lg mb-2">
+                            Is my work protected?
+                        </h3>
+                        <p class="text-gray-600">
+                            Yes! You retain full ownership of your creative
+                            work. We only use your content to showcase it on our
+                            platform and help you get discovered.
+                        </p>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-6">
+                        <h3 class="font-semibold text-lg mb-2">
+                            How do referrals work?
+                        </h3>
+                        <p class="text-gray-600">
+                            Share your unique referral link with friends. When
+                            they sign up and complete their first job or post
+                            their first job, you both earn ₦100!
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="bg-gray-900 text-gray-400">
+            <div class="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
+                    <div>
+                        <h3 class="text-white font-semibold mb-4">Craftiva</h3>
+                        <p class="text-sm">
+                            Connecting Africa's creative talent with
+                            opportunities to earn, grow, and showcase their
+                            work.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="text-white font-semibold mb-4">Platform</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li>
+                                <a href="#features" class="hover:text-white"
+                                    >Features</a
+                                >
+                            </li>
+                            <li>
+                                <a href="#faq" class="hover:text-white">FAQ</a>
+                            </li>
+                            <li>
+                                <a href="help-center.html" class="hover:text-white">Help Center</a>
+                            </li>
+                            <li>
+                                <a href="contact-form.html" class="hover:text-white">Contact Us</a>
+                            </li>
+                            <li>
+                                <a
+                                    href="login-supabase.html"
+                                    class="hover:text-white"
+                                    >Login</a
+                                >
+                            </li>
+                            <li>
+                                <a
+                                    href="signup-member-supabase.html"
+                                    class="hover:text-white"
+                                    >Sign Up</a
+                                >
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-white font-semibold mb-4">Legal</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li>
+                                <a
+                                    href="terms-of-service.html"
+                                    class="hover:text-white"
+                                    >Terms of Service</a
+                                >
+                            </li>
+                            <li>
+                                <a
+                                    href="privacy-policy.html"
+                                    class="hover:text-white"
+                                    >Privacy Policy</a
+                                >
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="text-white font-semibold mb-4">Contact</h4>
+                        <ul class="space-y-2 text-sm">
+                            <li>support@craftiva.com</li>
+                            <li>+234 (9) 155 164 087</li>
+                            <li>Lagos, Nigeria</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="border-t border-gray-800 mt-8 pt-8 text-center">
+                    <p>&copy; 2025 Craftiva. All Rights Reserved.</p>
+                </div>
+            </div>
+        </footer>
+
+        <script>
+            feather.replace();
+
+            // Handle referral codes from URL parameters
+            function getReferralCode() {
+                const urlParams = new URLSearchParams(window.location.search);
+                return urlParams.get("ref");
+            }
+
+            function updateSignupLinks() {
+                const referralCode = getReferralCode();
+                if (referralCode) {
+                    const memberLinks = document.querySelectorAll(
+                        "#signup-member-link, #hero-member-link"
+                    );
+                    const apprenticeLinks = document.querySelectorAll(
+                        "#hero-apprentice-link"
+                    );
+
+                    memberLinks.forEach((link) => {
+                        link.href = `signup-member-supabase.html?ref=${referralCode}`;
+                    });
+
+                    apprenticeLinks.forEach((link) => {
+                        link.href = `signup-apprentice-supabase.html?ref=${referralCode}`;
+                    });
+
+                    console.log("Referral code detected:", referralCode);
+                }
+            }
+
+            // Update links when page loads
+            document.addEventListener("DOMContentLoaded", updateSignupLinks);
             
-            targetPositions[i*3] = p.x; targetPositions[i*3+1] = p.y; targetPositions[i*3+2] = p.z;
-            targetColors[i*3] = p.r; targetColors[i*3+1] = p.g; targetColors[i*3+2] = p.b;
-            targetSizes[i] = p.s;
-        }
-    }
-
-    const cameraUtils = new Camera(videoElement, {
-        onFrame: async () => {
-            canvasElement.width = videoElement.videoWidth;
-            canvasElement.height = videoElement.videoHeight;
-            await hands.send({image: videoElement});
-        }, width: 640, height: 480
-    });
-    cameraUtils.start();
-
-    // Animation
-    function animate() {
-        requestAnimationFrame(animate);
-        
-        if (shakeIntensity > 0) {
-            renderer.domElement.style.transform = `translate(${(Math.random()-0.5)*shakeIntensity*40}px, ${(Math.random()-0.5)*shakeIntensity*40}px)`;
-        } else {
-            renderer.domElement.style.transform = 'translate(0,0)';
-        }
-
-        const pos = particles.geometry.attributes.position.array;
-        const col = particles.geometry.attributes.color.array;
-        const siz = particles.geometry.attributes.size.array;
-
-        for(let i=0; i<COUNT*3; i++) {
-            pos[i] += (targetPositions[i] - pos[i]) * 0.1;
-            col[i] += (targetColors[i] - col[i]) * 0.1;
-        }
-        for(let i=0; i<COUNT; i++) siz[i] += (targetSizes[i] - siz[i]) * 0.1;
-
-        particles.geometry.attributes.position.needsUpdate = true;
-        particles.geometry.attributes.color.needsUpdate = true;
-        particles.geometry.attributes.size.needsUpdate = true;
-        
-        // UPDATED ROTATION LOGIC: Locking rotation for Shrine
-        if(currentTech === 'red') {
-            particles.rotation.z -= 0.1;
-        } else if (currentTech === 'purple') {
-            particles.rotation.z += 0.2; 
-            particles.rotation.y += 0.05;
-        } else if (currentTech === 'shrine') {
-            // FORCE UPRIGHT: Reset and freeze all rotations
-            particles.rotation.set(0, 0, 0); 
-        } else {
-            // Default Neutral rotation
-            particles.rotation.y += 0.005;
-        }
-
-        composer.render();
-    }
-    animate();
-
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        composer.setSize(window.innerWidth, window.innerHeight);
-    });
-</script>
-</body>
+            // Mobile menu toggle
+            const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+            const mobileNavDrawer = document.getElementById('mobile-nav-drawer');
+            const mobileNavOverlay = document.getElementById('mobile-nav-overlay');
+            const mobileNavClose = document.getElementById('mobile-nav-close');
+            
+            function openMobileMenu() {
+                mobileNavDrawer.classList.add('active');
+                mobileNavOverlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+            
+            function closeMobileMenu() {
+                mobileNavDrawer.classList.remove('active');
+                mobileNavOverlay.classList.remove('active');
+                document.body.style.overflow = '';
+            }
+            
+            if (mobileMenuToggle) {
+                mobileMenuToggle.addEventListener('click', openMobileMenu);
+            }
+            
+            if (mobileNavClose) {
+                mobileNavClose.addEventListener('click', closeMobileMenu);
+            }
+            
+            if (mobileNavOverlay) {
+                mobileNavOverlay.addEventListener('click', closeMobileMenu);
+            }
+            
+            // Close mobile menu when clicking a link
+            const mobileNavItems = document.querySelectorAll('.mobile-nav-item');
+            mobileNavItems.forEach(item => {
+                item.addEventListener('click', closeMobileMenu);
+            });
+        </script>
+        <script src="dark-mode.js"></script>
+    </body>
 </html>
