@@ -2,10 +2,14 @@
 import { supabase, POINT_TO_NGN_RATE, ngnToPoints, pointsToNgn } from "./supabase-client.js";
 export { supabase, POINT_TO_NGN_RATE, ngnToPoints, pointsToNgn } from "./supabase-client.js";
 import {
+    createNotification,
     notifyJobApplicationSubmitted,
     notifyJobApplicationStatus,
     notifyJobAlert,
+    notifyEscrowFundsReleased,
+    notifyEscrowFundsRefunded,
 } from "./payment-notifications.js";
+export { createNotification };
 import { getUserWallet, calculatePayout } from "./manual-payment-system.js";
 
 // Constants
@@ -2112,8 +2116,7 @@ export async function getApprenticeStats(apprenticeId) {
                 `
                 total_earnings,
                 completed_jobs,
-                pending_jobs:job_applications(count),
-                active_jobs:job_requests(count)
+                pending_jobs:job_applications(count)
             `
             )
             .eq("id", apprenticeId)
@@ -3376,6 +3379,18 @@ export async function submitDispute(jobRequestId, userId, disputeData) {
             throw new Error("You are not authorized to dispute this job");
         }
 
+        // Prevent duplicate disputes
+        const { data: existingDispute } = await supabase
+            .from("disputes")
+            .select("id")
+            .eq("job_id", jobRequestId)
+            .limit(1)
+            .single();
+
+        if (existingDispute) {
+            throw new Error("A dispute has already been raised for this job.");
+        }
+
         // Get escrow amount if exists
         const { data: escrow } = await supabase
             .from("job_escrow")
@@ -3429,6 +3444,15 @@ export async function submitDispute(jobRequestId, userId, disputeData) {
             .single();
 
         if (error) throw error;
+
+        // Mark job as disputed immediately
+        await supabase
+            .from("job_requests")
+            .update({
+                status: "disputed",
+                updated_at: new Date().toISOString()
+            })
+            .eq("id", jobRequestId);
 
         return data;
     } catch (error) {
@@ -3636,39 +3660,267 @@ export async function updateDisputeStatus(disputeId, status, adminNotes = null, 
 
         // If dispute is resolved, update job status if needed
         if (status === 'resolved' && resolution) {
+            // Fetch full dispute details including job info
             const { data: dispute } = await supabase
                 .from("disputes")
-                .select("job_id")
+                .select("job_id, member_id, apprentice_id")
                 .eq("id", disputeId)
                 .single();
 
             if (dispute && dispute.job_id) {
-                // Update job status based on resolution
-                if (resolution === 'favor_member') {
-                    // Refund escrow to member
-                    const { data: escrow } = await supabase
-                        .from("job_escrow")
-                        .select("id")
-                        .eq("job_id", dispute.job_id)
-                        .eq("status", "held")
+                // Fetch job title
+                const { data: job } = await supabase
+                    .from("job_requests")
+                    .select("title, client_id, assigned_apprentice_id, escrow_amount")
+                    .eq("id", dispute.job_id)
+                    .single();
+
+                // Escrow amount lives on the job row itself
+                const escrowAmount = job?.escrow_amount || 0;
+                const jobTitle = job?.title || "Disputed Job";
+                const memberId = dispute.member_id || job?.client_id;
+                const apprenticeId = dispute.apprentice_id || job?.assigned_apprentice_id;
+
+                await supabase.from("job_requests").update({
+                    status: "disputed",
+                    updated_at: new Date().toISOString()
+                }).eq("id", dispute.job_id);
+
+                // ── FAVOR MEMBER: refund escrow back to member wallet ──
+                if (resolution === 'favor_member' && escrowAmount > 0 && memberId) {
+                    // Credit member wallet
+                    const { data: memberWallet } = await supabase
+                        .from("user_wallets")
+                        .select("balance_ngn, balance_points")
+                        .eq("user_id", memberId)
                         .single();
 
-                    if (escrow) {
-                        // Refund logic would go here - call refundEscrowFunds
-                        // This is handled by the admin in the UI
+                    const newBalance = (memberWallet?.balance_ngn || 0) + escrowAmount;
+                    const newPoints = ngnToPoints(newBalance);
+
+                    await supabase.from("user_wallets").update({
+                        balance_ngn: newBalance,
+                        balance_points: newPoints,
+                        updated_at: new Date().toISOString(),
+                    }).eq("user_id", memberId);
+
+                    await supabase.from("job_requests").update({
+                        escrow_amount: 0,
+                        updated_at: new Date().toISOString()
+                    }).eq("id", dispute.job_id);
+
+                    // Log wallet transaction
+                    await supabase.from("wallet_transactions").insert({
+                        user_id: memberId,
+                        job_id: dispute.job_id,
+                        transaction_type: "escrow_refund",
+                        amount_ngn: escrowAmount,
+                        amount_points: ngnToPoints(escrowAmount),
+                        description: `Dispute resolved in your favour. Escrow refunded for: ${jobTitle}`,
+                        reference: `DISPUTE-REFUND-${disputeId}`,
+                        status: "completed",
+                        metadata: { dispute_id: disputeId, resolution }
+                    });
+
+                    // Notify member
+                    await notifyEscrowFundsRefunded(
+                        memberId, escrowAmount, jobTitle,
+                        "Dispute resolved in your favour by admin"
+                    );
+
+                    // Notify apprentice
+                    await createNotification({
+                        userId: apprenticeId,
+                        type: "dispute_resolved",
+                        title: "Dispute Resolved",
+                        message: `The dispute for job "${jobTitle}" has been resolved in favour of the client. No payment will be released.`,
+                        metadata: { dispute_id: disputeId, job_id: dispute.job_id, resolution }
+                    });
+                }
+
+                // ── FAVOR APPRENTICE: release escrow to apprentice wallet ──
+                else if (resolution === 'favor_apprentice' && escrowAmount > 0 && apprenticeId) {
+                    // Apply 10% platform fee
+                    const platformFee = Math.round(escrowAmount * 0.10);
+                    const apprenticePayout = escrowAmount - platformFee;
+
+                    // Credit apprentice wallet
+                    const { data: apprenticeWallet } = await supabase
+                        .from("user_wallets")
+                        .select("balance_ngn, balance_points")
+                        .eq("user_id", apprenticeId)
+                        .single();
+
+                    const newBalance = (apprenticeWallet?.balance_ngn || 0) + apprenticePayout;
+                    const newPoints = ngnToPoints(newBalance);
+
+                    await supabase.from("user_wallets").update({
+                        balance_ngn: newBalance,
+                        balance_points: newPoints,
+                        updated_at: new Date().toISOString(),
+                    }).eq("user_id", apprenticeId);
+
+                    await supabase.from("job_requests").update({
+                        escrow_amount: 0,
+                        updated_at: new Date().toISOString()
+                    }).eq("id", dispute.job_id);
+
+                    // Log wallet transaction
+                    await supabase.from("wallet_transactions").insert({
+                        user_id: apprenticeId,
+                        job_id: dispute.job_id,
+                        transaction_type: "escrow_release",
+                        amount_ngn: apprenticePayout,
+                        amount_points: ngnToPoints(apprenticePayout),
+                        description: `Dispute resolved in your favour. Payment released for: ${jobTitle}`,
+                        reference: `DISPUTE-RELEASE-${disputeId}`,
+                        status: "completed",
+                        metadata: { dispute_id: disputeId, resolution }
+                    });
+
+                    // Update apprentice profile stats
+                    const { data: profile } = await supabase
+                        .from("profiles")
+                        .select("total_earnings, completed_jobs")
+                        .eq("id", apprenticeId)
+                        .single();
+
+                    await supabase.from("profiles").update({
+                        total_earnings: (profile?.total_earnings || 0) + apprenticePayout,
+                        completed_jobs: (profile?.completed_jobs || 0) + 1,
+                    }).eq("id", apprenticeId);
+
+                    // Notify apprentice
+                    await notifyEscrowFundsReleased(
+                        apprenticeId, apprenticePayout, jobTitle
+                    );
+
+                    // Notify member
+                    await createNotification({
+                        userId: memberId,
+                        type: "dispute_resolved",
+                        title: "Dispute Resolved",
+                        message: `The dispute for job "${jobTitle}" has been resolved in favour of the apprentice. Payment has been released.`,
+                        metadata: { dispute_id: disputeId, job_id: dispute.job_id, resolution }
+                    });
+                }
+
+                // ── SPLIT: half to each party ──
+                else if (resolution === 'split' && escrowAmount > 0) {
+                    const half = Math.round(escrowAmount / 2);
+
+                    // Refund half to member
+                    if (memberId) {
+                        const { data: mWallet } = await supabase
+                            .from("user_wallets").select("balance_ngn")
+                            .eq("user_id", memberId).single();
+
+                        await supabase.from("user_wallets").update({
+                            balance_ngn: (mWallet?.balance_ngn || 0) + half,
+                            balance_points: ngnToPoints((mWallet?.balance_ngn || 0) + half),
+                            updated_at: new Date().toISOString()
+                        }).eq("user_id", memberId);
+
+                        await supabase.from("wallet_transactions").insert({
+                            user_id: memberId,
+                            job_id: dispute.job_id,
+                            transaction_type: "escrow_refund",
+                            amount_ngn: half,
+                            amount_points: ngnToPoints(half),
+                            description: `Dispute settled — 50% refunded for: ${jobTitle}`,
+                            reference: `DISPUTE-SPLIT-MEMBER-${disputeId}`,
+                            status: "completed",
+                            metadata: { dispute_id: disputeId, resolution }
+                        });
+
+                        await createNotification({
+                            userId: memberId,
+                            type: "dispute_resolved",
+                            title: "Dispute Settled (Split)",
+                            message: `The dispute for "${jobTitle}" was settled. ₦${half.toLocaleString()} has been refunded to your wallet.`,
+                            metadata: { dispute_id: disputeId, resolution }
+                        });
                     }
-                } else if (resolution === 'favor_apprentice') {
-                    // Release escrow to apprentice
-                    const { data: escrow } = await supabase
-                        .from("job_escrow")
-                        .select("id")
-                        .eq("job_id", dispute.job_id)
-                        .eq("status", "held")
-                        .single();
 
-                    if (escrow) {
-                        // Release logic would go here - call releaseEscrowFunds
-                        // This is handled by the admin in the UI
+                    // Release half to apprentice
+                    if (apprenticeId) {
+                        const { data: aWallet } = await supabase
+                            .from("user_wallets").select("balance_ngn")
+                            .eq("user_id", apprenticeId).single();
+
+                        await supabase.from("user_wallets").update({
+                            balance_ngn: (aWallet?.balance_ngn || 0) + half,
+                            balance_points: ngnToPoints((aWallet?.balance_ngn || 0) + half),
+                            updated_at: new Date().toISOString()
+                        }).eq("user_id", apprenticeId);
+
+                        await supabase.from("wallet_transactions").insert({
+                            user_id: apprenticeId,
+                            job_id: dispute.job_id,
+                            transaction_type: "escrow_release",
+                            amount_ngn: half,
+                            amount_points: ngnToPoints(half),
+                            description: `Dispute settled — 50% released for: ${jobTitle}`,
+                            reference: `DISPUTE-SPLIT-APPRENTICE-${disputeId}`,
+                            status: "completed",
+                            metadata: { dispute_id: disputeId, resolution }
+                        });
+
+                        await createNotification({
+                            userId: apprenticeId,
+                            type: "dispute_resolved",
+                            title: "Dispute Settled (Split)",
+                            message: `The dispute for "${jobTitle}" was settled. ₦${half.toLocaleString()} has been released to your wallet.`,
+                            metadata: { dispute_id: disputeId, resolution }
+                        });
+                    }
+
+                    await supabase.from("job_requests").update({
+                        escrow_amount: 0,
+                        updated_at: new Date().toISOString()
+                    }).eq("id", dispute.job_id);
+                }
+
+                // ── NO FAULT / CLOSED: no money moves, just close the job ──
+                else if (resolution === 'no_fault' || resolution === 'closed') {
+                    if (memberId) {
+                        await createNotification({
+                            userId: memberId,
+                            type: "dispute_resolved",
+                            title: "Dispute Closed",
+                            message: `The dispute for "${jobTitle}" has been closed with no fault assigned. No funds have been moved.`,
+                            metadata: { dispute_id: disputeId, resolution }
+                        });
+                    }
+                    if (apprenticeId) {
+                        await createNotification({
+                            userId: apprenticeId,
+                            type: "dispute_resolved",
+                            title: "Dispute Closed",
+                            message: `The dispute for "${jobTitle}" has been closed with no fault assigned. No funds have been moved.`,
+                            metadata: { dispute_id: disputeId, resolution }
+                        });
+                    }
+                }
+                else {
+                    // Unknown resolution — just notify both parties the dispute was closed
+                    if (memberId) {
+                        await createNotification({
+                            userId: memberId,
+                            type: "dispute_resolved",
+                            title: "Dispute Resolved",
+                            message: `Your dispute for "${jobTitle}" has been reviewed and closed by admin.`,
+                            metadata: { dispute_id: disputeId, resolution }
+                        });
+                    }
+                    if (apprenticeId) {
+                        await createNotification({
+                            userId: apprenticeId,
+                            type: "dispute_resolved",
+                            title: "Dispute Resolved",
+                            message: `The dispute for "${jobTitle}" has been reviewed and closed by admin.`,
+                            metadata: { dispute_id: disputeId, resolution }
+                        });
                     }
                 }
             }

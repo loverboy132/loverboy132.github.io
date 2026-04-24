@@ -1,482 +1,311 @@
 <!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-        <title>Craftnet - Discover, Earn, and Showcase Your Work</title>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <link
-            href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-            rel="stylesheet"
-        />
-        <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
-        <link rel="stylesheet" href="dark-mode.css">
-        <link rel="stylesheet" href="mobile-responsive.css">
-        <style>
-            body {
-                font-family: "Inter", sans-serif;
-            }
-            .hero-bg {
-                background-color: #f8f9fa;
-                background-image: radial-gradient(#e0e0e0 1px, transparent 1px);
-                background-size: 20px 20px;
-            }
-            .btn {
-                transition: all 0.3s ease;
-            }
-            .btn:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-            }
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <title>Craftnet - Discover, Earn, and Showcase Your Work</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script>
+        // Tailwind Dark Mode Config
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
+    <style>
+        :root { --header-height: 72px; }
+        body { font-family: "Inter", sans-serif; margin: 0; padding-top: var(--header-height); scroll-behavior: smooth; transition: background-color 0.3s ease; }
+        
+        /* Hero Background with Pattern */
+        .hero-bg {
+            background: linear-gradient(135deg, #f8f9fa 0%, #f0f4ff 100%);
+            background-image: radial-gradient(#e0e0e0 0.5px, transparent 0.5px);
+            background-size: 24px 24px;
+        }
+        .dark .hero-bg {
+            background: linear-gradient(135deg, #111827 0%, #1f2937 100%);
+            background-image: radial-gradient(#374151 0.5px, transparent 0.5px);
+        }
 
-            @media (max-width: 767px) {
-                body {
-                    padding-top: 104px;
-                }
-            }
+        section { scroll-margin-top: var(--header-height); }
 
-            @media (min-width: 768px) {
-                body {
-                    padding-top: 176px;
-                }
-            }
-        </style>
-    </head>
-    <body class="bg-white text-gray-800 home-page">
-        <!-- Header -->
-        <header
-            class="home-header bg-white/80 backdrop-blur-md fixed top-0 left-0 right-0 z-50 border-b border-gray-200"
-        >
-            <div
-                class="container mx-auto px-4 sm:px-6 py-4 sm:py-5 flex justify-between items-center"
-            >
-                <a href="index.html" class="flex items-center">
-                    <div class="home-logo">
-                        <svg version="1.0" xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 300.000000 300.000000"
-                            preserveAspectRatio="xMidYMid meet"
-                            fill="currentColor"
-                            style="color: #1d4ed8;"
-                        >
-                        <g transform="translate(0.000000,300.000000) scale(0.100000,-0.100000)"
-                        fill="currentColor" stroke="none">
-                        <path d="M539 1931 c-153 -50 -269 -212 -269 -375 0 -67 24 -156 55 -211 36
-                        -60 116 -132 183 -163 50 -24 69 -27 162 -27 99 0 110 2 171 32 196 97 281
-                        340 189 537 -35 74 -112 151 -187 188 -57 28 -78 33 -157 35 -68 2 -105 -2
-                        -147 -16z m241 -57 c142 -46 241 -199 227 -352 -12 -124 -83 -229 -193 -283
-                        -55 -28 -76 -32 -137 -32 -136 1 -250 71 -313 193 -26 49 -29 65 -29 150 0 89
-                        2 99 34 158 84 155 244 220 411 166z"/>
-                        <path d="M627 1822 c-22 -24 -21 -57 3 -109 33 -73 75 -47 97 58 11 54 -64 91
-                        -100 51z m63 -27 c12 -15 6 -49 -13 -73 -8 -11 -13 -9 -23 10 -17 30 -17 65
-                        -1 71 20 9 24 8 37 -8z"/>
-                        <path d="M449 1726 c-14 -29 -2 -51 34 -62 12 -3 34 -18 49 -32 23 -21 30 -23
-                        43 -12 14 12 13 16 -14 44 -16 17 -31 42 -33 56 -2 20 -9 26 -35 28 -27 3 -35
-                        -1 -44 -22z"/>
-                        <path d="M812 1738 c-6 -6 -12 -19 -12 -28 0 -9 -11 -27 -25 -40 -14 -13 -25
-                        -29 -25 -36 0 -25 22 -26 46 -3 14 13 39 28 57 34 28 9 32 14 32 45 0 32 -3
-                        35 -30 38 -17 2 -36 -3 -43 -10z"/>
-                        <path d="M618 1616 c-24 -18 -39 -63 -32 -92 8 -33 50 -64 86 -64 69 0 106
-                        100 55 148 -26 25 -82 29 -109 8z m80 -38 c21 -21 14 -57 -14 -70 -23 -11 -29
-                        -10 -45 10 -15 19 -16 28 -7 48 12 26 46 32 66 12z"/>
-                        <path d="M388 1565 c-9 -21 -8 -28 7 -45 21 -24 48 -26 65 -5 7 9 29 15 51 15
-                        32 0 39 3 39 20 0 17 -7 20 -44 20 -25 0 -48 5 -51 10 -13 20 -55 11 -67 -15z"/>
-                        <path d="M875 1581 c-6 -5 -28 -11 -50 -13 -57 -4 -55 -32 2 -36 23 -2 47 -10
-                        53 -18 31 -36 93 12 70 55 -11 22 -58 29 -75 12z"/>
-                        <path d="M536 1451 c-16 -17 -40 -31 -55 -33 -21 -2 -27 -9 -29 -35 -3 -27 1
-                        -35 22 -45 22 -9 29 -8 46 7 11 10 20 25 20 34 0 8 12 27 26 42 16 17 24 34
-                        21 43 -9 23 -20 20 -51 -13z"/>
-                        <path d="M753 1464 c-3 -9 5 -26 21 -43 14 -15 26 -37 26 -49 0 -14 9 -27 25
-                        -34 21 -9 28 -8 45 7 32 29 20 75 -20 75 -9 0 -29 14 -45 30 -32 34 -43 37
-                        -52 14z"/>
-                        <path d="M650 1392 c0 -23 -6 -45 -15 -52 -24 -20 -19 -59 11 -72 45 -21 79
-                        19 55 66 -6 11 -12 37 -13 56 -2 24 -9 36 -20 38 -15 3 -18 -4 -18 -36z"/>
-                        <path d="M1840 1728 c-29 -11 -40 -25 -40 -55 0 -14 -6 -23 -15 -23 -9 0 -15
-                        -10 -15 -26 0 -19 4 -25 15 -20 13 4 15 -9 15 -84 l0 -90 30 0 30 0 0 90 0 90
-                        25 -6 c22 -5 25 -3 25 20 0 21 -5 26 -25 26 -19 0 -25 5 -25 21 0 16 5 20 28
-                        17 22 -2 28 1 30 20 2 13 -2 22 -10 23 -7 0 -20 2 -28 3 -8 2 -26 -1 -40 -6z"/>
-                        <path d="M1223 1715 c-48 -21 -73 -68 -73 -140 0 -102 63 -166 147 -150 40 7
-                        99 56 89 73 -11 19 -50 14 -69 -8 -22 -26 -50 -25 -81 3 -39 34 -39 124 -1
-                        162 31 31 49 31 81 0 20 -20 29 -23 49 -15 14 5 25 13 25 18 0 14 -43 50 -73
-                        61 -37 14 -55 13 -94 -4z"/>
-                        <path d="M1954 1695 c-4 -8 -4 -21 -1 -29 3 -8 -2 -16 -15 -19 -23 -6 -22 -42
-                        2 -42 11 0 13 -13 11 -55 -3 -68 11 -107 43 -121 36 -17 76 -4 76 24 0 18 -5
-                        23 -27 22 -28 0 -28 1 -31 67 l-3 68 31 -6 c27 -6 30 -4 30 20 0 22 -4 26 -30
-                        26 -27 0 -30 3 -30 30 0 25 -4 30 -25 30 -14 0 -28 -7 -31 -15z"/>
-                        <path d="M2590 1681 c0 -21 -5 -31 -15 -31 -9 0 -15 -10 -15 -26 0 -19 4 -25
-                        15 -20 13 4 15 -8 15 -74 0 -70 2 -81 22 -94 28 -20 62 -20 82 -1 21 22 11 41
-                        -22 40 -26 0 -27 1 -30 67 l-3 68 31 -6 c27 -6 30 -4 30 20 0 22 -4 26 -31 26
-                        -27 0 -30 3 -27 28 3 23 -1 27 -24 30 -25 3 -28 0 -28 -27z m36 -67 c-5 -13
-                        -10 -14 -18 -6 -6 6 -8 18 -4 28 5 13 10 14 18 6 6 -6 8 -18 4 -28z"/>
-                        <path d="M1420 1540 l0 -110 31 0 32 0 -6 48 c-9 74 1 102 39 118 23 9 34 21
-                        34 34 0 28 -44 27 -64 -2 l-16 -22 0 22 c0 17 -6 22 -25 22 l-25 0 0 -110z"/>
-                        <path d="M1592 1634 c-12 -8 -22 -21 -22 -28 0 -22 31 -28 51 -10 26 23 69 11
-                        69 -19 0 -19 -6 -22 -47 -25 -53 -3 -83 -24 -83 -59 0 -60 57 -90 107 -57 19
-                        12 28 13 31 6 2 -7 15 -12 28 -12 24 0 24 2 24 85 0 78 -2 88 -25 110 -29 30
-                        -97 34 -133 9z m82 -161 c-27 -20 -49 -12 -49 17 0 20 6 26 30 30 24 4 31 2
-                        33 -14 2 -11 -4 -26 -14 -33z"/>
-                        <path d="M2110 1540 l0 -110 25 0 c24 0 25 2 25 66 0 80 11 104 49 104 36 0
-                        41 -13 41 -101 0 -67 1 -69 25 -69 25 0 25 1 25 90 0 77 -3 93 -20 110 -24 24
-                        -82 27 -104 4 -15 -14 -16 -14 -16 0 0 10 -9 16 -25 16 l-25 0 0 -110z"/>
-                        <path d="M2366 1624 c-22 -23 -26 -36 -26 -83 0 -33 6 -65 15 -77 33 -48 122
-                        -55 160 -14 28 31 6 48 -36 27 -35 -16 -57 -13 -76 11 -29 35 -16 43 59 41 47
-                        -2 73 2 76 9 7 21 -19 82 -41 97 -36 25 -100 19 -131 -11z m112 -41 c3 -21 -1
-                        -23 -42 -23 -50 0 -51 1 -35 31 15 29 73 23 77 -8z"/>
-                        </g>
-                    </svg>
-                    </div>
-                </a>
-                <nav class="hidden md:flex items-center space-x-6 desktop-nav">
-                    <a
-                        href="#features"
-                        class="text-gray-600 hover:text-gray-900"
-                        >Features</a
-                    >
-                    <a href="#faq" class="text-gray-600 hover:text-gray-900"
-                        >FAQ</a
-                    >
-                </nav>
-                <div class="hidden md:flex items-center space-x-4">
-                    <a
-                        href="login-supabase.html"
-                        class="text-gray-600 hover:text-gray-900 font-medium"
-                        >Log In</a
-                    >
-                    <a
-                        href="signup-member-supabase.html"
-                        id="signup-member-link"
-                        class="bg-gray-900 text-white px-5 py-2 rounded-lg font-semibold text-sm shadow-md hover:bg-gray-800 btn"
-                        >Sign Up</a
-                    >
+        /* Mobile Drawer */
+        .mobile-nav-drawer {
+            position: fixed;
+            top: 0;
+            right: -100%;
+            width: 85%;
+            max-width: 320px;
+            height: 100vh;
+            background: white;
+            z-index: 100;
+            transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .dark .mobile-nav-drawer { background: #1f2937; color: white; }
+        .mobile-nav-drawer.active { right: 0; }
+
+        .overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(4px);
+            z-index: 90;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        .overlay.active { opacity: 1; visibility: visible; }
+
+        .btn-grad {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-grad:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(37, 99, 235, 0.2); }
+    </style>
+</head>
+<body class="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100">
+
+    <header class="bg-white/90 dark:bg-gray-900/90 backdrop-blur-lg fixed top-0 left-0 right-0 z-50 border-b border-gray-100 dark:border-gray-800 h-[72px] flex items-center">
+        <div class="container mx-auto px-4 md:px-6 flex justify-between items-center">
+            <a href="index.html" class="flex items-center gap-2">
+                <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white shadow-lg">
+                    <i data-feather="box" class="w-6 h-6"></i>
                 </div>
-                <button id="mobile-menu-toggle" class="md:hidden mobile-menu-toggle" aria-label="Toggle menu">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
-                    </svg>
-                </button>
-            </div>
-        </header>
+                <span class="text-xl font-bold tracking-tight dark:text-white">Craftnet</span>
+            </a>
         
-        <!-- Mobile Menu Overlay -->
-        <div id="mobile-nav-overlay" class="mobile-nav-overlay"></div>
-        
-        <!-- Mobile Menu Drawer -->
-        <div id="mobile-nav-drawer" class="mobile-nav-drawer">
-            <div class="mobile-nav-header">
-                <span class="font-bold text-lg">Menu</span>
-                <button id="mobile-nav-close" class="mobile-nav-close" aria-label="Close menu">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
+            <nav class="hidden md:flex items-center space-x-6">
+                <a href="#features" class="hover:text-blue-600 font-medium transition-colors">Features</a>
+                <a href="#faq" class="hover:text-blue-600 font-medium transition-colors">FAQ</a>
+                
+                <button id="dark-mode-toggle" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                    <i data-feather="moon" class="dark:hidden"></i>
+                    <i data-feather="sun" class="hidden dark:block text-yellow-400"></i>
                 </button>
-            </div>
-            <nav class="mobile-nav-menu">
-                <a href="#features" class="mobile-nav-item">Features</a>
-                <a href="#faq" class="mobile-nav-item">FAQ</a>
-                <a href="login-supabase.html" class="mobile-nav-item">Log In</a>
-                <a href="signup-member-supabase.html" id="mobile-signup-link" class="mobile-nav-item">Sign Up</a>
+
+                <div class="h-6 w-px bg-gray-200 dark:bg-gray-700"></div>
+                <a href="login-supabase.html" class="text-gray-700 dark:text-gray-300 hover:text-blue-600 font-semibold">Log In</a>
+                <a href="signup-member-supabase.html" class="btn-grad text-white px-6 py-2.5 rounded-lg font-bold shadow-md">Sign Up</a>
             </nav>
+
+            <div class="flex items-center gap-2 md:hidden">
+                <button id="dark-mode-toggle-mobile" class="p-2 rounded-full hover:bg-gray-100">
+                    <i data-feather="moon" class="dark:text-white"></i>
+                </button>
+                <button id="menu-open" class="p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg">
+                    <i data-feather="menu"></i>
+                </button>
+            </div>
         </div>
+    </header>
 
-        <!-- Hero Section -->
-        <main class="hero-bg pb-16 sm:pb-20">
-            <div class="container mx-auto px-4 sm:px-6 text-center">
-                <div class="max-w-4xl mx-auto">
-                    <h1
-                        class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold text-gray-900 leading-tight mb-3 md:mb-6 px-2"
-                    >
-                        We help Africa's young workforce get discovered, earn
-                        money, and showcase their work.
-                    </h1>
-                    <p class="text-base sm:text-lg md:text-xl text-gray-600 mb-3 md:mb-10 px-2">
-                        For photographers, designers, artisans, students, video
-                        editors, and recent grads. A simple platform to earn,
-                        grow, and get seen — all in one place.
-                    </p>
-                    <div
-                        class="flex flex-col sm:flex-row justify-center items-stretch sm:items-center space-y-3 md:space-y-0 md:space-x-6 px-4"
-                    >
-                        <a
-                            href="signup-member-supabase.html"
-                            id="hero-member-link"
-                            class="w-full sm:w-auto bg-blue-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg shadow-lg hover:bg-blue-700 btn min-h-[48px] flex items-center justify-center"
-                        >
-                            Sign Up as Member
-                        </a>
-                        <a
-                            href="signup-apprentice-supabase.html"
-                            id="hero-apprentice-link"
-                            class="w-full sm:w-auto bg-white text-blue-600 border-2 border-blue-600 px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg shadow-lg hover:bg-blue-50 btn min-h-[48px] flex items-center justify-center"
-                        >
-                            Sign Up as Apprentice
-                        </a>
-                    </div>
+    <div id="overlay" class="overlay"></div>
+    <aside id="drawer" class="mobile-nav-drawer shadow-2xl">
+        <div class="p-6 flex items-center justify-between border-b dark:border-gray-700">
+            <span class="font-bold text-lg text-blue-600">Menu</span>
+            <button id="menu-close" class="p-2 text-gray-400"><i data-feather="x"></i></button>
+        </div>
+        <nav class="p-6 flex flex-col gap-4">
+            <a href="#features" class="flex items-center gap-4 p-3 rounded-xl hover:bg-blue-50 dark:hover:bg-gray-800 font-medium">
+                <i data-feather="zap" class="text-blue-500"></i> Features
+            </a>
+            <a href="#faq" class="flex items-center gap-4 p-3 rounded-xl hover:bg-blue-50 dark:hover:bg-gray-800 font-medium">
+                <i data-feather="help-circle" class="text-blue-500"></i> FAQ
+            </a>
+            <hr class="dark:border-gray-700">
+            <a href="login-supabase.html" class="p-3 text-center border-2 border-gray-100 dark:border-gray-700 rounded-xl font-bold">Log In</a>
+            <a href="signup-member-supabase.html" class="btn-grad p-4 text-center text-white rounded-xl font-bold">Join Craftnet</a>
+        </nav>
+    </aside>
+
+    <main class="hero-bg py-16 md:py-28 border-b dark:border-gray-800">
+        <div class="container mx-auto px-4 text-center">
+            <h1 class="text-4xl md:text-6xl font-extrabold text-gray-900 dark:text-white leading-tight mb-6 max-w-4xl mx-auto">
+                We help Africa's young workforce get discovered and <span class="text-blue-600">earn money.</span>
+            </h1>
+            <p class="text-lg md:text-xl text-gray-600 dark:text-gray-400 mb-10 max-w-2xl mx-auto leading-relaxed">
+                For photographers, designers, artisans, and students. A simple platform to earn, grow, and get seen — all in one place.
+            </p>
+            <div class="flex flex-col sm:flex-row justify-center gap-4 px-4">
+                <a href="signup-member-supabase.html" class="btn-grad text-white px-8 py-4 rounded-xl font-bold shadow-lg">Sign Up as Member</a>
+                <a href="signup-apprentice-supabase.html" class="bg-white dark:bg-gray-800 text-blue-600 border-2 border-blue-600 px-8 py-4 rounded-xl font-bold shadow-lg">Sign Up as Apprentice</a>
+            </div>
+        </div>
+    </main>
+
+    <section id="features" class="py-24 bg-white dark:bg-gray-900">
+        <div class="container mx-auto px-4">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-16 dark:text-white">One Platform, Endless Opportunities</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-gray-50 dark:bg-gray-800 p-8 rounded-2xl border-t-4 border-blue-600 shadow-sm hover:shadow-md transition-all">
+                    <h3 class="text-2xl font-bold mb-3 dark:text-white">Showcase Your Work</h3>
+                    <p class="text-gray-600 dark:text-gray-400">Our free gallery lets you upload your creative portfolio, get feedback, and be discovered by clients.</p>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800 p-8 rounded-2xl border-t-4 border-blue-400 shadow-sm hover:shadow-md transition-all">
+                    <h3 class="text-2xl font-bold mb-3 dark:text-white">Earn Through Hustle</h3>
+                    <p class="text-gray-600 dark:text-gray-400">Monetize your network through referrals, take on paid jobs as an apprentice, and win prizes.</p>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-800 p-8 rounded-2xl border-t-4 border-indigo-500 shadow-sm hover:shadow-md transition-all">
+                    <h3 class="text-2xl font-bold mb-3 dark:text-white">Grow and Get Seen</h3>
+                    <p class="text-gray-600 dark:text-gray-400">Climb the leaderboard, access exclusive events, and connect with mentors across Africa.</p>
                 </div>
             </div>
-        </main>
+        </div>
+    </section>
 
-        <!-- Features Section -->
-        <section id="features" class="py-12 sm:py-16 md:py-20 bg-gray-50">
-            <div class="container mx-auto px-4 sm:px-6">
-                <h2 class="text-2xl sm:text-3xl font-bold text-center text-gray-900 mb-8 sm:mb-12">
-                    One Platform, Endless Opportunities
-                </h2>
-                <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 md:gap-10">
-                    <div class="bg-white p-8 rounded-xl shadow-md">
-                        <h3 class="text-2xl font-bold mb-3">
-                            Showcase Your Work
-                        </h3>
-                        <p class="text-gray-600">
-                            Our free gallery lets you upload your creative
-                            portfolio, get feedback, and be discovered.
-                        </p>
-                    </div>
-                    <div class="bg-white p-8 rounded-xl shadow-md">
-                        <h3 class="text-2xl font-bold mb-3">
-                            Earn Through Your Hustle
-                        </h3>
-                        <p class="text-gray-600">
-                            Monetize your network through referrals, take on
-                            paid jobs as an apprentice, and win prizes.
-                        </p>
-                    </div>
-                    <div class="bg-white p-8 rounded-xl shadow-md">
-                        <h3 class="text-2xl font-bold mb-3">
-                            Grow and Get Seen
-                        </h3>
-                        <p class="text-gray-600">
-                            Climb the leaderboard, access exclusive events, and
-                            connect with mentors.
-                        </p>
-                    </div>
+    <section id="faq" class="py-24 bg-gray-50 dark:bg-gray-800/50">
+        <div class="container mx-auto px-4 max-w-4xl">
+            <h2 class="text-3xl md:text-4xl font-bold text-center mb-16 dark:text-white">Frequently Asked Questions</h2>
+            <div class="space-y-4">
+                <details class="group bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm cursor-pointer">
+                    <summary class="flex justify-between items-center font-bold text-lg dark:text-white list-none">
+                        Is it free to use?
+                        <i data-feather="chevron-down" class="group-open:rotate-180 transition-transform"></i>
+                    </summary>
+                    <p class="mt-4 text-gray-600 dark:text-gray-400">Yes! Basic use is free. Some advanced features require a subscription. You can showcase your work, apply for jobs, and earn through referrals at no cost.</p>
+                </details>
+
+                <details class="group bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm cursor-pointer">
+                    <summary class="flex justify-between items-center font-bold text-lg dark:text-white list-none">
+                        How do I earn money?
+                        <i data-feather="chevron-down" class="group-open:rotate-180 transition-transform"></i>
+                    </summary>
+                    <p class="mt-4 text-gray-600 dark:text-gray-400">Through referrals (₦100 per successful referral), jobs as an apprentice, and future competitions. Members can also earn by posting jobs and connecting with talented apprentices.</p>
+                </details>
+     <details class="group bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm cursor-pointer">
+                    <summary class="flex justify-between items-center font-bold text-lg dark:text-white list-none">
+                        How do payment work?
+                        <i data-feather="chevron-down" class="group-open:rotate-180 transition-transform"></i>
+                    </summary>
+                    <p class="mt-4 text-gray-600 dark:text-gray-400">All payments are processed securely through Paystack. Members pay upfront for jobs, and apprentices receive payment upon job completion and approval.</p>
+                </details>
+                     <details class="group bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm cursor-pointer">
+                    <summary class="flex justify-between items-center font-bold text-lg dark:text-white list-none">
+                        Difference between members and apprentice 
+                        <i data-feather="chevron-down" class="group-open:rotate-180 transition-transform"></i>
+                    </summary>
+                    <p class="mt-4 text-gray-600 dark:text-gray-400">Members are clients who post jobs and hire apprentices. Apprentices are creative professionals who apply for jobs and showcase their work. You can be both!</p>
+                </details>
+                <details class="group bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm cursor-pointer">
+                    <summary class="flex justify-between items-center font-bold text-lg dark:text-white list-none">
+                        Is my work protected?
+                        <i data-feather="chevron-down" class="group-open:rotate-180 transition-transform"></i>
+                    </summary>
+                    <p class="mt-4 text-gray-600 dark:text-gray-400">Yes! You retain full ownership of your creative work. We only use your content to showcase it on our platform and help you get discovered.</p>
+                </details>
+                          <details class="group bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm cursor-pointer">
+                    <summary class="flex justify-between items-center font-bold text-lg dark:text-white list-none">
+                    How do referral work?
+                        <i data-feather="chevron-down" class="group-open:rotate-180 transition-transform"></i>
+                    </summary>
+                    <p class="mt-4 text-gray-600 dark:text-gray-400">Share your unique referral link with friends. When they sign up and complete their first job or post their first job, you both earn ₦100!</p>
+                </details>
+                
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-gray-900 text-gray-400 pt-16 pb-8">
+        <div class="container mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
+                <div>
+                    <h3 class="text-white font-bold text-xl mb-4">Craftiva</h3>
+                    <p class="text-sm">Connecting Africa's creative talent with opportunities to earn, grow, and showcase work.</p>
+                </div>
+                <div>
+                    <h4 class="text-white font-bold mb-4">Platform</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="#features" class="hover:text-white">Features</a></li>
+                        <li><a href="#faq" class="hover:text-white">FAQ</a></li>
+                        <li><a href="contact-form.html" class="hover:text-white">Contact Us</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-white font-bold mb-4">Legal</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li><a href="terms-of-service.html" class="hover:text-white">Terms of Service</a></li>
+                        <li><a href="privacy-policy.html" class="hover:text-white">Privacy Policy</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="text-white font-bold mb-4">Contact</h4>
+                    <ul class="space-y-2 text-sm">
+                        <li>support@craftiva.com</li>
+                        <li>+234 (9) 155 164 087</li>
+                        <li>Lagos, Nigeria</li>
+                    </ul>
                 </div>
             </div>
-        </section>
-
-        <!-- FAQ Section -->
-        <section id="faq" class="py-12 sm:py-16 md:py-20 bg-white">
-            <div class="container mx-auto px-4 sm:px-6 max-w-4xl">
-                <h2 class="text-2xl sm:text-3xl font-bold text-center text-gray-900 mb-8 sm:mb-12">
-                    Frequently Asked Questions
-                </h2>
-                <div class="space-y-6">
-                    <div class="bg-gray-50 rounded-lg p-6">
-                        <h3 class="font-semibold text-lg mb-2">
-                            Is it free to use?
-                        </h3>
-                        <p class="text-gray-600">
-                            Yes! Basic use is free. Some advanced features
-                            require a subscription. You can showcase your work,
-                            apply for jobs, and earn through referrals at no
-                            cost.
-                        </p>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-6">
-                        <h3 class="font-semibold text-lg mb-2">
-                            How do I earn money?
-                        </h3>
-                        <p class="text-gray-600">
-                            Through referrals (₦100 per successful referral),
-                            jobs as an apprentice, and future competitions.
-                            Members can also earn by posting jobs and connecting
-                            with talented apprentices.
-                        </p>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-6">
-                        <h3 class="font-semibold text-lg mb-2">
-                            What's the difference between Members and
-                            Apprentices?
-                        </h3>
-                        <p class="text-gray-600">
-                            Members are clients who post jobs and hire
-                            apprentices. Apprentices are creative professionals
-                            who apply for jobs and showcase their work. You can
-                            be both!
-                        </p>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-6">
-                        <h3 class="font-semibold text-lg mb-2">
-                            How do payments work?
-                        </h3>
-                        <p class="text-gray-600">
-                            All payments are processed securely through
-                            Paystack. Members pay upfront for jobs, and
-                            apprentices receive payment upon job completion and
-                            approval.
-                        </p>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-6">
-                        <h3 class="font-semibold text-lg mb-2">
-                            Is my work protected?
-                        </h3>
-                        <p class="text-gray-600">
-                            Yes! You retain full ownership of your creative
-                            work. We only use your content to showcase it on our
-                            platform and help you get discovered.
-                        </p>
-                    </div>
-                    <div class="bg-gray-50 rounded-lg p-6">
-                        <h3 class="font-semibold text-lg mb-2">
-                            How do referrals work?
-                        </h3>
-                        <p class="text-gray-600">
-                            Share your unique referral link with friends. When
-                            they sign up and complete their first job or post
-                            their first job, you both earn ₦100!
-                        </p>
-                    </div>
-                </div>
+            <div class="border-t border-gray-800 pt-8 text-center text-xs">
+                &copy; 2026 Craftiva. All Rights Reserved.
             </div>
-        </section>
+        </div>
+    </footer>
 
-        <!-- Footer -->
-        <footer class="bg-gray-900 text-gray-400">
-            <div class="container mx-auto px-4 sm:px-6 py-8 sm:py-12">
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8">
-                    <div>
-                        <h3 class="text-white font-semibold mb-4">Craftiva</h3>
-                        <p class="text-sm">
-                            Connecting Africa's creative talent with
-                            opportunities to earn, grow, and showcase their
-                            work.
-                        </p>
-                    </div>
-                    <div>
-                        <h4 class="text-white font-semibold mb-4">Platform</h4>
-                        <ul class="space-y-2 text-sm">
-                            <li>
-                                <a href="#features" class="hover:text-white"
-                                    >Features</a
-                                >
-                            </li>
-                            <li>
-                                <a href="#faq" class="hover:text-white">FAQ</a>
-                            </li>
-                            <li>
-                                <a href="help-center.html" class="hover:text-white">Help Center</a>
-                            </li>
-                            <li>
-                                <a href="contact-form.html" class="hover:text-white">Contact Us</a>
-                            </li>
-                            <li>
-                                <a
-                                    href="login-supabase.html"
-                                    class="hover:text-white"
-                                    >Login</a
-                                >
-                            </li>
-                            <li>
-                                <a
-                                    href="signup-member-supabase.html"
-                                    class="hover:text-white"
-                                    >Sign Up</a
-                                >
-                            </li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h4 class="text-white font-semibold mb-4">Legal</h4>
-                        <ul class="space-y-2 text-sm">
-                            <li>
-                                <a
-                                    href="terms-of-service.html"
-                                    class="hover:text-white"
-                                    >Terms of Service</a
-                                >
-                            </li>
-                            <li>
-                                <a
-                                    href="privacy-policy.html"
-                                    class="hover:text-white"
-                                    >Privacy Policy</a
-                                >
-                            </li>
-                        </ul>
-                    </div>
-                    <div>
-                        <h4 class="text-white font-semibold mb-4">Contact</h4>
-                        <ul class="space-y-2 text-sm">
-                            <li>support@craftiva.com</li>
-                            <li>+234 (9) 155 164 087</li>
-                            <li>Lagos, Nigeria</li>
-                        </ul>
-                    </div>
-                </div>
-                <div class="border-t border-gray-800 mt-8 pt-8 text-center">
-                    <p>&copy; 2025 Craftiva. All Rights Reserved.</p>
-                </div>
-            </div>
-        </footer>
+    <script>
+        feather.replace();
 
-        <script>
-            feather.replace();
+        // Dark Mode Logic
+        const html = document.documentElement;
+        const themeBtn = document.getElementById('dark-mode-toggle');
+        const themeBtnMobile = document.getElementById('dark-mode-toggle-mobile');
 
-            // Handle referral codes from URL parameters
-            function getReferralCode() {
-                const urlParams = new URLSearchParams(window.location.search);
-                return urlParams.get("ref");
+        // Read from either key (support both index.html and inner page toggles)
+        const savedTheme = localStorage.getItem('theme');
+        const savedCraftiva = localStorage.getItem('craftiva-dark-mode');
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        let isDark = savedTheme === 'dark' 
+            || savedCraftiva === 'true' 
+            || (!savedTheme && !savedCraftiva && prefersDark);
+
+        if (isDark) {
+            document.documentElement.classList.add('dark');
+            // Ensure both keys are in sync on load
+            localStorage.setItem('theme', 'dark');
+            localStorage.setItem('craftiva-dark-mode', 'true');
+        }
+
+        function toggleDarkMode() {
+            isDark = !isDark;
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            // Sync with inner pages (dark-mode.js reads 'craftiva-dark-mode')
+            localStorage.setItem('craftiva-dark-mode', isDark ? 'true' : 'false');
+            document.documentElement.classList.toggle('dark', isDark);
+        }
+
+        themeBtn.addEventListener('click', toggleDarkMode);
+        themeBtnMobile.addEventListener('click', toggleDarkMode);
+
+        // Mobile Menu Logic
+        const openBtn = document.getElementById('menu-open');
+        const closeBtn = document.getElementById('menu-close');
+        const drawer = document.getElementById('drawer');
+        const overlay = document.getElementById('overlay');
+
+        function toggleMenu(state) {
+            drawer.classList.toggle('active', state);
+            overlay.classList.toggle('active', state);
+            document.body.style.overflow = state ? 'hidden' : '';
+        }
+
+        openBtn.addEventListener('click', () => toggleMenu(true));
+        closeBtn.addEventListener('click', () => toggleMenu(false));
+        overlay.addEventListener('click', () => toggleMenu(false));
+
+        // Referral Code Logic (From your file)
+        function updateSignupLinks() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const ref = urlParams.get("ref");
+            if (ref) {
+                document.querySelectorAll('a[href*="signup"]').forEach(link => {
+                    const base = link.getAttribute('href').split('?')[0];
+                    link.href = `${base}?ref=${ref}`;
+                });
             }
-
-            function updateSignupLinks() {
-                const referralCode = getReferralCode();
-                if (referralCode) {
-                    const memberLinks = document.querySelectorAll(
-                        "#signup-member-link, #hero-member-link"
-                    );
-                    const apprenticeLinks = document.querySelectorAll(
-                        "#hero-apprentice-link"
-                    );
-
-                    memberLinks.forEach((link) => {
-                        link.href = `signup-member-supabase.html?ref=${referralCode}`;
-                    });
-
-                    apprenticeLinks.forEach((link) => {
-                        link.href = `signup-apprentice-supabase.html?ref=${referralCode}`;
-                    });
-
-                    console.log("Referral code detected:", referralCode);
-                }
-            }
-
-            // Update links when page loads
-            document.addEventListener("DOMContentLoaded", updateSignupLinks);
-            
-            // Mobile menu toggle
-            const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
-            const mobileNavDrawer = document.getElementById('mobile-nav-drawer');
-            const mobileNavOverlay = document.getElementById('mobile-nav-overlay');
-            const mobileNavClose = document.getElementById('mobile-nav-close');
-            
-            function openMobileMenu() {
-                mobileNavDrawer.classList.add('active');
-                mobileNavOverlay.classList.add('active');
-                document.body.style.overflow = 'hidden';
-            }
-            
-            function closeMobileMenu() {
-                mobileNavDrawer.classList.remove('active');
-                mobileNavOverlay.classList.remove('active');
-                document.body.style.overflow = '';
-            }
-            
-            if (mobileMenuToggle) {
-                mobileMenuToggle.addEventListener('click', openMobileMenu);
-            }
-            
-            if (mobileNavClose) {
-                mobileNavClose.addEventListener('click', closeMobileMenu);
-            }
-            
-            if (mobileNavOverlay) {
-                mobileNavOverlay.addEventListener('click', closeMobileMenu);
-            }
-            
-            // Close mobile menu when clicking a link
-            const mobileNavItems = document.querySelectorAll('.mobile-nav-item');
-            mobileNavItems.forEach(item => {
-                item.addEventListener('click', closeMobileMenu);
-            });
-        </script>
-        <script src="dark-mode.js"></script>
-    </body>
+        }
+        window.onload = updateSignupLinks;
+    </script>
+</body>
 </html>

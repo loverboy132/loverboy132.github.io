@@ -6,7 +6,11 @@ import {
     getDisputeEvidenceSignedUrl,
     getAllUsersWithStats,
     getUserDetails,
-    getUserActivities
+    getUserActivities,
+    getAllJobRequests,
+    getJobRequestById,
+    updateApplicationStatus,
+    createNotification,
 } from "./supabase-auth.js";
 import {
     getUserNotifications,
@@ -31,6 +35,11 @@ let dashboardData = {
 };
 let allDisputes = [];
 let filteredDisputes = [];
+let allJobs = [];
+let filteredJobs = [];
+let jobsCurrentPage = 1;
+const JOBS_PER_PAGE = 15;
+let currentJobId = null;
 let currentDisputeFilters = {
     status: '',
     type: '',
@@ -189,35 +198,484 @@ async function loadUsersData() {
 // Load jobs data
 async function loadJobsData() {
     try {
-        const { count, error } = await supabase
+        const { data: jobs, error } = await supabase
             .from('job_requests')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'in-progress');
+            .select(`
+                *,
+                client:profiles!job_requests_client_id_fkey(id, name, email, avatar_url),
+                apprentice:profiles!job_requests_assigned_apprentice_id_fkey(id, name, email, avatar_url),
+                escrow:job_escrow(id, amount_ngn, status),
+                applications:job_applications(count)
+            `)
+            .order('created_at', { ascending: false });
 
         if (error) throw error;
 
-        // Get recent job activities
-        const { data: recentJobs, error: recentError } = await supabase
-            .from('job_requests')
-            .select('id, title, status, created_at, updated_at')
-            .order('updated_at', { ascending: false })
-            .limit(5);
+        allJobs = jobs || [];
+        filteredJobs = [...allJobs];
 
-        if (recentError) throw recentError;
+        updateJobsStats();
+        displayJobs();
+        setupJobsRealtime();
 
+        // Return count for dashboard summary widget
+        const activeCount = allJobs.filter(j =>
+            ['open','in_progress','pending_review','disputed'].includes(j.status)
+        ).length;
         return {
-            count,
-            recent: recentJobs.map(job => ({
+            count: activeCount,
+            recent: allJobs.slice(0, 5).map(job => ({
                 type: 'job',
-                title: `Job ${job.status}: ${job.title}`,
+                title: `${job.status}: ${job.title}`,
                 created_at: job.updated_at || job.created_at,
                 icon: 'briefcase'
             }))
         };
-        
     } catch (error) {
         console.error('Error loading jobs data:', error);
         return { count: 0, recent: [] };
+    }
+}
+
+function updateJobsStats() {
+    const open = allJobs.filter(j => j.status === 'open').length;
+    const active = allJobs.filter(j => j.status === 'in_progress').length;
+    const disputed = allJobs.filter(j => j.status === 'disputed').length;
+    const completed = allJobs.filter(j => j.status === 'completed').length;
+
+    const el = id => document.getElementById(id);
+    if (el('jobs-open-count')) el('jobs-open-count').textContent = open;
+    if (el('jobs-active-count')) el('jobs-active-count').textContent = active;
+    if (el('jobs-disputed-count')) el('jobs-disputed-count').textContent = disputed;
+    if (el('jobs-completed-count')) el('jobs-completed-count').textContent = completed;
+}
+
+function displayJobs() {
+    const container = document.getElementById('jobs-list-container');
+    if (!container) return;
+
+    const start = (jobsCurrentPage - 1) * JOBS_PER_PAGE;
+    const pageJobs = filteredJobs.slice(start, start + JOBS_PER_PAGE);
+
+    if (pageJobs.length === 0) {
+        container.innerHTML = `
+            <tr><td colspan="7" style="text-align:center;padding:40px;color:#64748b;">
+                <i class="fas fa-briefcase" style="font-size:2rem;margin-bottom:12px;display:block;color:#cbd5e1;"></i>
+                No jobs found
+            </td></tr>`;
+        updateJobsPagination();
+        return;
+    }
+
+    container.innerHTML = pageJobs.map(job => {
+        const statusColors = {
+            open: '#10b981', in_progress: '#3b82f6',
+            pending_review: '#f59e0b', disputed: '#ef4444',
+            completed: '#6b7280', cancelled: '#9ca3af'
+        };
+        const color = statusColors[job.status] || '#6b7280';
+        const escrowAmount = job.escrow?.[0]?.amount_ngn || 0;
+        const appCount = job.applications?.[0]?.count || 0;
+        const clientName = job.client?.name || 'N/A';
+        const apprenticeName = job.apprentice?.name || '—';
+
+        return `
+        <tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;"
+            onclick="viewJobDetails('${job.id}')">
+            <td style="padding:14px 16px;">
+                <div style="font-weight:600;color:#1e293b;font-size:0.9rem;
+                            max-width:200px;overflow:hidden;text-overflow:ellipsis;
+                            white-space:nowrap;">${job.title}</div>
+                <div style="font-size:0.78rem;color:#64748b;margin-top:2px;">
+                    ${job.job_type || 'public'} · ₦${(job.fixed_price || job.budget_max || 0).toLocaleString()}
+                </div>
+            </td>
+            <td style="padding:14px 16px;">
+                <span style="display:inline-block;padding:4px 10px;border-radius:20px;
+                             font-size:0.78rem;font-weight:600;color:white;
+                             background:${color};">
+                    ${job.status.replace(/_/g,' ')}
+                </span>
+            </td>
+            <td style="padding:14px 16px;font-size:0.85rem;color:#374151;">${clientName}</td>
+            <td style="padding:14px 16px;font-size:0.85rem;color:#374151;">${apprenticeName}</td>
+            <td style="padding:14px 16px;font-size:0.85rem;color:#374151;">
+                ${escrowAmount > 0 ? `<span style="color:#10b981;font-weight:600;">
+                    ₦${escrowAmount.toLocaleString()}</span>` : '—'}
+            </td>
+            <td style="padding:14px 16px;font-size:0.85rem;color:#374151;">${appCount}</td>
+            <td style="padding:14px 16px;font-size:0.85rem;color:#64748b;">
+                ${formatTimeAgo(job.created_at)}
+            </td>
+        </tr>`;
+    }).join('');
+
+    updateJobsPagination();
+}
+
+function updateJobsPagination() {
+    const totalPages = Math.ceil(filteredJobs.length / JOBS_PER_PAGE);
+    const info = document.getElementById('jobs-pagination-info');
+    const prev = document.getElementById('jobs-prev-btn');
+    const next = document.getElementById('jobs-next-btn');
+
+    if (info) info.textContent =
+        `Page ${jobsCurrentPage} of ${Math.max(totalPages, 1)} (${filteredJobs.length} jobs)`;
+    if (prev) prev.disabled = jobsCurrentPage <= 1;
+    if (next) next.disabled = jobsCurrentPage >= totalPages;
+}
+
+function changeJobsPage(delta) {
+    const totalPages = Math.ceil(filteredJobs.length / JOBS_PER_PAGE);
+    jobsCurrentPage = Math.max(1, Math.min(jobsCurrentPage + delta, totalPages));
+    displayJobs();
+}
+
+function applyJobFilters() {
+    const status = document.getElementById('job-status-filter')?.value || '';
+    const type = document.getElementById('job-type-filter')?.value || '';
+    const search = (document.getElementById('job-search-input')?.value || '').toLowerCase();
+
+    filteredJobs = allJobs.filter(job => {
+        const matchStatus = !status || job.status === status;
+        const matchType = !type || job.job_type === type;
+        const matchSearch = !search ||
+            job.title?.toLowerCase().includes(search) ||
+            job.client?.name?.toLowerCase().includes(search) ||
+            job.apprentice?.name?.toLowerCase().includes(search);
+        return matchStatus && matchType && matchSearch;
+    });
+
+    jobsCurrentPage = 1;
+    displayJobs();
+}
+
+function clearJobFilters() {
+    ['job-status-filter','job-type-filter','job-search-input'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    filteredJobs = [...allJobs];
+    jobsCurrentPage = 1;
+    displayJobs();
+}
+
+function refreshJobs() {
+    loadJobsData();
+}
+
+function setupJobsRealtime() {
+    supabase
+        .channel('admin-jobs-realtime')
+        .on('postgres_changes',
+            { event: '*', schema: 'public', table: 'job_requests' },
+            () => loadJobsData()
+        )
+        .subscribe();
+}
+
+async function viewJobDetails(jobId) {
+    currentJobId = jobId;
+    const modal = document.getElementById('job-detail-modal');
+    const body = document.getElementById('job-detail-body');
+    if (!modal || !body) return;
+
+    body.innerHTML = `<div style="text-align:center;padding:40px;color:#64748b;">
+        <i class="fas fa-spinner fa-spin" style="font-size:2rem;"></i><br>
+        Loading job details...</div>`;
+    modal.style.display = 'flex';
+
+    try {
+        const { data: job, error } = await supabase
+            .from('job_requests')
+            .select(`
+                *,
+                client:profiles!job_requests_client_id_fkey(id, name, email, avatar_url, phone),
+                apprentice:profiles!job_requests_assigned_apprentice_id_fkey(id, name, email, avatar_url, phone),
+                escrow:job_escrow(id, amount_ngn, status, created_at),
+                applications:job_applications(
+                    id, status, proposal, created_at,
+                    apprentice:profiles!job_applications_apprentice_id_fkey(id, name, email, avatar_url)
+                )
+            `)
+            .eq('id', jobId)
+            .single();
+
+        if (error) throw error;
+
+        const escrow = job.escrow?.[0];
+        const statusColors = {
+            open: '#10b981', in_progress: '#3b82f6', pending_review: '#f59e0b',
+            disputed: '#ef4444', completed: '#6b7280', cancelled: '#9ca3af'
+        };
+        const sColor = statusColors[job.status] || '#6b7280';
+
+        const applicationsHtml = (job.applications || []).length > 0
+            ? (job.applications || []).map(app => `
+                <div style="display:flex;align-items:center;justify-content:space-between;
+                            padding:12px;border:1px solid #e5e7eb;border-radius:8px;
+                            margin-bottom:8px;">
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <div style="width:36px;height:36px;border-radius:50%;background:#3b82f6;
+                                    display:flex;align-items:center;justify-content:center;
+                                    color:white;font-weight:700;font-size:0.9rem;">
+                            ${(app.apprentice?.name || 'A')[0].toUpperCase()}
+                        </div>
+                        <div>
+                            <div style="font-weight:600;font-size:0.88rem;">
+                                ${app.apprentice?.name || 'Unknown'}</div>
+                            <div style="font-size:0.78rem;color:#64748b;">
+                                ${formatTimeAgo(app.created_at)}</div>
+                        </div>
+                    </div>
+                    <span style="padding:3px 10px;border-radius:20px;font-size:0.78rem;
+                                 font-weight:600;color:white;background:${
+                        app.status === 'accepted' ? '#10b981' :
+                        app.status === 'rejected' ? '#ef4444' : '#f59e0b'};">
+                        ${app.status}
+                    </span>
+                </div>`).join('')
+            : '<p style="color:#64748b;font-size:0.88rem;">No applications yet.</p>';
+
+        body.innerHTML = `
+            <!-- Header -->
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;
+                        margin-bottom:24px;flex-wrap:wrap;gap:12px;">
+                <div>
+                    <h2 style="font-size:1.3rem;font-weight:700;color:#1e293b;margin:0 0 6px;">
+                        ${job.title}</h2>
+                    <span style="padding:4px 12px;border-radius:20px;font-size:0.82rem;
+                                 font-weight:700;color:white;background:${sColor};">
+                        ${job.status.replace(/_/g,' ').toUpperCase()}
+                    </span>
+                </div>
+                <div style="font-size:1.4rem;font-weight:700;color:#10b981;">
+                    ₦${(job.fixed_price || job.budget_max || 0).toLocaleString()}
+                </div>
+            </div>
+
+            <!-- Info Grid -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+                <div style="background:#f8fafc;border-radius:10px;padding:16px;">
+                    <div style="font-size:0.8rem;font-weight:600;color:#64748b;
+                                text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
+                        Client</div>
+                    <div style="font-weight:600;color:#1e293b;">${job.client?.name || 'N/A'}</div>
+                    <div style="font-size:0.82rem;color:#64748b;">${job.client?.email || ''}</div>
+                </div>
+                <div style="background:#f8fafc;border-radius:10px;padding:16px;">
+                    <div style="font-size:0.8rem;font-weight:600;color:#64748b;
+                                text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
+                        Assigned Apprentice</div>
+                    <div style="font-weight:600;color:#1e293b;">
+                        ${job.apprentice?.name || '—'}</div>
+                    <div style="font-size:0.82rem;color:#64748b;">
+                        ${job.apprentice?.email || ''}</div>
+                </div>
+                <div style="background:#f8fafc;border-radius:10px;padding:16px;">
+                    <div style="font-size:0.8rem;font-weight:600;color:#64748b;
+                                text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
+                        Escrow</div>
+                    ${escrow
+                        ? `<div style="font-weight:700;color:#10b981;font-size:1.1rem;">
+                                ₦${escrow.amount_ngn?.toLocaleString()}</div>
+                           <div style="font-size:0.82rem;color:#64748b;">Status: ${escrow.status}</div>`
+                        : '<div style="color:#64748b;font-size:0.88rem;">No escrow held</div>'
+                    }
+                </div>
+                <div style="background:#f8fafc;border-radius:10px;padding:16px;">
+                    <div style="font-size:0.8rem;font-weight:600;color:#64748b;
+                                text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
+                        Details</div>
+                    <div style="font-size:0.85rem;color:#374151;">
+                        Type: <strong>${job.job_type || 'public'}</strong><br>
+                        Created: <strong>${formatTimeAgo(job.created_at)}</strong><br>
+                        Applications: <strong>${(job.applications || []).length}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div style="margin-bottom:20px;">
+                <div style="font-size:0.85rem;font-weight:600;color:#64748b;
+                            text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
+                    Description</div>
+                <div style="background:#f8fafc;border-radius:10px;padding:16px;
+                            font-size:0.9rem;color:#374151;line-height:1.6;
+                            max-height:150px;overflow-y:auto;">
+                    ${job.description || 'No description provided.'}
+                </div>
+            </div>
+
+            <!-- Applications -->
+            <div style="margin-bottom:20px;">
+                <div style="font-size:0.85rem;font-weight:600;color:#64748b;
+                            text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">
+                    Applications (${(job.applications || []).length})
+                </div>
+                ${applicationsHtml}
+            </div>
+
+            <!-- Admin Actions -->
+            <div style="border-top:1px solid #e5e7eb;padding-top:16px;">
+                <div style="font-size:0.85rem;font-weight:600;color:#64748b;
+                            text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">
+                    Admin Actions</div>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    ${job.status !== 'cancelled' && job.status !== 'completed' ? `
+                    <button onclick="adminForceCancel('${job.id}', '${job.client?.id}', '${job.apprentice?.id || ''}')"
+                        style="padding:10px 18px;background:#ef4444;color:white;border:none;
+                               border-radius:8px;font-size:0.88rem;font-weight:600;cursor:pointer;">
+                        <i class="fas fa-times-circle"></i> Force Cancel
+                    </button>` : ''}
+                    ${job.status === 'in_progress' || job.status === 'pending_review' ? `
+                    <button onclick="adminForceComplete('${job.id}', '${job.apprentice?.id || ''}')"
+                        style="padding:10px 18px;background:#10b981;color:white;border:none;
+                               border-radius:8px;font-size:0.88rem;font-weight:600;cursor:pointer;">
+                        <i class="fas fa-check-circle"></i> Force Complete
+                    </button>` : ''}
+                    <button onclick="closeJobDetailModal()"
+                        style="padding:10px 18px;background:#f1f5f9;color:#374151;border:none;
+                               border-radius:8px;font-size:0.88rem;font-weight:600;cursor:pointer;">
+                        Close
+                    </button>
+                </div>
+            </div>
+        `;
+    } catch (err) {
+        console.error('Error loading job details:', err);
+        body.innerHTML = `<p style="color:#ef4444;text-align:center;padding:40px;">
+            Failed to load job details: ${err.message}</p>`;
+    }
+}
+
+function closeJobDetailModal() {
+    const modal = document.getElementById('job-detail-modal');
+    if (modal) modal.style.display = 'none';
+    currentJobId = null;
+}
+
+async function adminForceCancel(jobId, clientId, apprenticeId) {
+    if (!confirm('Force cancel this job? Any held escrow will be refunded to the client.'))
+        return;
+
+    try {
+        // Update job status
+        const { error } = await supabase.from('job_requests')
+            .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+            .eq('id', jobId);
+        if (error) throw error;
+
+        // Refund escrow if held
+        const { data: escrow } = await supabase.from('job_escrow')
+            .select('id, amount_ngn').eq('job_id', jobId).eq('status', 'held').single();
+
+        if (escrow && clientId) {
+            const { data: wallet } = await supabase.from('user_wallets')
+                .select('balance_ngn').eq('user_id', clientId).single();
+
+            const newBal = (wallet?.balance_ngn || 0) + escrow.amount_ngn;
+            await supabase.from('user_wallets').update({
+                balance_ngn: newBal,
+                balance_points: ngnToPoints ? ngnToPoints(newBal) : 0,
+                updated_at: new Date().toISOString()
+            }).eq('user_id', clientId);
+
+            await supabase.from('job_escrow')
+                .update({ status: 'refunded', updated_at: new Date().toISOString() })
+                .eq('id', escrow.id);
+
+            await supabase.from('wallet_transactions').insert({
+                user_id: clientId, job_id: jobId,
+                transaction_type: 'escrow_refund',
+                amount_ngn: escrow.amount_ngn,
+                description: 'Admin force-cancelled job. Escrow refunded.',
+                reference: `ADMIN-CANCEL-${jobId}`,
+                status: 'completed'
+            });
+
+            // Notify client
+            await supabase.from('notifications').insert({
+                user_id: clientId, type: 'job_cancelled',
+                title: 'Job Cancelled by Admin',
+                message: `Your job has been cancelled by admin. ₦${escrow.amount_ngn?.toLocaleString()} has been refunded to your wallet.`,
+                is_read: false, created_at: new Date().toISOString()
+            });
+        }
+
+        // Notify apprentice if assigned
+        if (apprenticeId && apprenticeId !== 'undefined') {
+            await supabase.from('notifications').insert({
+                user_id: apprenticeId, type: 'job_cancelled',
+                title: 'Job Cancelled by Admin',
+                message: 'A job you were working on has been cancelled by admin.',
+                is_read: false, created_at: new Date().toISOString()
+            });
+        }
+
+        showNotification('Job force-cancelled and escrow refunded.', 'success');
+        closeJobDetailModal();
+        loadJobsData();
+    } catch (err) {
+        console.error('Error force cancelling job:', err);
+        showNotification('Failed to cancel job: ' + err.message, 'error');
+    }
+}
+
+async function adminForceComplete(jobId, apprenticeId) {
+    if (!confirm('Force complete this job? Escrow will be released to the apprentice (minus 10% fee).'))
+        return;
+
+    try {
+        const { error } = await supabase.from('job_requests')
+            .update({ status: 'completed', updated_at: new Date().toISOString() })
+            .eq('id', jobId);
+        if (error) throw error;
+
+        const { data: escrow } = await supabase.from('job_escrow')
+            .select('id, amount_ngn').eq('job_id', jobId).eq('status', 'held').single();
+
+        if (escrow && apprenticeId && apprenticeId !== 'undefined') {
+            const fee = Math.round(escrow.amount_ngn * 0.10);
+            const payout = escrow.amount_ngn - fee;
+
+            const { data: wallet } = await supabase.from('user_wallets')
+                .select('balance_ngn').eq('user_id', apprenticeId).single();
+
+            const newBal = (wallet?.balance_ngn || 0) + payout;
+            await supabase.from('user_wallets').update({
+                balance_ngn: newBal,
+                balance_points: ngnToPoints ? ngnToPoints(newBal) : 0,
+                updated_at: new Date().toISOString()
+            }).eq('user_id', apprenticeId);
+
+            await supabase.from('job_escrow')
+                .update({ status: 'released', updated_at: new Date().toISOString() })
+                .eq('id', escrow.id);
+
+            await supabase.from('wallet_transactions').insert({
+                user_id: apprenticeId, job_id: jobId,
+                transaction_type: 'escrow_release',
+                amount_ngn: payout,
+                description: 'Admin force-completed job. Payment released.',
+                reference: `ADMIN-COMPLETE-${jobId}`,
+                status: 'completed'
+            });
+
+            await supabase.from('notifications').insert({
+                user_id: apprenticeId, type: 'job_completed',
+                title: 'Job Completed — Payment Released',
+                message: `Admin has marked your job as complete. ₦${payout.toLocaleString()} has been released to your wallet.`,
+                is_read: false, created_at: new Date().toISOString()
+            });
+        }
+
+        showNotification('Job force-completed and payment released.', 'success');
+        closeJobDetailModal();
+        loadJobsData();
+    } catch (err) {
+        console.error('Error force completing job:', err);
+        showNotification('Failed to complete job: ' + err.message, 'error');
     }
 }
 
@@ -415,6 +873,8 @@ function navigateToSection(sectionId) {
         // Load section-specific data
         if (sectionId === 'disputes') {
             loadDisputes();
+        } else if (sectionId === 'jobs' && allJobs.length === 0) {
+            loadJobsData();
         } else if (sectionId === 'users') {
             loadUsers();
         } else if (sectionId === 'contact-requests') {
@@ -433,6 +893,12 @@ function navigateToSection(sectionId) {
 
 // Make navigateToSection available globally immediately
 window.navigateToSection = navigateToSection;
+document.querySelectorAll('.sidebar-nav .nav-item').forEach(link => {
+    link.addEventListener('click', function() {
+        const section = this.getAttribute('data-section');
+        if (section) navigateToSection(section);
+    });
+});
 
 // Toggle sidebar
 function toggleSidebar() {
@@ -797,24 +1263,34 @@ async function viewDisputeDetails(disputeId) {
                         <h4 style="margin-bottom: 12px; color: #1e293b; font-size: 1rem;">Evidence Files</h4>
                         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;">
                             ${evidenceUrls.map((url, idx) => {
-                                const isImage = url.match(/\.(jpg|jpeg|png|gif|webp)$/i) || url.includes('image');
-                                const isPdf = url.match(/\.(pdf)$/i) || url.includes('pdf');
+                                const ref = evidenceRefs[idx];
+                                const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(ref);
+                                const isPdf = /\.pdf$/i.test(ref);
+                                const isDoc = /\.(doc|docx)$/i.test(ref);
+                                const viewerSrc = isDoc
+                                    ? `https://docs.google.com/viewer?url=${encodeURIComponent(url)}&embedded=true`
+                                    : url;
+                                const iconHtml = isImage
+                                    ? `<img src="${url}" alt="Evidence ${idx + 1}"
+                                            style="max-width:100%;max-height:150px;border-radius:4px;
+                                                   margin-bottom:8px;cursor:pointer;"
+                                            onerror="this.parentElement.innerHTML='<i class=\\'fas fa-exclamation-triangle\\' style=\\'color:#ef4444;\\'></i><p style=\\'font-size:0.8rem;color:#64748b;margin-top:8px;\\'>Failed to load</p>'">`
+                                    : isPdf
+                                    ? `<i class="fas fa-file-pdf" style="font-size:3rem;color:#ef4444;margin-bottom:8px;"></i>`
+                                    : isDoc
+                                    ? `<i class="fas fa-file-word" style="font-size:3rem;color:#2563eb;margin-bottom:8px;"></i>`
+                                    : `<i class="fas fa-file" style="font-size:3rem;color:#64748b;margin-bottom:8px;"></i>`;
+
                                 return `
-                                    <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; text-align: center; background: #f8fafc;">
-                                        ${isImage ? `
-                                            <img src="${url}" alt="Evidence ${idx + 1}" 
-                                                 style="max-width: 100%; max-height: 150px; border-radius: 4px; margin-bottom: 8px; cursor: pointer;"
-                                                 onclick="window.open('${url}', '_blank')"
-                                                 onerror="this.parentElement.innerHTML='<i class=\\'fas fa-exclamation-triangle\\' style=\\'color: #ef4444;\\'></i><p style=\\'font-size: 0.8rem; color: #64748b; margin-top: 8px;\\'>Failed to load</p>'">
-                                        ` : isPdf ? `
-                                            <i class="fas fa-file-pdf" style="font-size: 3rem; color: #ef4444; margin-bottom: 8px;"></i>
-                                        ` : `
-                                            <i class="fas fa-file" style="font-size: 3rem; color: #64748b; margin-bottom: 8px;"></i>
-                                        `}
-                                        <a href="${url}" target="_blank" 
-                                           style="display: block; font-size: 0.85rem; color: #3b82f6; text-decoration: none; margin-top: 8px;">
-                                            ${isPdf ? 'View PDF' : isImage ? 'View Image' : 'View File'}
-                                        </a>
+                                    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;
+                                                text-align:center;background:#f8fafc;">
+                                        ${iconHtml}
+                                        <button onclick="openEvidencePreview('${viewerSrc}', ${isImage})"
+                                            style="display:block;width:100%;margin-top:8px;padding:6px;
+                                                   background:#3b82f6;color:#fff;border:none;border-radius:6px;
+                                                   font-size:0.85rem;cursor:pointer;">
+                                            ${isPdf ? 'View PDF' : isImage ? 'View Image' : isDoc ? 'View Doc' : 'View File'}
+                                        </button>
                                     </div>
                                 `;
                             }).join('')}
@@ -2218,6 +2694,52 @@ async function saveAdminNotes(requestId) {
     }
 }
 
+function openEvidencePreview(src, isImage) {
+    const existing = document.getElementById('evidence-preview-modal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'evidence-preview-modal';
+    modal.style.cssText = `
+        position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);
+        display:flex;align-items:center;justify-content:center;padding:16px;
+    `;
+
+    const contentHtml = isImage
+        ? `<img src="${src}" style="max-width:100%;max-height:80vh;border-radius:8px;
+                                    display:block;margin:auto;">`
+        : `<iframe src="${src}" style="width:100%;height:80vh;border:none;"
+               sandbox="allow-scripts allow-same-origin"></iframe>`;
+
+    modal.innerHTML = `
+        <div style="background:#fff;border-radius:12px;width:100%;max-width:900px;
+                    display:flex;flex-direction:column;overflow:hidden;
+                    max-height:90vh;">
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:14px 20px;border-bottom:1px solid #e5e7eb;flex-shrink:0;">
+                <span style="font-weight:600;font-size:15px;color:#111;">
+                    Evidence File
+                </span>
+                <button id="close-evidence-modal"
+                    style="background:none;border:none;cursor:pointer;
+                           font-size:22px;color:#6b7280;line-height:1;">
+                    &#x2715;
+                </button>
+            </div>
+            <div style="flex:1;overflow:auto;padding:${isImage ? '16px' : '0'};">
+                ${contentHtml}
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('close-evidence-modal')
+        .addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+}
+
+window.openEvidencePreview = openEvidencePreview;
+
 // Make functions globally available
 window.loadContactRequests = loadContactRequests;
 window.applyContactRequestFilters = applyContactRequestFilters;
@@ -2228,4 +2750,12 @@ window.updateContactRequestStatus = updateContactRequestStatus;
 window.openAddAdminNotesModal = openAddAdminNotesModal;
 window.closeAdminNotesModal = closeAdminNotesModal;
 window.saveAdminNotes = saveAdminNotes;
+window.viewJobDetails = viewJobDetails;
+window.closeJobDetailModal = closeJobDetailModal;
+window.adminForceCancel = adminForceCancel;
+window.adminForceComplete = adminForceComplete;
+window.applyJobFilters = applyJobFilters;
+window.clearJobFilters = clearJobFilters;
+window.refreshJobs = refreshJobs;
+window.changeJobsPage = changeJobsPage;
 

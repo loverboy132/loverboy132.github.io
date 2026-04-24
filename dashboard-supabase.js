@@ -2761,6 +2761,8 @@ const memberContentTemplates = {
                                             ? "blue"
                                             : job.status === "pending_review"
                                             ? "yellow"
+                                            : job.status === "disputed"
+                                            ? "red"
                                             : "purple"
                                     }-100 text-${
                                     job.status === "open"
@@ -2769,6 +2771,8 @@ const memberContentTemplates = {
                                         ? "blue"
                                         : job.status === "pending_review"
                                         ? "yellow"
+                                        : job.status === "disputed"
+                                        ? "red"
                                         : "purple"
                                 }-800 text-xs px-3 py-1 rounded-full capitalize">${job.status.replace(
                                     "_",
@@ -2894,7 +2898,7 @@ const memberContentTemplates = {
                                 }
                                 
                                 ${
-                                    ((job.status === "in_progress" || job.status === "pending_review") && job.assigned_apprentice_id)
+                                    ((job.status === "in_progress" || job.status === "pending_review") && job.assigned_apprentice_id && job.status !== "disputed")
                                         ? `
                                     <div class="border-t border-gray-200 pt-4">
                                         <h5 class="font-semibold text-gray-900 mb-3">Progress Updates</h5>
@@ -2923,11 +2927,20 @@ const memberContentTemplates = {
                                 
                                 <div class="flex justify-end space-x-2 mt-4">
                                     ${
-                                        job.status === "pending_review"
+                                        (job.status === "pending_review" && job.status !== "disputed")
                                             ? `
                                         <div class="flex items-center space-x-2">
                                             <span class="text-sm text-gray-600">Review required</span>
                                             <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm review-job-btn" data-job-id="${job.id}">Review Job</button>
+                                        </div>
+                                    `
+                                            : job.status === "disputed"
+                                            ? `
+                                        <div class="flex items-center space-x-2">
+                                            <span class="bg-red-100 text-red-800 text-sm font-medium px-3 py-1 rounded-full">
+                                                <i data-feather="alert-triangle" class="w-3 h-3 inline mr-1"></i>
+                                                This job is under dispute
+                                            </span>
                                         </div>
                                     `
                                             : `
@@ -9236,8 +9249,42 @@ async function handleJobProgressUpdate(jobId, progress) {
 async function handleViewCV(cvUrl) {
     try {
         const signedUrl = await getCVSignedUrl(cvUrl);
-        // Open CV in new tab
-        window.open(signedUrl, '_blank');
+
+        // Remove any existing CV modal
+        const existing = document.getElementById('cv-preview-modal');
+        if (existing) existing.remove();
+
+        // Build modal
+        const modal = document.createElement('div');
+        modal.id = 'cv-preview-modal';
+        modal.style.cssText = `
+            position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);
+            display:flex;align-items:center;justify-content:center;padding:16px;
+        `;
+        modal.innerHTML = `
+            <div style="background:#fff;border-radius:12px;width:100%;max-width:860px;
+                        height:90vh;display:flex;flex-direction:column;overflow:hidden;">
+                <div style="display:flex;align-items:center;justify-content:space-between;
+                            padding:14px 20px;border-bottom:1px solid #e5e7eb;">
+                    <span style="font-weight:600;font-size:15px;color:#111;">Applicant CV</span>
+                    <button id="close-cv-modal" style="background:none;border:none;cursor:pointer;
+                        font-size:22px;color:#6b7280;line-height:1;" aria-label="Close">&#x2715;</button>
+                </div>
+                ${/\.(doc|docx)$/i.test(cvUrl)
+                    ? `<iframe src="https://docs.google.com/viewer?url=${encodeURIComponent(signedUrl)}&embedded=true"
+                          style="flex:1;width:100%;border:none;"></iframe>`
+                    : `<iframe src="${signedUrl}" style="flex:1;width:100%;border:none;"
+                          sandbox="allow-scripts allow-same-origin"></iframe>`
+                }
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Close handlers
+        document.getElementById('close-cv-modal').addEventListener('click', () => modal.remove());
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
     } catch (error) {
         console.error("Error viewing CV:", error);
         showNotification(error.message || "Failed to open CV. Please try again.", "error");
@@ -10447,8 +10494,25 @@ async function openDisputeModal(jobId) {
         }
 
         // Check if job is in a state that can be disputed
-        if (job.status !== 'in-progress' && job.status !== 'pending_review') {
+        if (job.status === 'disputed') {
+            showNotification("A dispute has already been raised for this job.", "error");
+            return;
+        }
+        if (job.status !== 'in_progress' && job.status !== 'pending_review') {
             showNotification("This job cannot be disputed in its current state", "error");
+            return;
+        }
+
+        // Double-check at DB level for existing dispute
+        const { data: existingDispute } = await supabase
+            .from("disputes")
+            .select("id")
+            .eq("job_id", jobId)
+            .limit(1)
+            .single();
+
+        if (existingDispute) {
+            showNotification("A dispute has already been raised for this job.", "error");
             return;
         }
 
@@ -10537,6 +10601,9 @@ async function handleDisputeSubmission(event) {
         document.getElementById("dispute-evidence-preview").innerHTML = "";
 
         // Refresh jobs tab if on jobs page
+        // Re-render jobs to show disputed status immediately
+        if (typeof loadMemberJobs === 'function') loadMemberJobs();
+        else if (typeof loadJobs === 'function') loadJobs();
         const jobsTab = document.querySelector('[data-tab="jobs"]');
         if (jobsTab) {
             jobsTab.click();
@@ -11296,7 +11363,7 @@ async function handleFinalSubmissionReview(submissionId) {
                 .eq("id", submission.job_request_id)
                 .single();
 
-            if (jobQuery.data && jobQuery.data.status === "pending_review") {
+            if (jobQuery.data && jobQuery.data.status === "pending_review" && jobQuery.data.status !== "disputed") {
                 disputeBtn.style.display = "block";
                 disputeBtn.onclick = () => {
                     finalSubmissionReviewModal.classList.remove("active");
